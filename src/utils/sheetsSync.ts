@@ -1204,7 +1204,24 @@ export class SheetsSyncEngine {
       const result = JSON.parse(resText);
       
       if (result.success) {
-        if (result.products) {
+        // Resolve keys based on mapped sheet names (with lowercase fallback)
+        const payloadData = result.payload || result;
+        const prodKey = activeConn.productsSheetName || "Products";
+        const custKey = activeConn.customersSheetName || "Customers";
+        const invKey = activeConn.invoicesSheetName || "Invoices";
+        const invItemsKey = activeConn.invoiceItemsSheetName || "InvoiceItems";
+        const agentKey = activeConn.agentsSheetName || "Agents";
+        const settingsKey = activeConn.settingsSheetName || "Settings";
+
+        const productsList = payloadData[prodKey] || payloadData["products"];
+        const customersList = payloadData[custKey] || payloadData["customers"];
+        const invoicesList = payloadData[invKey] || payloadData["invoices"];
+        const invoiceItemsList = payloadData[invItemsKey] || payloadData["invoiceItems"];
+        const agentsList = payloadData[agentKey] || payloadData["agents"];
+        const settingsList = payloadData[settingsKey] || payloadData["settings"];
+        const paymentTransactionsList = payloadData["PaymentTransactions"] || payloadData["paymentTransactions"];
+
+        if (productsList) {
           // Merge conflict resolution:
           // Local products have the raw values. Keep local version if unpushed edits exist.
           const syncQueue = this.getSyncQueue();
@@ -1220,7 +1237,7 @@ export class SheetsSyncEngine {
           });
 
           const localProducts = this.getProducts();
-          const dbProductsList = Array.isArray(result.products) ? result.products : [];
+          const dbProductsList = Array.isArray(productsList) ? productsList : [];
 
           const mergedProducts = dbProductsList.map((p: Product) => {
             if (unpushedProductIds.has(p.id)) {
@@ -1242,15 +1259,15 @@ export class SheetsSyncEngine {
 
           this.saveProducts(mergedProducts);
         }
-        if (result.customers) this.saveCustomers(result.customers);
-        if (result.invoices) this.saveInvoices(result.invoices);
-        if (result.invoiceItems) this.saveInvoiceItems(result.invoiceItems);
-        if (result.agents && Array.isArray(result.agents)) this.saveAgents(result.agents);
-        if (result.paymentTransactions && Array.isArray(result.paymentTransactions)) {
-          this.savePaymentTransactions(result.paymentTransactions);
+        if (customersList) this.saveCustomers(customersList);
+        if (invoicesList) this.saveInvoices(invoicesList);
+        if (invoiceItemsList) this.saveInvoiceItems(invoiceItemsList);
+        if (agentsList && Array.isArray(agentsList)) this.saveAgents(agentsList);
+        if (paymentTransactionsList && Array.isArray(paymentTransactionsList)) {
+          this.savePaymentTransactions(paymentTransactionsList);
         }
 
-        if (result.settings) {
+        if (settingsList) {
           const companySettings = this.getCompanySettings();
           let nextInvNum = companySettings.nextInvoiceNumber;
           let prefix = companySettings.invoicePrefix;
@@ -1260,7 +1277,7 @@ export class SheetsSyncEngine {
           let email = companySettings.email;
           let gst = companySettings.gstNumber;
 
-          result.settings.forEach((s: { key: string; value: any }) => {
+          settingsList.forEach((s: { key: string; value: any }) => {
             if (s.key === "nextInvoiceNumber") nextInvNum = parseInt(s.value) || nextInvNum;
             if (s.key === "invoicePrefix") prefix = s.value || prefix;
             if (s.key === "companyName") name = s.value || name;
