@@ -1127,7 +1127,6 @@ export class SheetsSyncEngine {
         const agentsList = payloadData[agentKey] || payloadData["agents"];
         const settingsList = payloadData[settingsKey] || payloadData["settings"];
         const paymentTransactionsList = payloadData["PaymentTransactions"] || payloadData["paymentTransactions"];
-        const employeesList = payloadData["Employees"] || payloadData["employees"];
         const usersList = payloadData["Users"] || payloadData["users"];
         const promoCodesList = payloadData["PromoCodes"] || payloadData["promoCodes"];
         const userActivityList = payloadData["UserActivity"] || payloadData["userActivity"] || payloadData["userActivities"];
@@ -1178,7 +1177,6 @@ export class SheetsSyncEngine {
         if (paymentTransactionsList && Array.isArray(paymentTransactionsList)) {
           this.savePaymentTransactions(paymentTransactionsList);
         }
-        if (employeesList && Array.isArray(employeesList)) this.saveEmployees(employeesList);
         if (usersList && Array.isArray(usersList) && usersList.length > 0) this.saveUsers(usersList);
         if (promoCodesList && Array.isArray(promoCodesList)) this.savePromoCodes(promoCodesList);
         if (userActivityList && Array.isArray(userActivityList)) this.saveUserActivities(userActivityList);
@@ -1267,14 +1265,13 @@ export class SheetsSyncEngine {
         action: "SYNC_UP",
         spreadsheetId: conn.spreadsheetId,
         payload: {
-          [conn.productsSheetName || "Products"]: this.getProducts(),
+          [conn.productsSheetName || "Products"]: this.getProducts().map(({ inventorySkus, productOptions, ...p }) => p),
           [conn.customersSheetName || "Customers"]: this.getCustomers(),
           [conn.invoicesSheetName || "Invoices"]: this.getInvoices(),
           [conn.invoiceItemsSheetName || "InvoiceItems"]: this.getInvoiceItems(),
           [conn.settingsSheetName || "Settings"]: [this.getCompanySettings()],
           [conn.agentsSheetName || "Agents"]: this.getAgents(),
           "PaymentTransactions": this.getPaymentTransactions(),
-          "Employees": this.getEmployees(),
           "Users": this.getUsers(),
           "PromoCodes": this.getPromoCodes(),
           "UserActivity": this.getUserActivities(),
@@ -1315,14 +1312,13 @@ export class SheetsSyncEngine {
         action: "SYNC_UP",
         spreadsheetId: conn.spreadsheetId,
         payload: {
-          [conn.productsSheetName || "Products"]: this.getProducts(),
+          [conn.productsSheetName || "Products"]: this.getProducts().map(({ inventorySkus, productOptions, ...p }) => p),
           [conn.customersSheetName || "Customers"]: this.getCustomers(),
           [conn.invoicesSheetName || "Invoices"]: this.getInvoices(),
           [conn.invoiceItemsSheetName || "InvoiceItems"]: this.getInvoiceItems(),
           [conn.settingsSheetName || "Settings"]: [this.getCompanySettings()],
           [conn.agentsSheetName || "Agents"]: this.getAgents(),
           "PaymentTransactions": this.getPaymentTransactions(),
-          "Employees": this.getEmployees(),
           "Users": this.getUsers(),
           "PromoCodes": this.getPromoCodes(),
           "UserActivity": this.getUserActivities(),
@@ -1371,14 +1367,13 @@ export class SheetsSyncEngine {
         action: "SYNC_UP",
         spreadsheetId: conn.spreadsheetId,
         payload: {
-          [conn.productsSheetName || "Products"]: this.getProducts(),
+          [conn.productsSheetName || "Products"]: this.getProducts().map(({ inventorySkus, productOptions, ...p }) => p),
           [conn.customersSheetName || "Customers"]: this.getCustomers(),
           [conn.invoicesSheetName || "Invoices"]: this.getInvoices(),
           [conn.invoiceItemsSheetName || "InvoiceItems"]: this.getInvoiceItems(),
           [conn.settingsSheetName || "Settings"]: [this.getCompanySettings()],
           [conn.agentsSheetName || "Agents"]: this.getAgents(),
           "PaymentTransactions": this.getPaymentTransactions(),
-          "Employees": this.getEmployees(),
           "Users": this.getUsers(),
           "PromoCodes": this.getPromoCodes(),
           "UserActivity": this.getUserActivities(),
