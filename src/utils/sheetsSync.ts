@@ -17,149 +17,19 @@ import {
 } from "../types";
 
 // Professional mock data for immediate out-of-the-box loading
-const DEFAULT_EMPLOYEES: Employee[] = [
-  { id: "EMP-1001", fullName: "James Carter", role: "Sales Agent", email: "james@tcferp.com", mobile: "9876543201", status: "Active" },
-  { id: "EMP-1002", fullName: "Sarah Connor", role: "Support Agent", email: "sarah@tcferp.com", mobile: "9876543202", status: "Active" },
-  { id: "EMP-1003", fullName: "Elena Rostova", role: "Billing Specialist", email: "elena@tcferp.com", mobile: "9876543203", status: "Active" },
-];
+const DEFAULT_EMPLOYEES: Employee[] = [];
 
-const DEFAULT_AGENTS: Agent[] = [
-  {
-    id: "AGT-001",
-    name: "Ganesh",
-    mobile: "9988776655",
-    email: "ganesh@referral.com",
-    agentType: "Employee Agent",
-    commissionPercentage: 5,
-    status: "Active",
-    notes: "Internal showroom operator as sales agent",
-    createdDate: "2026-01-10"
-  },
-  {
-    id: "AGT-002",
-    name: "Ravi",
-    mobile: "8877665544",
-    email: "ravi@referral.com",
-    agentType: "Referral Partner",
-    commissionPercentage: 8,
-    status: "Active",
-    notes: "External architect and referral partner",
-    createdDate: "2026-02-15"
-  },
-  {
-    id: "AGT-003",
-    name: "Suresh",
-    mobile: "7766554433",
-    email: "suresh@marketing.com",
-    agentType: "Marketing Agent",
-    commissionPercentage: 10,
-    status: "Suspended",
-    notes: "Suspended due to review",
-    createdDate: "2026-04-01"
-  }
-];
+const DEFAULT_AGENTS: Agent[] = [];
 
-const DEFAULT_PROMO_CODES: PromoCode[] = [
-  { promoCode: "TCF10", description: "Get a 10% flat discount on premium TCF furniture", discountType: "Percentage", percentageDiscount: 10, startDate: "2026-01-01", endDate: "2030-12-31", maximumUsage: 500, usageCount: 22, activeStatus: "Active" },
-  { promoCode: "FLAT25", description: "Flat ₹25 off on orders above ₹100", discountType: "Fixed", fixedDiscount: 25, startDate: "2026-01-01", endDate: "2030-12-31", maximumUsage: 100, usageCount: 5, activeStatus: "Active" },
-  { promoCode: "WELCOME", description: "First time furniture buyer 15% discount bonus", discountType: "Percentage", percentageDiscount: 15, startDate: "2026-06-01", endDate: "2026-12-31", maximumUsage: 1000, usageCount: 12, activeStatus: "Active" }
-];
+const DEFAULT_PROMO_CODES: PromoCode[] = [];
 
-const DEFAULT_PRODUCTS: Product[] = [
-  { id: "PROD-1001", name: "Modern Sofa Set", category: "Living Room", unit: "Set", price: 1299.99 },
-  { id: "PROD-1002", name: "Wooden Dining Table (6-Seater)", category: "Dining Room", unit: "Set", price: 849.50 },
-  { id: "PROD-1003", name: "Royal King Size Bed", category: "Bedroom", unit: "Unit", price: 999.99 },
-  { id: "PROD-1004", name: "Premium TV Unit & Console", category: "Living Room", unit: "Unit", price: 450.00 },
-  { id: "PROD-1005", name: "Wooden Wardrobe (3-Door)", category: "Bedroom", unit: "Unit", price: 699.00 },
-  { id: "PROD-1006", name: "Ergonomic Office Chair", category: "Office", unit: "Unit", price: 189.99 },
-  { id: "PROD-1007", name: "Solid Wood Coffee Table", category: "Living Room", unit: "Unit", price: 249.99 },
-  { id: "PROD-1008", name: "Executive Study Table", category: "Office", unit: "Unit", price: 299.99 },
-  { id: "PROD-1009", name: "Luxury Leather Recliner Chair", category: "Living Room", unit: "Unit", price: 549.99 },
-  { id: "PROD-1010", name: "Modular L-Shape Sofa", category: "Living Room", unit: "Set", price: 1599.99 }
-];
+const DEFAULT_PRODUCTS: Product[] = [];
 
-const DEFAULT_CUSTOMERS: Customer[] = [
-  { id: "CUST-1001", name: "Anand Verma", mobile: "9876543210", address: "Sri Ram Nilayam, Flat 202, Tenali" },
-  { id: "CUST-1002", name: "Lakshmi Prasanna", mobile: "8765432109", address: "Ganesh Nagar, Near Temple Street, Guntur" },
-  { id: "CUST-1003", name: "Venkata Krishna", mobile: "7654321098", address: "Tenali Central Club Road, Tenali" },
-  { id: "CUST-1004", name: "Suresh Babu", mobile: "6543210987", address: "Main Bazaar Road, Vijayawada" },
-];
+const DEFAULT_CUSTOMERS: Customer[] = [];
 
-import { getTodayStr, isDateInCurrentWeek, getInvoiceDateStr, parseInvoiceDate, getCurrentTimeStr } from "./dateUtils";
+const DEFAULT_INVOICES: Invoice[] = [];
 
-const TODAY = getTodayStr();
-
-const DEFAULT_INVOICES: Invoice[] = [
-  {
-    invoiceNo: "YR-1001",
-    date: TODAY,
-    customerName: "Anand Verma",
-    mobile: "9876543210",
-    itemCount: 2,
-    subtotal: 439.98,
-    discount: 39.98,
-    grandTotal: 400.00,
-    status: "Completed",
-    createdBy: "admin",
-    createdDate: TODAY,
-    createdTime: "09:30 AM",
-    lastEditedBy: "admin",
-    lastEditedDate: TODAY,
-    lastEditedTime: "09:45 AM",
-    assignedEmployee: "James Carter",
-    expectedDeliveryDate: TODAY,
-    deliveryDate: TODAY,
-    deliveryNotes: "Delivered to home address with assembly completed",
-    referralAgentId: "AGT-001",
-    referralAgentName: "Ganesh"
-  },
-  {
-    invoiceNo: "YR-1002",
-    date: TODAY,
-    customerName: "Lakshmi Prasanna",
-    mobile: "8765432109",
-    itemCount: 1,
-    subtotal: 549.99,
-    discount: 49.99,
-    grandTotal: 500.00,
-    status: "Work In Progress",
-    createdBy: "manager",
-    createdDate: TODAY,
-    createdTime: "10:15 AM",
-    assignedEmployee: "Sarah Connor",
-    expectedDeliveryDate: TODAY,
-    deliveryNotes: "Assembly at customer location required by technicians",
-    referralAgentId: "AGT-002",
-    referralAgentName: "Ravi"
-  },
-  {
-    invoiceNo: "YR-1003",
-    date: TODAY,
-    customerName: "Venkata Krishna",
-    mobile: "7654321098",
-    itemCount: 2,
-    subtotal: 2449.49,
-    discount: 249.49,
-    grandTotal: 2200.00,
-    status: "Ready for Delivery",
-    createdBy: "admin",
-    createdDate: TODAY,
-    createdTime: "11:00 AM",
-    assignedEmployee: "Elena Rostova",
-    expectedDeliveryDate: TODAY,
-    deliveryNotes: "Deliver to office main reception, 3rd floor lounge area",
-    referralAgentId: "AGT-001",
-    referralAgentName: "Ganesh"
-  },
-];
-
-const DEFAULT_INVOICE_ITEMS: InvoiceItem[] = [
-  { invoiceNo: "YR-1001", productId: "PROD-1007", productName: "Solid Wood Coffee Table", quantity: 1, unitPrice: 249.99, amount: 249.99 },
-  { invoiceNo: "YR-1001", productId: "PROD-1006", productName: "Ergonomic Office Chair", quantity: 1, unitPrice: 189.99, amount: 189.99 },
-  { invoiceNo: "YR-1002", productId: "PROD-1009", productName: "Luxury Leather Recliner Chair", quantity: 1, unitPrice: 549.99, amount: 549.99 },
-  { invoiceNo: "YR-1003", productId: "PROD-1010", productName: "Modular L-Shape Sofa", quantity: 1, unitPrice: 1599.99, amount: 1599.99 },
-  { invoiceNo: "YR-1003", productId: "PROD-1002", productName: "Wooden Dining Table (6-Seater)", quantity: 1, unitPrice: 849.50, amount: 849.50 },
-];
+const DEFAULT_INVOICE_ITEMS: InvoiceItem[] = [];
 
 const DEFAULT_CONNECTION_SETTINGS: ConnectionSettings = {
   spreadsheetId: "",
@@ -241,32 +111,9 @@ const DEFAULT_USERS: User[] = [
   }
 ];
 
-const DEFAULT_AUDIT_LOGS: AuditLog[] = [
-  {
-    id: "AUDIT-1001",
-    actionType: "System Initialized",
-    userName: "System",
-    date: TODAY,
-    time: "08:00 AM",
-    previousValue: "None",
-    newValue: "Smart Billing ERP system database mounted with offline session storage rules."
-  }
-];
+const DEFAULT_AUDIT_LOGS: AuditLog[] = [];
 
-const DEFAULT_ACTIVITIES: UserActivity[] = [
-  {
-    id: "ACT-1001",
-    username: "admin",
-    loginDate: TODAY,
-    loginTime: "08:30 AM",
-    logoutTime: "11:30 AM",
-    sessionDuration: "03h 00m",
-    deviceType: "Desktop",
-    browser: "Chrome v112",
-    ipAddress: "192.168.1.15",
-    activeSeconds: 10800
-  }
-];
+const DEFAULT_ACTIVITIES: UserActivity[] = [];
 
 export class SheetsSyncEngine {
   private static getStorageItem<T>(key: string, defaultValue: T): T {
