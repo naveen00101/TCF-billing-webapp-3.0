@@ -120,6 +120,24 @@ const DEFAULT_AUDIT_LOGS: AuditLog[] = [];
 const DEFAULT_ACTIVITIES: UserActivity[] = [];
 
 export class SheetsSyncEngine {
+  private static isSyncingDown = false;
+  private static isSyncingInProgress = false;
+  private static hasPendingSyncRequest = false;
+  private static backgroundSyncTimeout: any = null;
+
+  private static queueAutomaticSync(): void {
+    if (this.isSyncingDown) return;
+    const conn = this.getConnectionSettings();
+    if (!conn.isConnected || !conn.appsScriptUrl) return;
+
+    if (this.backgroundSyncTimeout) {
+      clearTimeout(this.backgroundSyncTimeout);
+    }
+
+    this.backgroundSyncTimeout = setTimeout(() => {
+      this.triggerBackgroundSync();
+    }, 1000);
+  }
   private static getStorageItem<T>(key: string, defaultValue: T): T {
     const value = localStorage.getItem(key);
     if (!value) return defaultValue;
@@ -158,6 +176,7 @@ export class SheetsSyncEngine {
   public static saveProducts(products: Product[]): void {
     const validated = this.validateAndRepairProductTree(products);
     this.setStorageItem("billing_products", validated);
+    this.queueAutomaticSync();
   }
 
   // Option Groups persistency helpers
@@ -357,6 +376,7 @@ export class SheetsSyncEngine {
 
   public static saveCustomers(customers: Customer[]): void {
     this.setStorageItem("billing_customers", customers);
+    this.queueAutomaticSync();
   }
 
   // Invoice Lookup Handlers
@@ -492,6 +512,7 @@ export class SheetsSyncEngine {
     });
 
     this.setStorageItem("billing_invoices", sanitized);
+    this.queueAutomaticSync();
   }
 
   public static getInvoiceItems(): InvoiceItem[] {
@@ -500,6 +521,7 @@ export class SheetsSyncEngine {
 
   public static saveInvoiceItems(items: InvoiceItem[]): void {
     this.setStorageItem("billing_invoice_items", items);
+    this.queueAutomaticSync();
   }
 
   public static getPaymentTransactions(): PaymentTransaction[] {
@@ -508,6 +530,7 @@ export class SheetsSyncEngine {
 
   public static savePaymentTransactions(txns: PaymentTransaction[]): void {
     this.setStorageItem("billing_payment_transactions", txns);
+    this.queueAutomaticSync();
   }
 
   // Connections and configuration
@@ -553,6 +576,7 @@ export class SheetsSyncEngine {
 
   public static saveCompanySettings(settings: CompanySettings): void {
     this.setStorageItem("billing_company_settings", settings);
+    this.queueAutomaticSync();
   }
 
   // Draft Invoices
@@ -594,6 +618,7 @@ export class SheetsSyncEngine {
 
   public static saveUsers(users: User[]): void {
     this.setStorageItem("billing_user_registry", users);
+    this.queueAutomaticSync();
   }
 
   // Dedicated Employees Registry
@@ -603,6 +628,7 @@ export class SheetsSyncEngine {
 
   public static saveEmployees(employees: Employee[]): void {
     this.setStorageItem("billing_employees_registry", employees);
+    this.queueAutomaticSync();
   }
 
   // Dedicated Referral & Internal Agents Registry
@@ -612,6 +638,7 @@ export class SheetsSyncEngine {
 
   public static saveAgents(agents: Agent[]): void {
     this.setStorageItem("billing_agents_registry", agents);
+    this.queueAutomaticSync();
   }
 
   // Promo Codes Module
@@ -621,6 +648,7 @@ export class SheetsSyncEngine {
 
   public static savePromoCodes(promos: PromoCode[]): void {
     this.setStorageItem("billing_promo_codes", promos);
+    this.queueAutomaticSync();
   }
 
   // Cancellation Rules/Settings
@@ -638,6 +666,7 @@ export class SheetsSyncEngine {
 
   public static saveCancellationRules(rules: { [status: string]: number }): void {
     this.setStorageItem("billing_cancellation_rules", rules);
+    this.queueAutomaticSync();
   }
 
   // Audit Logs (Internal activity trails)
@@ -647,6 +676,7 @@ export class SheetsSyncEngine {
 
   public static saveAuditLogs(logs: AuditLog[]): void {
     this.setStorageItem("billing_audit_logs", logs);
+    this.queueAutomaticSync();
   }
 
   public static addAuditLog(actionType: string, userName: string, previousValue: string, newValue: string): void {
@@ -672,6 +702,7 @@ export class SheetsSyncEngine {
 
   public static saveUserActivities(activities: UserActivity[]): void {
     this.setStorageItem("billing_user_activities", activities);
+    this.queueAutomaticSync();
   }
 
   // Log a new activity start
@@ -878,42 +909,52 @@ export class SheetsSyncEngine {
 
   // Restore defaults
   public static resetToDemoDefaults(): void {
-    this.saveProducts(DEFAULT_PRODUCTS);
-    this.saveCustomers(DEFAULT_CUSTOMERS);
-    this.saveInvoices(DEFAULT_INVOICES);
-    this.saveInvoiceItems(DEFAULT_INVOICE_ITEMS);
-    this.saveCompanySettings(DEFAULT_COMPANY_SETTINGS);
-    this.saveUsers(DEFAULT_USERS);
-    this.saveEmployees(DEFAULT_EMPLOYEES);
-    this.saveAgents(DEFAULT_AGENTS);
-    this.savePromoCodes(DEFAULT_PROMO_CODES);
-    this.saveCancellationRules({
-      "Draft": 100,
-      "Work In Progress": 80,
-      "Ready for Delivery": 60,
-      "Ready For Delivery": 60,
-      "Delivered": 0,
-      "Completed": 0
-    });
-    this.saveAuditLogs(DEFAULT_AUDIT_LOGS);
-    this.saveUserActivities(DEFAULT_ACTIVITIES);
+    this.isSyncingDown = true;
+    try {
+      this.saveProducts(DEFAULT_PRODUCTS);
+      this.saveCustomers(DEFAULT_CUSTOMERS);
+      this.saveInvoices(DEFAULT_INVOICES);
+      this.saveInvoiceItems(DEFAULT_INVOICE_ITEMS);
+      this.saveCompanySettings(DEFAULT_COMPANY_SETTINGS);
+      this.saveUsers(DEFAULT_USERS);
+      this.saveEmployees(DEFAULT_EMPLOYEES);
+      this.saveAgents(DEFAULT_AGENTS);
+      this.savePromoCodes(DEFAULT_PROMO_CODES);
+      this.saveCancellationRules({
+        "Draft": 100,
+        "Work In Progress": 80,
+        "Ready for Delivery": 60,
+        "Ready For Delivery": 60,
+        "Delivered": 0,
+        "Completed": 0
+      });
+      this.saveAuditLogs(DEFAULT_AUDIT_LOGS);
+      this.saveUserActivities(DEFAULT_ACTIVITIES);
 
-    const conn = this.getConnectionSettings();
-    conn.isConnected = false;
-    this.saveConnectionSettings(conn);
+      const conn = this.getConnectionSettings();
+      conn.isConnected = false;
+      this.saveConnectionSettings(conn);
+    } finally {
+      this.isSyncingDown = false;
+    }
   }
 
   // Clear all local database records (leaves settings intact)
   public static clearLocalData(): void {
-    this.saveProducts([]);
-    this.saveCustomers([]);
-    this.saveInvoices([]);
-    this.saveInvoiceItems([]);
-    this.saveAgents([]);
-    this.savePaymentTransactions([]);
-    this.savePromoCodes([]);
-    this.saveAuditLogs([]);
-    this.saveUserActivities([]);
+    this.isSyncingDown = true;
+    try {
+      this.saveProducts([]);
+      this.saveCustomers([]);
+      this.saveInvoices([]);
+      this.saveInvoiceItems([]);
+      this.saveAgents([]);
+      this.savePaymentTransactions([]);
+      this.savePromoCodes([]);
+      this.saveAuditLogs([]);
+      this.saveUserActivities([]);
+    } finally {
+      this.isSyncingDown = false;
+    }
   }
 
   private static isRateLimitError(e: any): boolean {
@@ -1035,6 +1076,7 @@ export class SheetsSyncEngine {
   }
 
   public static async syncDownFromSheets(conn?: ConnectionSettings): Promise<{ success: boolean; message: string }> {
+    this.isSyncingDown = true;
     try {
       const activeConn = conn || this.getConnectionSettings();
       if (!activeConn.appsScriptUrl) {
@@ -1085,6 +1127,11 @@ export class SheetsSyncEngine {
         const agentsList = payloadData[agentKey] || payloadData["agents"];
         const settingsList = payloadData[settingsKey] || payloadData["settings"];
         const paymentTransactionsList = payloadData["PaymentTransactions"] || payloadData["paymentTransactions"];
+        const employeesList = payloadData["Employees"] || payloadData["employees"];
+        const usersList = payloadData["Users"] || payloadData["users"];
+        const promoCodesList = payloadData["PromoCodes"] || payloadData["promoCodes"];
+        const userActivityList = payloadData["UserActivity"] || payloadData["userActivity"] || payloadData["userActivities"];
+        const auditLogList = payloadData["AuditLog"] || payloadData["auditLog"] || payloadData["auditLogs"];
 
         if (productsList) {
           // Merge conflict resolution:
@@ -1131,6 +1178,11 @@ export class SheetsSyncEngine {
         if (paymentTransactionsList && Array.isArray(paymentTransactionsList)) {
           this.savePaymentTransactions(paymentTransactionsList);
         }
+        if (employeesList && Array.isArray(employeesList)) this.saveEmployees(employeesList);
+        if (usersList && Array.isArray(usersList) && usersList.length > 0) this.saveUsers(usersList);
+        if (promoCodesList && Array.isArray(promoCodesList)) this.savePromoCodes(promoCodesList);
+        if (userActivityList && Array.isArray(userActivityList)) this.saveUserActivities(userActivityList);
+        if (auditLogList && Array.isArray(auditLogList)) this.saveAuditLogs(auditLogList);
 
         if (settingsList) {
           const companySettings = this.getCompanySettings();
@@ -1186,6 +1238,8 @@ export class SheetsSyncEngine {
         ? "⚠️ Google Sheets API quota/rate limit exceeded. All billing data is safely preserved offline. Active features are 100% operational!"
         : `Sync pulling failed: ${e.message || e}`;
       return { success: false, message: friendlyMsg };
+    } finally {
+      this.isSyncingDown = false;
     }
   }
 
@@ -1216,6 +1270,7 @@ export class SheetsSyncEngine {
           [conn.productsSheetName || "Products"]: this.getProducts(),
           [conn.customersSheetName || "Customers"]: this.getCustomers(),
           [conn.invoicesSheetName || "Invoices"]: this.getInvoices(),
+          [conn.invoiceItemsSheetName || "InvoiceItems"]: this.getInvoiceItems(),
           [conn.settingsSheetName || "Settings"]: [this.getCompanySettings()],
           [conn.agentsSheetName || "Agents"]: this.getAgents(),
           "PaymentTransactions": this.getPaymentTransactions(),
@@ -1263,6 +1318,7 @@ export class SheetsSyncEngine {
           [conn.productsSheetName || "Products"]: this.getProducts(),
           [conn.customersSheetName || "Customers"]: this.getCustomers(),
           [conn.invoicesSheetName || "Invoices"]: this.getInvoices(),
+          [conn.invoiceItemsSheetName || "InvoiceItems"]: this.getInvoiceItems(),
           [conn.settingsSheetName || "Settings"]: [this.getCompanySettings()],
           [conn.agentsSheetName || "Agents"]: this.getAgents(),
           "PaymentTransactions": this.getPaymentTransactions(),
@@ -1297,10 +1353,6 @@ export class SheetsSyncEngine {
     }
   }
 
-  private static isSyncingInProgress = false;
-  private static hasPendingSyncRequest = false;
-  private static backgroundSyncTimeout: any = null;
-
   public static async triggerBackgroundSync(): Promise<void> {
     const conn = this.getConnectionSettings();
     if (!conn.isConnected || !conn.appsScriptUrl) return;
@@ -1322,6 +1374,7 @@ export class SheetsSyncEngine {
           [conn.productsSheetName || "Products"]: this.getProducts(),
           [conn.customersSheetName || "Customers"]: this.getCustomers(),
           [conn.invoicesSheetName || "Invoices"]: this.getInvoices(),
+          [conn.invoiceItemsSheetName || "InvoiceItems"]: this.getInvoiceItems(),
           [conn.settingsSheetName || "Settings"]: [this.getCompanySettings()],
           [conn.agentsSheetName || "Agents"]: this.getAgents(),
           "PaymentTransactions": this.getPaymentTransactions(),
