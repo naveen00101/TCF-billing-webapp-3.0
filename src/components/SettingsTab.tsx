@@ -1,0 +1,1493 @@
+import React, { useState } from"react";
+import { Info, Settings, Database, Server, RefreshCw, Copy, Check, ShieldAlert, Download, Upload, AlertCircle, Sparkles, Lock, ShieldCheck, Sun, Moon, Laptop, User } from"lucide-react";
+import { ConnectionSettings, CompanySettings } from"../types";
+import { SheetsSyncEngine } from"../utils/sheetsSync";
+import { SYSTEM_LOGO } from"../constants/branding";
+import codeGsStr from "../../backend/Code.gs?raw";
+
+interface SettingsTabProps {
+ connSettings: ConnectionSettings;
+ companySettings: CompanySettings;
+ onRefresh: () => void;
+ onShowNotification: (text: string, type:"success" |"error" |"info") => void;
+ currentUserTheme: string;
+ onUpdateTheme: (theme:"light" |"dark" |"system") => void;
+}
+
+export default function SettingsTab({
+ connSettings,
+ companySettings,
+ onRefresh,
+ onShowNotification,
+ currentUserTheme,
+ onUpdateTheme,
+}: SettingsTabProps) {
+ const currentUser = SheetsSyncEngine.getCurrentUser();
+ const userRole = currentUser?.role ||"Employee";
+ const isAdmin = userRole ==="Admin";
+
+ // Sync Status
+ const [isSyncing, setIsSyncing] = useState(false);
+
+ // Cancellation refund settings state
+ const [cancellationRules, setCancellationRules] = useState<{ [status: string]: number }>(() =>
+ SheetsSyncEngine.getCancellationRules()
+ );
+
+ // Connection settings states
+ const [appsScriptUrl, setAppsScriptUrl] = useState(connSettings.appsScriptUrl);
+ const [spreadsheetId, setSpreadsheetId] = useState(connSettings.spreadsheetId);
+ const [apiKey, setApiKey] = useState(connSettings.apiKey ||"");
+ const [spreadsheetName, setSpreadsheetName] = useState(connSettings.spreadsheetName ||"Not Connected");
+ const [isConnected, setIsConnected] = useState(connSettings.isConnected);
+
+ // Customize mapping sheet states
+ const [productsSheet, setProductsSheet] = useState(connSettings.productsSheetName ||"Products");
+ const [customersSheet, setCustomersSheet] = useState(connSettings.customersSheetName ||"Customers");
+ const [invoicesSheet, setInvoicesSheet] = useState(connSettings.invoicesSheetName ||"Invoices");
+ const [invoiceItemsSheet, setInvoiceItemsSheet] = useState(connSettings.invoiceItemsSheetName ||"InvoiceItems");
+ const [settingsSheet, setSettingsSheet] = useState(connSettings.settingsSheetName ||"Settings");
+ const [agentsSheet, setAgentsSheet] = useState(connSettings.agentsSheetName ||"Agents");
+
+ // Company settings states
+ const [companyName, setCompanyName] = useState(String(companySettings.companyName ||""));
+ const [shortName, setShortName] = useState(String(companySettings.shortName ||"TCF Smart Billing"));
+ const [address, setAddress] = useState(String(companySettings.address ||""));
+ const [phone, setPhone] = useState(String(companySettings.phone ||""));
+ const [email, setEmail] = useState(String(companySettings.email ||""));
+ const [gstNumber, setGstNumber] = useState(String(companySettings.gstNumber ||""));
+ const [website, setWebsite] = useState(String(companySettings.website ||"www.tcfshowroom.com"));
+ const [invoiceFooter, setInvoiceFooter] = useState(String(companySettings.invoiceFooter ||""));
+ const [invoicePrefix, setInvoicePrefix] = useState(String(companySettings.invoicePrefix ||"YR"));
+ const [nextInvoiceNumber, setNextInvoiceNumber] = useState(companySettings.nextInvoiceNumber || 1001);
+ const [defaultPrintFormat, setDefaultPrintFormat] = useState<"Receipt" |"A5" |"A4">(companySettings.defaultPrintFormat ||"Receipt");
+ const [defaultDownloadFormat, setDefaultDownloadFormat] = useState<"Receipt" |"A5" |"A4">(companySettings.defaultDownloadFormat ||"A4");
+ const [useLogoWatermark, setUseLogoWatermark] = useState<boolean>(companySettings.useLogoWatermark ?? true);
+ const [invoiceTerms, setInvoiceTerms] = useState(String(companySettings.invoiceTerms ||""));
+
+ // GST Settings States
+ const [companyState, setCompanyState] = useState(companySettings.companyState ||"Andhra Pradesh");
+ const [companyStateCode, setCompanyStateCode] = useState(companySettings.companyStateCode ||"37");
+ const [cgstPercentage, setCgstPercentage] = useState(companySettings.cgstPercentage ?? 9);
+ const [sgstPercentage, setSgstPercentage] = useState(companySettings.sgstPercentage ?? 9);
+ const [igstPercentage, setIgstPercentage] = useState(companySettings.igstPercentage ?? 18);
+ const [gstEnabledByDefault, setGstEnabledByDefault] = useState(companySettings.gstEnabledByDefault ?? false);
+
+ // File Copy helpers
+ const [copiedCode, setCopiedCode] = useState(false);
+
+ // Copy script code utility
+ const copyScriptCode = async () => {
+ try {
+ await navigator.clipboard.writeText(codeGsStr);
+ setCopiedCode(true);
+ onShowNotification("Google Apps Script code copy completed! Paste into extensions.","success");
+ setTimeout(() => setCopiedCode(false), 2000);
+ } catch {
+ onShowNotification("Copy failed.","error");
+ }
+ };
+
+ // Submit company info settings
+ const handleSaveCompany = async (e: React.FormEvent) => {
+ e.preventDefault();
+ if (!isAdmin) {
+ onShowNotification("Clearance Blocked: Only Admin role can alter company credentials.","error");
+ return;
+ }
+ if (!companyName.trim()) {
+ onShowNotification("Company Name cannot be empty.","error");
+ return;
+ }
+
+ const payload: CompanySettings = {
+ companyName: companyName.trim(),
+ shortName: shortName.trim(),
+ address: address.trim(),
+ phone: phone.trim(),
+ email: email.trim(),
+ gstNumber: gstNumber.trim(),
+ website: website.trim(),
+ invoiceFooter: invoiceFooter.trim(),
+ invoiceTerms: invoiceTerms,
+ invoicePrefix: invoicePrefix.trim().toUpperCase(),
+ nextInvoiceNumber: Number(nextInvoiceNumber) || 1001,
+ defaultPrintFormat,
+ defaultDownloadFormat,
+ useLogoWatermark,
+ };
+
+ SheetsSyncEngine.saveCompanySettings(payload);
+ 
+ // Sync to Sheets
+ if (connSettings.isConnected) {
+ try {
+ await SheetsSyncEngine.pushTransaction(connSettings,"saveSettings", payload);
+ } catch (err) {
+ console.error("Failed to sync company settings to Sheets", err);
+ onShowNotification("Saved locally, but failed to sync to Google Sheets.","error");
+ }
+ }
+
+ // Audit Log trace
+ SheetsSyncEngine.addAuditLog(
+"Settings Modified",
+ currentUser?.fullName ||"System Admin",
+"Prior Company Settings",
+ `Saved Company branding: ${companyName}`
+ );
+
+ onShowNotification("✓ Company branding settings saved successfully.","success");
+ onRefresh();
+ };
+
+ // Save cancellation rules
+ const handleSaveCancellationRules = async (e: React.FormEvent) => {
+ e.preventDefault();
+ if (!isAdmin) {
+ onShowNotification("Clearance Blocked: Only Admin role can alter cancellation rules.","error");
+ return;
+ }
+
+ SheetsSyncEngine.saveCancellationRules(cancellationRules);
+
+ if (connSettings.isConnected) {
+ try {
+ await SheetsSyncEngine.pushTransaction(connSettings,"saveSettings", { cancellationRules: JSON.stringify(cancellationRules) });
+ } catch (err) {
+ console.error("Failed to sync cancellation rules to Sheets", err);
+ }
+ }
+
+ // Audit Log trace
+ SheetsSyncEngine.addAuditLog(
+"Cancellation Policy Modified",
+ currentUser?.fullName ||"System Admin",
+"Prior Refund Coefficients",
+ `Saved status refunds: ${JSON.stringify(cancellationRules)}`
+ );
+
+ onShowNotification("✓ Cancellation refund percentages saved successfully.","success");
+ onRefresh();
+ };
+
+ // Submit GST Settings
+ const handleSaveGstSettings = async (e: React.FormEvent) => {
+ e.preventDefault();
+ if (!isAdmin) {
+ onShowNotification("Clearance Blocked: Only Admin role can alter GST settings.","error");
+ return;
+ }
+
+ const currentCompany = SheetsSyncEngine.getCompanySettings();
+ const updatedCompany: CompanySettings = {
+ ...currentCompany,
+ gstNumber: gstNumber.trim(),
+ companyState: companyState.trim(),
+ companyStateCode: companyStateCode.trim(),
+ cgstPercentage: Number(cgstPercentage),
+ sgstPercentage: Number(sgstPercentage),
+ igstPercentage: Number(igstPercentage),
+ gstEnabledByDefault: gstEnabledByDefault
+ };
+
+ SheetsSyncEngine.saveCompanySettings(updatedCompany);
+
+ if (connSettings.isConnected) {
+ try {
+ await SheetsSyncEngine.pushTransaction(connSettings,"saveSettings", updatedCompany);
+ } catch (err) {
+ console.error("Failed to sync GST settings to Sheets", err);
+ }
+ }
+
+ SheetsSyncEngine.addAuditLog(
+"GST Settings Modified",
+ currentUser?.fullName ||"System Admin",
+ `State: ${currentCompany.companyState ||"Andhra Pradesh"}, CGST: ${currentCompany.cgstPercentage ?? 9}%`,
+ `State: ${companyState}, CGST: ${cgstPercentage}%`
+ );
+
+ onShowNotification("✓ GST configuration saved successfully.","success");
+ onRefresh();
+ };
+
+ // Validate current sheet connection parameters
+ const handleTestConnection = async () => {
+ if (!isAdmin) return;
+ if (!appsScriptUrl.trim()) {
+ onShowNotification("A valid Google Apps Script Web App URL is required.","error");
+ return;
+ }
+ if (!spreadsheetId.trim()) {
+ onShowNotification("A valid Google Spreadsheet ID is required.","error");
+ return;
+ }
+
+ setIsSyncing(true);
+ onShowNotification("Pinging Google Spreadsheet...","info");
+
+ const activeMapping = {
+ productsSheetName: productsSheet,
+ customersSheetName: customersSheet,
+ invoicesSheetName: invoicesSheet,
+ invoiceItemsSheetName: invoiceItemsSheet,
+ settingsSheetName: settingsSheet,
+ agentsSheetName: agentsSheet,
+ };
+
+ const result = await SheetsSyncEngine.testAppsScriptConnection(
+ appsScriptUrl.trim(),
+ spreadsheetId.trim(),
+ activeMapping
+ );
+
+ setIsSyncing(false);
+
+ if (result.success) {
+ const dbName = result.spreadsheetName ||"Connected Sheet";
+ setSpreadsheetName(dbName);
+ setIsConnected(true);
+
+ const updatedConn: ConnectionSettings = {
+ spreadsheetId: spreadsheetId.trim(),
+ spreadsheetName: dbName,
+ appsScriptUrl: appsScriptUrl.trim(),
+ apiKey: apiKey,
+ isConnected: true,
+ lastSyncTime: new Date().toLocaleTimeString(),
+ ...activeMapping,
+ };
+
+ SheetsSyncEngine.saveConnectionSettings(updatedConn);
+ 
+ SheetsSyncEngine.addAuditLog(
+"Database Linked",
+ currentUser?.fullName ||"System Admin",
+"Offline Static DB",
+ `Linked active spreadsheet: ${dbName}`
+ );
+
+ onShowNotification("✓ Connection test benefited! Spreadsheet is verified.","success");
+ onRefresh();
+ } else {
+ setIsConnected(false);
+ setSpreadsheetName("Not Connected");
+ onShowNotification(`Test Failed: ${result.message}`,"error");
+ }
+ };
+
+ // Initialize Database in drive via script
+ const handleInitializeDatabase = async () => {
+ if (!isAdmin || !appsScriptUrl.trim()) return;
+
+ setIsSyncing(true);
+ onShowNotification("Requesting database initialization via script...","info");
+
+ const result = await SheetsSyncEngine.initializeDatabaseViaAppsScript(
+ appsScriptUrl.trim(),
+ companyName ||"My Smart Billing",
+ spreadsheetId.trim() || undefined
+ );
+
+ setIsSyncing(false);
+
+ if (result.success && result.spreadsheetId) {
+ setSpreadsheetId(result.spreadsheetId);
+ setSpreadsheetName(result.spreadsheetName ||"Smart Billing Database");
+ setIsConnected(true);
+
+ const activeMapping = {
+ productsSheetName:"Products",
+ customersSheetName:"Customers",
+ invoicesSheetName:"Invoices",
+ invoiceItemsSheetName:"InvoiceItems",
+ settingsSheetName:"Settings",
+ agentsSheetName:"Agents",
+ };
+
+ const updatedConn: ConnectionSettings = {
+ spreadsheetId: result.spreadsheetId,
+ spreadsheetName: result.spreadsheetName ||"Smart Billing Database",
+ appsScriptUrl: appsScriptUrl.trim(),
+ apiKey: apiKey,
+ isConnected: true,
+ lastSyncTime: new Date().toLocaleTimeString(),
+ ...activeMapping,
+ };
+
+ SheetsSyncEngine.saveConnectionSettings(updatedConn);
+ onShowNotification("✓ Sheets Database initialized successfully! Code mapped.","success");
+ 
+ await SheetsSyncEngine.pullDatabaseFromSQLite(updatedConn);
+ onRefresh();
+ } else {
+ onShowNotification(`Database Initialization Failed: ${result.message}`,"error");
+ }
+ };
+
+ const handleUpdateSchema = async () => {
+ if (!isAdmin || !appsScriptUrl.trim() || !spreadsheetId.trim()) return;
+
+ setIsSyncing(true);
+ onShowNotification("Checking for database schema updates...","info");
+
+ const result = await SheetsSyncEngine.updateDatabaseSchemaViaAppsScript(
+ appsScriptUrl.trim(),
+ spreadsheetId.trim()
+ );
+
+ setIsSyncing(false);
+
+ if (result.success) {
+ onShowNotification(`✓ ${result.message}`,"success");
+ onRefresh();
+ } else {
+ onShowNotification(`Schema Validation Failed: ${result.message}`,"error");
+ }
+ };
+
+ // Manual Synchronization
+ const handleSyncPull = async () => {
+    if (!isAdmin) return;
+    const conn = SheetsSyncEngine.getConnectionSettings();
+    
+    setIsSyncing(true);
+    onShowNotification("Refreshing local data from SQLite backend...","info");
+    
+    const result = await SheetsSyncEngine.pullDatabaseFromSQLite(conn);
+    setIsSyncing(false);
+
+    if (result.success) {
+      onShowNotification("✓ Local database cache refreshed successfully.","success");
+      onRefresh();
+    } else {
+      onShowNotification(`Pull Error: ${result.message}`,"error");
+    }
+  };
+
+ const handleBackupToSheets = async () => {
+    if (!isAdmin) return;
+    const conn = SheetsSyncEngine.getConnectionSettings();
+    if (!conn.appsScriptUrl || !conn.spreadsheetId) {
+      onShowNotification("Google Sheets connection credentials (URL and Spreadsheet ID) are not configured.", "error");
+      return;
+    }
+    setIsSyncing(true);
+    onShowNotification("Uploading local database backup to Google Sheets...", "info");
+    const result = await SheetsSyncEngine.backupToGoogleSheets(conn);
+    setIsSyncing(false);
+    if (result.success) {
+      onShowNotification(result.message || "✓ SQLite database successfully backed up to Google Sheets.", "success");
+    } else {
+      onShowNotification(`Backup Error: ${result.message}`, "error");
+    }
+  };
+
+  const handleRestoreFromSheets = async () => {
+    if (!isAdmin) return;
+    const conn = SheetsSyncEngine.getConnectionSettings();
+    if (!conn.appsScriptUrl || !conn.spreadsheetId) {
+      onShowNotification("Google Sheets connection credentials (URL and Spreadsheet ID) are not configured.", "error");
+      return;
+    }
+    if (!window.confirm("⚠️ WARNING: This will overwrite your local SQLite database with the backup from Google Sheets! Are you sure you want to proceed?")) {
+      return;
+    }
+    setIsSyncing(true);
+    onShowNotification("Restoring local database from Google Sheets...", "info");
+    const result = await SheetsSyncEngine.restoreFromGoogleSheets(conn);
+    setIsSyncing(false);
+    if (result.success) {
+      onShowNotification(result.message || "✓ SQLite database successfully restored from Google Sheets backup!", "success");
+      onRefresh();
+    } else {
+      onShowNotification(`Restore Error: ${result.message}`, "error");
+    }
+  };
+
+ const handleResetDefaults = () => {
+ if (!isAdmin) return;
+ const confirmReset = window.confirm(
+"Restore Default Demo Logs? This cleans local databases and fills standard Products, Customers, and Invoices."
+ );
+ if (!confirmReset) return;
+
+ SheetsSyncEngine.resetToDemoDefaults();
+ setAppsScriptUrl("");
+ setSpreadsheetId("");
+ setSpreadsheetName("Not Connected");
+ setIsConnected(false);
+
+ onShowNotification("✓ Application restarted with demo files. All sync logs disconnected.","success");
+ onRefresh();
+ };
+
+ const handleBackupExportJson = () => {
+ if (!isAdmin) return;
+ const payload = {
+ products: SheetsSyncEngine.getProducts(),
+ customers: SheetsSyncEngine.getCustomers(),
+ invoices: SheetsSyncEngine.getInvoices(),
+ invoiceItems: SheetsSyncEngine.getInvoiceItems(),
+ company: SheetsSyncEngine.getCompanySettings(),
+ exportedAt: new Date().toISOString(),
+ };
+
+ const dataStr ="data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(payload, null, 2));
+ const downloadAnchor = document.createElement("a");
+ downloadAnchor.setAttribute("href", dataStr);
+ downloadAnchor.setAttribute("download", `TCFERP_Backup_${new Date().toISOString().split("T")[0]}.json`);
+ document.body.appendChild(downloadAnchor);
+ downloadAnchor.click();
+ downloadAnchor.remove();
+
+ onShowNotification("✓ Comprehensive JSON Backup downloaded successfully.","success");
+ };
+
+ const handleProductCsvExport = () => {
+ if (!isAdmin) return;
+ const products = SheetsSyncEngine.getProducts();
+ const csvRows = [
+ ["Product ID","Product Name","Category","Unit","Price"],
+ ...products.map((p) => [p.id, p.name, p.category, p.unit, p.price]),
+ ];
+
+ const csvContent ="data:text/csv;charset=utf-8," + csvRows.map((e) => e.join(",")).join("\n");
+ const downloadAnchor = document.createElement("a");
+ downloadAnchor.setAttribute("href", encodeURI(csvContent));
+ downloadAnchor.setAttribute("download","Products_Catalog.csv");
+ document.body.appendChild(downloadAnchor);
+ downloadAnchor.click();
+ downloadAnchor.remove();
+
+ onShowNotification("✓ Catalog exported to CSV.","success");
+ };
+
+ const handleRestoreBackupJson = (e: React.ChangeEvent<HTMLInputElement>) => {
+ if (!isAdmin) return;
+ const files = e.target.files;
+ if (!files || files.length === 0) return;
+
+ const fileReader = new FileReader();
+ fileReader.onload = (fileEvent) => {
+ try {
+ const textStr = fileEvent.target?.result as string;
+ const backupData = JSON.parse(textStr);
+
+ if (backupData.products) SheetsSyncEngine.saveProducts(backupData.products);
+ if (backupData.customers) SheetsSyncEngine.saveCustomers(backupData.customers);
+ if (backupData.invoices) SheetsSyncEngine.saveInvoices(backupData.invoices, true);
+ if (backupData.invoiceItems) SheetsSyncEngine.saveInvoiceItems(backupData.invoiceItems);
+ if (backupData.company) SheetsSyncEngine.saveCompanySettings(backupData.company);
+
+ onShowNotification("✓ System restore completed from JSON backup successfully.","success");
+ onRefresh();
+ } catch (err) {
+ onShowNotification("Restore Error: Selected file has corrupted syntax.","error");
+ }
+ };
+ fileReader.readAsText(files[0]);
+ };
+
+ return (
+ <div className="grid gap-6 lg:grid-cols-3 animate-in fade-in duration-300">
+ 
+ {/* COLUMN LEFT: COMPANY SETTINGS & CANCELLATION POLICIES */}
+ <div className="space-y-6 lg:col-span-1">
+
+ {/* OPERATOR PROFILE & THEME PREFERENCES (Saves per active user) */}
+ <div className="rounded-xl border border-default dark:border-default bg-card p-5 shadow-sm space-y-4 h-fit transition-colors">
+ <div className="flex items-center justify-between border-b border-default pb-2">
+ <div className="flex items-center gap-1.5">
+ <User className="h-4 w-4 text-blue-600" />
+ <h2 className="font-bold text-primary dark:text-primary text-sm">Operator Profile Settings</h2>
+ </div>
+ <span className="text-[9px] bg-emerald-500/15 border border-emerald-500/20 text-emerald-500 px-1.5 py-0.5 rounded font-extrabold font-mono flex items-center gap-0.5">ACTIVE</span>
+ </div>
+
+ <div className="space-y-4">
+ <div className="flex items-center gap-3 bg-surface p-3 rounded-lg border border-default">
+ <div className="h-9 w-9 rounded-full bg-blue-500/10 text-blue-500 flex items-center justify-center border border-blue-500/20 text-sm font-bold font-mono">
+ {currentUser?.username?.substring(0, 2).toUpperCase() ||"OP"}
+ </div>
+ <div>
+ <h4 className="text-xs font-bold text-primary">{currentUser?.fullName}</h4>
+ <p className="text-[10px] text-muted font-mono">@{currentUser?.username} • {currentUser?.role}</p>
+ </div>
+ </div>
+
+ <div className="space-y-2">
+ <label className="text-[10px] uppercase font-bold text-muted block pb-0.5">Theme Preference</label>
+  <div className="grid grid-cols-3 gap-2">
+ {(["light","dark","system"] as const).map((pref) => {
+ const isActive = currentUserTheme === pref;
+ return (
+ <button
+ key={pref}
+ type="button"
+ onClick={() => {
+ onUpdateTheme(pref);
+ onShowNotification(`✓ Theme preference updated to ${pref.toUpperCase()}`,"success");
+ }}
+ className={`py-2 px-1 rounded-lg border text-xs font-semibold capitalize flex items-center justify-center gap-1.5 cursor-pointer outline-none transition-all ${
+ isActive
+ ?"bg-blue-600 border-blue-600 text-primary font-bold"
+ :"bg-surface border-default hover:bg-card-secondary text-secondary"
+ }`}
+ >
+ {pref ==="light" && <Sun className="h-3.5 w-3.5" />}
+ {pref ==="dark" && <Moon className="h-3.5 w-3.5" />}
+ {pref ==="system" && <Laptop className="h-3.5 w-3.5" />}
+ <span>{pref}</span>
+ </button>
+ );
+ })}
+ </div>
+ <p className="text-[10px] text-muted font-sans leading-tight mt-1">
+ Your theme is synchronized to your specific operator session: <strong>@{currentUser?.username}</strong>.
+ </p>
+ </div>
+ </div>
+ </div>
+ 
+ {/* COMPANY BRANDING */}
+ <div className="rounded-xl border border-default dark:border-default bg-card p-5 shadow-sm space-y-4 h-fit transition-colors">
+ <div className="flex items-center justify-between border-b border-default pb-2">
+ <div className="flex items-center gap-1.5">
+ <Settings className="h-4 w-4 text-blue-600" />
+ <h2 className="font-bold text-primary dark:text-primary text-sm">Company branding</h2>
+ </div>
+ {isAdmin ? (
+ <span className="text-[9px] bg-blue-500/15 border border-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded font-extrabold font-mono flex items-center gap-0.5"><ShieldCheck className="h-2.5 w-2.5" /> EDIT</span>
+ ) : (
+ <span className="text-[9px] bg-red-950/20 text-red-500 px-1.5 py-0.5 rounded font-extrabold font-mono flex items-center gap-0.5"><Lock className="h-2.5 w-2.5" /> READ ONLY</span>
+ )}
+ </div>
+
+ <form onSubmit={handleSaveCompany} className="space-y-4">
+ {/* Logo Settings Card (Logo Management System) */}
+ <div className="bg-surface  p-4 rounded-xl border border-default space-y-3 transition-colors">
+ <span className="text-[10px] uppercase font-bold text-muted dark:text-muted block tracking-wide">Logo Settings</span>
+ <div className="flex items-center gap-4">
+ {/* Preview Logo */}
+ <div className="h-14 w-14 rounded-xl border border-default bg-card flex items-center justify-center overflow-hidden shrink-0 shadow-sm">
+ <img src={SYSTEM_LOGO} alt="Corporate Logo Preview" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
+ </div>
+ {/* Actions */}
+ <div className="flex-1 space-y-1.5">
+ <p className="text-[11px] font-semibold text-secondary dark:text-muted">
+ System Logo
+ </p>
+ <p className="text-[9px] text-muted dark:text-muted font-sans tracking-wide">
+ Master logo loaded statically from <span className="font-mono">public/logo.jpeg</span>. Logo file dynamic overrides have been disabled.
+ </p>
+ </div>
+ </div>
+ </div>
+
+ <div className="grid gap-3 grid-cols-2">
+ <div className="space-y-1">
+ <label className="text-[10px] uppercase font-bold text-muted">Company Name</label>
+ <input
+ type="text"
+ required
+ disabled={!isAdmin}
+ value={companyName}
+ onChange={(e) => setCompanyName(e.target.value)}
+ className="w-full rounded-lg border border-default bg-surface  px-3 py-2 text-xs text-primary dark:text-primary focus:border-blue-500 outline-none disabled:opacity-75 font-sans"
+ />
+ </div>
+
+ <div className="space-y-1">
+ <label className="text-[10px] uppercase font-bold text-muted">Short Name (App Name)</label>
+ <input
+ type="text"
+ required
+ disabled={!isAdmin}
+ value={shortName}
+ onChange={(e) => setShortName(e.target.value)}
+ placeholder="TCF Smart Billing"
+ className="w-full rounded-lg border border-default bg-surface  px-3 py-2 text-xs text-primary dark:text-primary focus:border-blue-500 outline-none disabled:opacity-75 font-sans"
+ />
+ </div>
+ </div>
+
+ <div className="space-y-1">
+ <label className="text-[10px] uppercase font-bold text-muted">Postal Address</label>
+ <textarea
+ rows={2}
+ required
+ disabled={!isAdmin}
+ value={address}
+ onChange={(e) => setAddress(e.target.value)}
+ className="w-full rounded-lg border border-default bg-surface  px-3 py-2 text-xs text-primary dark:text-primary focus:border-blue-500 outline-none disabled:opacity-75 font-sans"
+ />
+ </div>
+
+ <div className="grid gap-3 grid-cols-2">
+ <div className="space-y-1">
+ <label className="text-[10px] uppercase font-bold text-muted">Telephone</label>
+ <input
+ type="text"
+ required
+ disabled={!isAdmin}
+ value={phone}
+ onChange={(e) => setPhone(e.target.value)}
+ className="w-full rounded-lg border border-default bg-surface  px-3 py-2 text-xs text-primary dark:text-primary focus:border-blue-500 outline-none disabled:opacity-75 font-sans"
+ />
+ </div>
+
+ <div className="space-y-1">
+ <label className="text-[10px] uppercase font-bold text-muted">E-mail</label>
+ <input
+ type="email"
+ required
+ disabled={!isAdmin}
+ value={email}
+ onChange={(e) => setEmail(e.target.value)}
+ className="w-full rounded-lg border border-default bg-surface  px-3 py-2 text-xs text-primary dark:text-primary focus:border-blue-500 outline-none disabled:opacity-75 font-sans"
+ />
+ </div>
+ </div>
+
+ <div className="grid gap-3 grid-cols-2">
+ <div className="space-y-1">
+ <label className="text-[10px] uppercase font-bold text-muted">Tax ID / GSTIN</label>
+ <input
+ type="text"
+ disabled={!isAdmin}
+ placeholder="GST-12AB34CD"
+ value={gstNumber}
+ onChange={(e) => setGstNumber(e.target.value.toUpperCase())}
+ className="w-full rounded-lg border border-default bg-surface  px-3 py-2 text-xs text-primary dark:text-primary focus:border-blue-500 outline-none font-mono disabled:opacity-75 uppercase"
+ />
+ </div>
+
+ <div className="space-y-1">
+ <label className="text-[10px] uppercase font-bold text-muted">Website URL</label>
+ <input
+ type="text"
+ disabled={!isAdmin}
+ placeholder="www.tcfshowroom.com"
+ value={website}
+ onChange={(e) => setWebsite(e.target.value)}
+ className="w-full rounded-lg border border-default bg-surface  px-3 py-2 text-xs text-primary dark:text-primary focus:border-blue-500 outline-none disabled:opacity-75 font-sans"
+ />
+ </div>
+ </div>
+
+ <div className="space-y-1">
+ <label className="text-[10px] uppercase font-bold text-muted">Invoice Terms & Conditions</label>
+ <textarea
+ rows={3}
+ disabled={!isAdmin}
+ placeholder="Declare return policies, warranties, or legal checkout stipulations..."
+ value={invoiceTerms}
+ onChange={(e) => setInvoiceTerms(e.target.value)}
+ className="w-full rounded-lg border border-default bg-surface  px-3 py-2 text-xs text-primary dark:text-primary focus:border-blue-500 outline-none disabled:opacity-75 font-sans"
+ />
+ </div>
+
+ <div className="space-y-1">
+ <label className="text-[10px] uppercase font-bold text-muted">Invoice Footer Note</label>
+ <textarea
+ rows={2}
+ disabled={!isAdmin}
+ placeholder="Custom corporate thank-you message..."
+ value={invoiceFooter}
+ onChange={(e) => setInvoiceFooter(e.target.value)}
+ className="w-full rounded-lg border border-default bg-surface  px-3 py-2 text-xs text-primary dark:text-primary focus:border-blue-500 outline-none disabled:opacity-75 font-sans"
+ />
+ </div>
+
+ <div className="grid gap-3 grid-cols-2">
+ <div className="space-y-1">
+ <label className="text-[10px] uppercase font-bold text-muted">Prefix</label>
+ <input
+ type="text"
+ required
+ disabled={!isAdmin}
+ value={invoicePrefix}
+ onChange={(e) => setInvoicePrefix(e.target.value)}
+ className="w-full rounded-lg border border-default bg-surface  px-3 py-2 text-xs text-primary dark:text-primary focus:border-blue-500 outline-none font-mono uppercase disabled:opacity-75"
+ />
+ </div>
+
+ <div className="space-y-1">
+ <label className="text-[10px] uppercase font-bold text-muted">Next Number</label>
+ <input
+ type="number"
+ required
+ disabled={!isAdmin}
+ value={nextInvoiceNumber}
+ onChange={(e) => setNextInvoiceNumber(parseInt(e.target.value) || 1001)}
+ className="w-full rounded-lg border border-default bg-surface  px-3 py-2 text-xs text-primary dark:text-primary focus:border-blue-500 outline-none font-mono disabled:opacity-75"
+ />
+ </div>
+ </div>
+
+ {isAdmin && (
+ <button
+ type="submit"
+ className="flex w-full items-center justify-center rounded-lg bg-blue-600 py-2.5 text-xs font-semibold text-primary hover:bg-blue-700 outline-none border-none cursor-pointer"
+ >
+ Update Company Branding
+ </button>
+ )}
+ </form>
+ </div>
+
+ {/* PRINT SETTINGS CARD */}
+ <div className="rounded-xl border border-default dark:border-default bg-card p-5 shadow-sm space-y-4 h-fit transition-colors">
+ <div className="flex items-center justify-between border-b border-default pb-2">
+ <div className="flex items-center gap-1.5">
+ <Settings className="h-4 w-4 text-blue-600" />
+ <h2 className="font-bold text-primary dark:text-primary text-sm">Print Settings</h2>
+ </div>
+ {isAdmin ? (
+ <span className="text-[9px] bg-blue-500/15 border border-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded font-extrabold font-mono flex items-center gap-0.5"><ShieldCheck className="h-2.5 w-2.5" /> ADMIN</span>
+ ) : (
+ <span className="text-[9px] bg-red-950/20 text-red-500 px-1.5 py-0.5 rounded font-extrabold font-mono flex items-center gap-0.5"><Lock className="h-2.5 w-2.5" /> READ ONLY</span>
+ )}
+ </div>
+
+ <p className="text-[11px] text-muted leading-relaxed font-sans">
+ Configure system-wide default layouts for printed physical slips and digital document downloads.
+ </p>
+
+ <form onSubmit={(e) => {
+ e.preventDefault();
+ if (!isAdmin) {
+ onShowNotification("Access Denied: Admin role required.","error");
+ return;
+ }
+ const payload: CompanySettings = {
+ ...companySettings,
+ defaultPrintFormat,
+ defaultDownloadFormat,
+ useLogoWatermark,
+ };
+ SheetsSyncEngine.saveCompanySettings(payload);
+ 
+ SheetsSyncEngine.addAuditLog(
+"Print Settings Modified",
+ currentUser?.fullName ||"System Admin",
+ `Old Layouts`,
+ `Print: ${defaultPrintFormat} | Download: ${defaultDownloadFormat} | Watermark: ${useLogoWatermark}`
+ );
+
+ onShowNotification("✓ Print Settings updated and saved.","success");
+ onRefresh();
+ }} className="space-y-4">
+ <div className="space-y-1">
+ <label className="text-[10px] uppercase font-bold text-muted">Default Print Format</label>
+ <select
+ disabled={!isAdmin}
+ value={defaultPrintFormat}
+ onChange={(e) => setDefaultPrintFormat(e.target.value as"Receipt" |"A5" |"A4")}
+ className="w-full rounded-lg border border-default bg-surface px-3 py-2 text-xs text-primary focus:border-blue-500 outline-none disabled:opacity-75"
+ >
+ <option value="Receipt">Receipt (80mm Thermal Slip)</option>
+ <option value="A5">A5 Invoice (Compact Page)</option>
+ <option value="A4">A4 Invoice (Standard Page)</option>
+ </select>
+ </div>
+
+ <div className="space-y-1">
+ <label className="text-[10px] uppercase font-bold text-muted">Default Download Format</label>
+ <select
+ disabled={!isAdmin}
+ value={defaultDownloadFormat}
+ onChange={(e) => setDefaultDownloadFormat(e.target.value as"Receipt" |"A5" |"A4")}
+ className="w-full rounded-lg border border-default bg-surface px-3 py-2 text-xs text-primary focus:border-blue-500 outline-none disabled:opacity-75"
+ >
+ <option value="Receipt">Receipt PDF (80mm Continuous)</option>
+ <option value="A5">A5 PDF (Compact Sheet)</option>
+ <option value="A4">A4 PDF (Standard Sheet)</option>
+ </select>
+ </div>
+
+ <div className="space-y-1 pt-2">
+ <label className="flex items-center gap-2 cursor-pointer">
+ <input
+ type="checkbox"
+ disabled={!isAdmin}
+ checked={useLogoWatermark}
+ onChange={(e) => setUseLogoWatermark(e.target.checked)}
+ className="rounded border-default text-blue-600 focus:ring-blue-500 h-4 w-4 disabled:opacity-50"
+ />
+ <span className="text-xs font-semibold text-secondary dark:text-muted">Use Logo Watermark</span>
+ </label>
+ <p className="text-[10px] text-muted ml-6">Render the company logo dynamically as a centered watermark on A4 and A5 PDFs.</p>
+ </div>
+
+ {isAdmin && (
+ <button
+ type="submit"
+ className="flex w-full items-center justify-center rounded-lg bg-surface py-2.5 text-xs font-semibold text-primary hover:bg-zinc-850 outline-none border-none cursor-pointer"
+ >
+ Save Print Settings
+ </button>
+ )}
+ </form>
+ </div>
+
+ {/* INVOICE SETTINGS CARD */}
+ <div className="rounded-xl border border-default dark:border-default bg-card p-5 shadow-sm space-y-4 h-fit transition-colors">
+ <div className="flex items-center justify-between border-b border-default pb-2">
+ <div className="flex items-center gap-1.5">
+ <Settings className="h-4 w-4 text-blue-600" />
+ <h2 className="font-bold text-primary dark:text-primary text-sm">Invoice Settings</h2>
+ </div>
+ {isAdmin ? (
+ <span className="text-[9px] bg-blue-500/15 border border-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded font-extrabold font-mono flex items-center gap-0.5"><ShieldCheck className="h-2.5 w-2.5" /> ADMIN</span>
+ ) : (
+ <span className="text-[9px] bg-red-950/20 text-red-500 px-1.5 py-0.5 rounded font-extrabold font-mono flex items-center gap-0.5"><Lock className="h-2.5 w-2.5" /> READ ONLY</span>
+ )}
+ </div>
+
+ <p className="text-[11px] text-muted leading-relaxed font-sans">
+ Manage the dynamic Terms &amp; Conditions printed on each customer invoice. Multi-line values are fully supported.
+ </p>
+
+ <form onSubmit={(e) => {
+ e.preventDefault();
+ if (!isAdmin) {
+ onShowNotification("Access Denied: Admin role required.","error");
+ return;
+ }
+ const payload: CompanySettings = {
+ ...companySettings,
+ invoiceTerms,
+ };
+ SheetsSyncEngine.saveCompanySettings(payload);
+ 
+ SheetsSyncEngine.addAuditLog(
+"Invoice Settings Modified",
+ currentUser?.fullName ||"System Admin",
+ `Old Terms`,
+ `Invoice terms and conditions updated.`
+ );
+
+ onShowNotification("✓ Invoice Settings successfully updated.","success");
+ onRefresh();
+ }} className="space-y-4">
+ <div className="space-y-1">
+ <label className="text-[10px] uppercase font-bold text-muted">Invoice Terms &amp; Conditions</label>
+ <textarea
+ rows={5}
+ disabled={!isAdmin}
+ placeholder="Goods once sold will not be taken back..."
+ value={invoiceTerms}
+ onChange={(e) => setInvoiceTerms(e.target.value)}
+ className="w-full rounded-lg border border-default bg-surface  px-3 py-2 text-xs text-primary dark:text-primary focus:border-blue-500 outline-none disabled:opacity-75 font-sans"
+ />
+ </div>
+
+ {isAdmin && (
+ <button
+ type="submit"
+ className="flex w-full items-center justify-center rounded-lg bg-blue-600 py-2.5 text-xs font-semibold text-primary hover:bg-blue-700 outline-none border-none cursor-pointer"
+ >
+ Save Invoice Settings
+ </button>
+ )}
+ </form>
+ </div>
+
+ {/* CANCELLATION REFUND POLICY SETTINGS CARD */}
+ <div className="rounded-xl border border-default dark:border-default bg-card p-5 shadow-sm space-y-4 h-fit transition-colors">
+ <div className="flex items-center justify-between border-b border-default pb-2">
+ <div className="flex items-center gap-1.5">
+ <AlertCircle className="h-4 w-4 text-red-500" />
+ <h2 className="font-bold text-primary dark:text-primary text-sm">Cancellation Refund Policy</h2>
+ </div>
+ {isAdmin ? (
+ <span className="text-[9px] bg-red-500/15 border border-red-500/20 text-red-500 px-1.5 py-0.5 rounded font-extrabold font-mono flex items-center gap-0.5"><ShieldCheck className="h-2.5 w-2.5 animate-pulse" /> EDIT</span>
+ ) : (
+ <span className="text-[9px] bg-red-950/20 text-red-500 px-1.5 py-0.5 rounded font-extrabold font-mono flex items-center gap-0.5"><Lock className="h-2.5 w-2.5" /> READ ONLY</span>
+ )}
+ </div>
+
+ <p className="text-[11px] text-muted leading-relaxed font-sans">
+ Define the percentage refund coefficients for clients when orders with different progress statuses are cancelled. The remaining percentage will be securely retained as company processing penalties.
+ </p>
+
+ <form onSubmit={handleSaveCancellationRules} className="space-y-4.5 pt-1">
+ <div className="space-y-3.5">
+ {Object.keys(cancellationRules).map((statusKey) => {
+ if (statusKey ==="Ready For Delivery") return null; // Deduplicate alternate casing representation
+ const displayLabel = statusKey;
+ return (
+ <div key={statusKey} className="grid grid-cols-3 items-center gap-3">
+ <label className="text-[11px] font-semibold text-muted col-span-2 truncate">
+ {displayLabel} Stage Refund
+ </label>
+ <div className="relative col-span-1">
+ <input
+ type="number"
+ min="0"
+ max="100"
+ required
+ disabled={!isAdmin}
+ value={cancellationRules[statusKey] ?? 0}
+ onChange={(e) => {
+ const val = Math.min(100, Math.max(0, parseInt(e.target.value) || 0));
+ setCancellationRules(prev => {
+ const updated = { ...prev, [statusKey]: val };
+ if (statusKey ==="Ready for Delivery") {
+ updated["Ready For Delivery"] = val;
+ }
+ return updated;
+ });
+ }}
+ className="w-full rounded-lg border border-default bg-surface pl-2 pr-6 py-1.5 text-xs text-right font-mono text-primary focus:border-red-500 outline-none disabled:opacity-75"
+ />
+ <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-muted pointer-events-none">%</span>
+ </div>
+ </div>
+ );
+ })}
+ </div>
+
+ {isAdmin && (
+ <button
+ type="submit"
+ className="flex w-full items-center justify-center rounded-lg bg-surface py-2.5 text-xs font-semibold text-primary hover:bg-zinc-850 outline-none border-none cursor-pointer"
+ >
+ Save Cancellation Refund Policy
+ </button>
+ )}
+ </form>
+ </div>
+
+ {/* GST CONFIGURATION SETTINGS CARD (Admin Only or Read-Only for others) */}
+ <div className="rounded-xl border border-default dark:border-default bg-card p-5 shadow-sm space-y-4 h-fit transition-colors">
+ <div className="flex items-center justify-between border-b border-default pb-2">
+ <div className="flex items-center gap-1.5">
+ <Sparkles className="h-4 w-4 text-emerald-500 animate-pulse" />
+ <h2 className="font-bold text-primary dark:text-primary text-sm">GST Configuration</h2>
+ </div>
+ {isAdmin ? (
+ <span className="text-[9px] bg-emerald-500/15 border border-emerald-500/20 text-emerald-500 px-1.5 py-0.5 rounded font-extrabold font-mono flex items-center gap-0.5"><ShieldCheck className="h-2.5 w-2.5" /> EDIT</span>
+ ) : (
+ <span className="text-[9px] bg-red-950/20 text-red-500 px-1.5 py-0.5 rounded font-extrabold font-mono flex items-center gap-0.5"><Lock className="h-2.5 w-2.5" /> READ ONLY</span>
+ )}
+ </div>
+
+ <p className="text-[11px] text-muted leading-relaxed font-sans">
+ Configure default corporate GST numbers, state identification, tax percentages, and initial system toggles. Tax values are fully editable.
+ </p>
+
+ <form onSubmit={handleSaveGstSettings} className="space-y-4 pt-1">
+ <div className="space-y-3">
+ <div>
+ <label className="text-[10px] uppercase font-bold text-muted dark:text-muted block pb-1">Company GSTIN</label>
+ <input
+ type="text"
+ required
+ disabled={!isAdmin}
+ value={gstNumber}
+ onChange={(e) => setGstNumber(e.target.value.toUpperCase())}
+ placeholder="E.g., 37AAAAT9876C1Z0"
+ className="w-full rounded-lg border border-default bg-surface px-3 py-1.5 text-xs text-primary focus:border-blue-500 outline-none disabled:opacity-75"
+ />
+ </div>
+
+ <div className="grid grid-cols-2 gap-3">
+ <div>
+ <label className="text-[10px] uppercase font-bold text-muted dark:text-muted block pb-1">Company State</label>
+ <input
+ type="text"
+ required
+ disabled={!isAdmin}
+ value={companyState}
+ onChange={(e) => setCompanyState(e.target.value)}
+ placeholder="Andhra Pradesh"
+ className="w-full rounded-lg border border-default bg-surface px-3 py-1.5 text-xs text-primary focus:border-blue-500 outline-none disabled:opacity-75"
+ />
+ </div>
+ <div>
+ <label className="text-[10px] uppercase font-bold text-muted dark:text-muted block pb-1">State Code</label>
+ <input
+ type="text"
+ required
+ disabled={!isAdmin}
+ value={companyStateCode}
+ onChange={(e) => setCompanyStateCode(e.target.value)}
+ placeholder="37"
+ className="w-full rounded-lg border border-default bg-surface px-3 py-1.5 text-xs text-primary focus:border-blue-500 outline-none disabled:opacity-75"
+ />
+ </div>
+ </div>
+
+ <div className="grid grid-cols-3 gap-2 pt-1 border-t border-default">
+ <div>
+ <label className="text-[10px] uppercase font-bold text-muted dark:text-muted block pb-1">CGST (%)</label>
+ <input
+ type="number"
+ step="0.01"
+ min="0"
+ max="100"
+ required
+ disabled={!isAdmin}
+ value={cgstPercentage}
+ onChange={(e) => setCgstPercentage(parseFloat(e.target.value) || 0)}
+ className="w-full rounded-lg border border-default bg-surface px-2 py-1.5 text-xs text-right font-mono text-primary focus:border-blue-500 outline-none disabled:opacity-75"
+ />
+ </div>
+ <div>
+ <label className="text-[10px] uppercase font-bold text-muted dark:text-muted block pb-1">SGST (%)</label>
+ <input
+ type="number"
+ step="0.01"
+ min="0"
+ max="100"
+ required
+ disabled={!isAdmin}
+ value={sgstPercentage}
+ onChange={(e) => setSgstPercentage(parseFloat(e.target.value) || 0)}
+ className="w-full rounded-lg border border-default bg-surface px-2 py-1.5 text-xs text-right font-mono text-primary focus:border-blue-500 outline-none disabled:opacity-75"
+ />
+ </div>
+ <div>
+ <label className="text-[10px] uppercase font-bold text-muted dark:text-muted block pb-1">IGST (%)</label>
+ <input
+ type="number"
+ step="0.01"
+ min="0"
+ max="100"
+ required
+ disabled={!isAdmin}
+ value={igstPercentage}
+ onChange={(e) => setIgstPercentage(parseFloat(e.target.value) || 0)}
+ className="w-full rounded-lg border border-default bg-surface px-2 py-1.5 text-xs text-right font-mono text-primary focus:border-blue-500 outline-none disabled:opacity-75"
+ />
+ </div>
+ </div>
+
+ <div className="flex items-center gap-2 pt-2">
+ <input
+ type="checkbox"
+ id="gstEnabledByDefault"
+ disabled={!isAdmin}
+ checked={gstEnabledByDefault}
+ onChange={(e) => setGstEnabledByDefault(e.target.checked)}
+ className="rounded text-blue-600 focus:ring-blue-500 h-3.5 w-3.5 border-default cursor-pointer disabled:opacity-75 disabled:pointer-events-none"
+ />
+ <label htmlFor="gstEnabledByDefault" className="text-xs font-semibold text-secondary dark:text-zinc-300 cursor-pointer disabled:opacity-75">
+ GST Billing Enabled by Default
+ </label>
+ </div>
+ </div>
+
+ {isAdmin && (
+ <button
+ type="submit"
+ className="flex w-full items-center justify-center rounded-lg bg-emerald-600 py-2 text-xs font-semibold text-primary hover:bg-emerald-700 outline-none border-none cursor-pointer"
+ >
+ Save GST Configuration
+ </button>
+ )}
+ </form>
+ </div>
+
+ </div>
+
+ {/* SENSITIVE BLOCKS: HIDDEN OR SEVERELY LOCKED FOR NON-ADMINS */}
+ {isAdmin ? (
+  <div className="space-y-6 lg:col-span-2 h-fit mb-6 animate-in zoom-in-95 duration-200">
+    {/* SQLite & Cloud Backup Controls Card */}
+    <div className="rounded-xl border border-default dark:border-default bg-card p-5 shadow-sm space-y-4 transition-colors">
+      <div className="flex items-center justify-between border-b border-default pb-3">
+        <div className="flex items-center gap-1.5">
+          <Database className="h-4 w-4 text-blue-600" />
+          <h2 className="font-bold text-primary dark:text-primary text-sm font-sans">SQLite &amp; Cloud Backup Controls</h2>
+        </div>
+        <span className="text-[10px] bg-emerald-500/15 border border-emerald-500/20 text-emerald-500 px-1.5 py-0.5 rounded font-extrabold font-mono flex items-center gap-0.5">
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+          SQLite Active
+        </span>
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-surface p-4 rounded-xl border border-default">
+        <div className="space-y-0.5 text-center sm:text-left">
+          <span className="text-[9px] uppercase font-bold text-muted">Products</span>
+          <p className="text-lg font-extrabold text-primary font-mono">{SheetsSyncEngine.getProducts().length}</p>
+        </div>
+        <div className="space-y-0.5 text-center sm:text-left border-l border-default pl-3">
+          <span className="text-[9px] uppercase font-bold text-muted">Customers</span>
+          <p className="text-lg font-extrabold text-primary font-mono">{SheetsSyncEngine.getCustomers().length}</p>
+        </div>
+        <div className="space-y-0.5 text-center sm:text-left border-l border-default pl-3">
+          <span className="text-[9px] uppercase font-bold text-muted">Invoices</span>
+          <p className="text-lg font-extrabold text-primary font-mono">{SheetsSyncEngine.getInvoices().length}</p>
+        </div>
+        <div className="space-y-0.5 text-center sm:text-left border-l border-default pl-3">
+          <span className="text-[9px] uppercase font-bold text-muted">Agents</span>
+          <p className="text-lg font-extrabold text-primary font-mono">{SheetsSyncEngine.getAgents().length}</p>
+        </div>
+      </div>
+
+      <div className="rounded-lg bg-blue-50/50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30 p-3 text-xs leading-relaxed text-muted dark:text-muted">
+        <p>
+          This app runs on a local <strong>SQLite database</strong>. Data is cached locally and written to disk. You can perform cloud backups to Google Sheets to keep your data safe and synced.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+        <button
+          onClick={handleBackupToSheets}
+          disabled={isSyncing}
+          className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-blue-600 py-2.5 text-xs font-bold text-white hover:bg-blue-700 disabled:opacity-50 cursor-pointer border-none"
+        >
+          <Upload className="h-4 w-4 text-white" />
+          <span>Backup to Google Sheets</span>
+        </button>
+        <button
+          onClick={handleRestoreFromSheets}
+          disabled={isSyncing}
+          className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-amber-600 bg-amber-50 dark:bg-amber-950/20 py-2.5 text-xs font-bold text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/20 disabled:opacity-50 cursor-pointer"
+        >
+          <Download className="h-4 w-4" />
+          <span>Restore from Google Sheets</span>
+        </button>
+      </div>
+    </div>
+
+    {/* Google Sheets Backup Settings Card */}
+    <div className="rounded-xl border border-default dark:border-default bg-card p-5 shadow-sm space-y-4 transition-colors">
+      <div className="flex items-center gap-1.5 border-b border-default pb-3">
+        <Server className="h-4 w-4 text-blue-600" />
+        <h2 className="font-bold text-primary dark:text-primary text-sm font-sans">Google Sheets Backup Settings</h2>
+      </div>
+
+ <div className="rounded-lg bg-blue-50/50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30 p-4 space-y-2 text-xs leading-relaxed text-muted dark:text-muted">
+ <div className="flex items-center gap-1.5 font-bold text-blue-700 dark:text-blue-400">
+ <Info className="h-4 w-4 shrink-0" />
+ <span>Permanent Database Configuration</span>
+ </div>
+ <p>Connect your Smart Billing System with any Google Spreadsheet to write real-time invoices. This configuration is permanent across deployments and devices.</p>
+ <div className="pt-2">
+ <ol className="list-decimal pl-4 space-y-1">
+ <li>Deploy our compiled <strong>google-apps-script-backend.gs</strong> as a Web App (Anyone, Execute as: Me).</li>
+ <li>Enter your copied <strong>Web App URL</strong> below.</li>
+ <li>Save Configuration or Test Connection to verify!</li>
+ </ol>
+ </div>
+ </div>
+
+ {/* CONNECTION SETTINGS FIELDS */}
+ <div className="space-y-3 pt-2">
+ <div className="space-y-1">
+ <div className="flex justify-between items-center">
+ <label className="text-[10px] uppercase font-bold text-muted">Apps Script URL</label>
+ <button
+ onClick={copyScriptCode}
+ className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+ >
+ {copiedCode ? <Check className="h-3.5 w-3.5 text-green-600" /> : <Copy className="h-3.5 w-3.5" />}
+ <span>Copy Script Code</span>
+ </button>
+ </div>
+ <input
+ type="text"
+ placeholder="https://script.google.com/macros/s/.../exec"
+ value={appsScriptUrl}
+ onChange={(e) => setAppsScriptUrl(e.target.value)}
+ className="w-full rounded-lg border border-default bg-surface px-3 py-2 text-xs focus:border-blue-500 outline-none font-mono text-primary dark:text-gray-100"
+ />
+ </div>
+
+ <div className="grid gap-3 grid-cols-2">
+ <div className="space-y-1 col-span-1">
+ <label className="text-[10px] uppercase font-bold text-muted">Spreadsheet ID</label>
+ <input
+ type="text"
+ placeholder="1aBcD-EfgHiJklMn..."
+ value={spreadsheetId}
+ onChange={(e) => setSpreadsheetId(e.target.value)}
+ className="w-full rounded-lg border border-default bg-surface px-3 py-2 text-xs focus:border-blue-500 outline-none font-mono text-primary dark:text-gray-100"
+ />
+ </div>
+
+ <div className="space-y-1 col-span-1">
+ <label className="text-[10px] uppercase font-bold text-muted">Spreadsheet Name</label>
+ <input
+ type="text"
+ placeholder="Will autofill on connection test..."
+ value={spreadsheetName}
+ onChange={(e) => setSpreadsheetName(e.target.value)}
+ className="w-full rounded-lg border border-default bg-surface px-3 py-2 text-xs font-semibold text-primary dark:text-gray-100 outline-none font-sans"
+ />
+ </div>
+ </div>
+ </div>
+
+ {/* ACTION HANDLERS */}
+ <div className="flex flex-col gap-2 pt-3 border-t border-default">
+ <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+ <button
+ onClick={async () => {
+ if (!isAdmin) return;
+ const activeMapping = {
+ productsSheetName: productsSheet,
+ customersSheetName: customersSheet,
+ invoicesSheetName: invoicesSheet,
+ invoiceItemsSheetName: invoiceItemsSheet,
+ settingsSheetName: settingsSheet,
+ agentsSheetName: agentsSheet,
+ };
+ const updatedConn: ConnectionSettings = {
+ spreadsheetId: spreadsheetId.trim(),
+ spreadsheetName: spreadsheetName.trim(),
+ appsScriptUrl: appsScriptUrl.trim(),
+ apiKey: apiKey,
+ isConnected: isConnected,
+ lastSyncTime: connSettings.lastSyncTime || new Date().toLocaleTimeString(),
+ ...activeMapping,
+ };
+ SheetsSyncEngine.saveConnectionSettings(updatedConn);
+ onShowNotification("Database Connection Settings permanently saved.","success");
+ }}
+ disabled={isSyncing}
+ className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-blue-600 bg-blue-600 py-2.5 text-xs font-semibold text-primary hover:bg-blue-700 disabled:opacity-50 cursor-pointer"
+ >
+ <Server className="h-4 w-4" />
+ <span>Save Configuration</span>
+ </button>
+ <button
+ onClick={handleTestConnection}
+ disabled={isSyncing}
+ className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-default dark:border-zinc-700 py-2.5 text-xs font-semibold text-secondary dark:text-gray-200 hover:bg-surface dark:hover:bg-zinc-800 disabled:opacity-50 cursor-pointer bg-card"
+ >
+ <Check className="h-4 w-4" />
+ <span>Test Connection</span>
+ </button>
+ <button
+ onClick={() => {
+ if (!isAdmin) return;
+ if (!confirm("Are you sure you want to clear the global database connection configuration?")) return;
+ setAppsScriptUrl("");
+ setSpreadsheetId("");
+ setSpreadsheetName("");
+ setIsConnected(false);
+ 
+ const activeMapping = {
+ productsSheetName: productsSheet,
+ customersSheetName: customersSheet,
+ invoicesSheetName: invoicesSheet,
+ invoiceItemsSheetName: invoiceItemsSheet,
+ settingsSheetName: settingsSheet,
+ agentsSheetName: agentsSheet,
+ };
+ const updatedConn: ConnectionSettings = {
+ spreadsheetId:"",
+ spreadsheetName:"",
+ appsScriptUrl:"",
+ apiKey:"",
+ isConnected: false,
+ lastSyncTime:"",
+ ...activeMapping,
+ };
+ SheetsSyncEngine.saveConnectionSettings(updatedConn);
+ onShowNotification("Connection defaults cleared globally.","info");
+ }}
+ disabled={isSyncing}
+ className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-rose-200 dark:border-rose-900/30 py-2.5 text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/20 disabled:opacity-50 cursor-pointer bg-card"
+ >
+ <RefreshCw className="h-4 w-4" />
+ <span>Reset Connection</span>
+ </button>
+ </div>
+
+ <div className="grid grid-cols-2 gap-2 mt-2">
+ <button
+ onClick={handleInitializeDatabase}
+ disabled={isSyncing}
+ className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-emerald-600 py-2.5 text-xs font-semibold text-primary hover:bg-emerald-700 disabled:opacity-50 cursor-pointer border-none"
+ >
+ <Sparkles className="h-4 w-4 text-emerald-100 fill-emerald-100 animate-pulse" />
+ <span>Initialize Database</span>
+ </button>
+ <button
+ onClick={handleUpdateSchema}
+ disabled={isSyncing || !isConnected}
+ className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-purple-600 py-2.5 text-xs font-semibold text-primary hover:bg-purple-700 disabled:opacity-50 cursor-pointer border-none"
+ >
+ <Sparkles className="h-4 w-4 text-purple-100 fill-purple-100" />
+ <span>Update Schema</span>
+ </button>
+  <button
+    onClick={handleSyncPull}
+    disabled={isSyncing}
+    className="col-span-2 flex items-center justify-center gap-2 rounded-lg bg-blue-600 py-2.5 text-xs font-semibold text-primary hover:bg-blue-700 disabled:opacity-50 disabled:bg-gray-200 dark:disabled:bg-zinc-800 disabled:text-muted border-none cursor-pointer"
+  >
+    <RefreshCw className={`h-4 w-4 ${isSyncing ? "animate-spin" : ""}`} />
+    <span>Refresh Local Cache</span>
+  </button>
+  <button
+    onClick={async () => {
+      if(!isAdmin) return;
+      if(!isConnected || !appsScriptUrl) {
+        onShowNotification("Please connect to Google Sheets backend first.", "error"); return;
+      }
+      if(!confirm("Are you sure you want to repair the invoice counters?")) return;
+      setIsSyncing(true);
+      try {
+        const payload = { action: "repairCounters", spreadsheetId: spreadsheetId };
+        const res = await fetch(appsScriptUrl, { 
+          method: "POST", mode: "cors", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(payload)
+        });
+        const resJson = await res.json();
+        if(resJson.success) {
+          onShowNotification("✓ Counters repaired successfully across Google Sheets databases.", "success");
+        } else {
+          onShowNotification("Failed to repair counters: " + resJson.message, "error");
+        }
+      } catch(e: any) {
+        onShowNotification("Failed to connect to Google Apps Script.", "error");
+      } finally {
+        setIsSyncing(false);
+      }
+    }}
+    disabled={isSyncing || !isConnected}
+    className="col-span-2 flex items-center justify-center gap-2 rounded-lg bg-yellow-600 py-2.5 text-xs font-semibold text-primary hover:bg-yellow-700 disabled:opacity-50 cursor-pointer border-none"
+  >
+    <Database className="h-4 w-4" />
+    <span>Repair Invoice Counters</span>
+  </button>
+ </div>
+ </div>
+
+ <details className="pt-2 outline-none">
+ <summary className="cursor-pointer text-[11px] font-bold text-muted uppercase select-none hover:text-blue-600 list-none flex items-center gap-1 font-mono">
+ Advanced Sheet Worksheets Mappings &rarr;
+ </summary>
+ <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 pt-3">
+ <div className="space-y-1">
+ <label className="text-[10px] text-muted uppercase">Products Sheet</label>
+ <input
+ type="text"
+ value={productsSheet}
+ onChange={(e) => setProductsSheet(e.target.value)}
+ className="w-full rounded-md border border-default bg-surface px-2 py-1 text-xs font-mono text-primary border-none"
+ />
+ </div>
+ <div className="space-y-1">
+ <label className="text-[10px] text-muted uppercase">Customers Sheet</label>
+ <input
+ type="text"
+ value={customersSheet}
+ onChange={(e) => setCustomersSheet(e.target.value)}
+ className="w-full rounded-md border border-default bg-surface px-2 py-1 text-xs font-mono text-primary border-none"
+ />
+ </div>
+ <div className="space-y-1">
+ <label className="text-[10px] text-muted uppercase">Invoices Sheet</label>
+ <input
+ type="text"
+ value={invoicesSheet}
+ onChange={(e) => setInvoicesSheet(e.target.value)}
+ className="w-full rounded-md border border-default bg-surface px-2 py-1 text-xs font-mono text-primary border-none"
+ />
+ </div>
+ <div className="space-y-1">
+ <label className="text-[10px] text-muted uppercase">InvoiceItems Sheet</label>
+ <input
+ type="text"
+ value={invoiceItemsSheet}
+ onChange={(e) => setInvoiceItemsSheet(e.target.value)}
+ className="w-full rounded-md border border-default bg-surface px-2 py-1 text-xs font-mono text-primary border-none"
+ />
+ </div>
+ <div className="space-y-1">
+ <label className="text-[10px] text-muted uppercase">Settings Sheet</label>
+ <input
+ type="text"
+ value={settingsSheet}
+ onChange={(e) => setSettingsSheet(e.target.value)}
+ className="w-full rounded-md border border-default bg-surface px-2 py-1 text-xs font-mono text-primary border-none"
+ />
+ </div>
+ <div className="space-y-1">
+ <label className="text-[10px] text-muted uppercase">Agents Sheet</label>
+ <input
+ type="text"
+ value={agentsSheet}
+ onChange={(e) => setAgentsSheet(e.target.value)}
+ className="w-full rounded-md border border-default bg-surface px-2 py-1 text-xs font-mono text-primary border-none"
+ />
+ </div>
+ </div>
+ </details>
+
+ {/* DATABASE EXPORTS BACKUP */}
+ <div className="border-t border-default pt-5 space-y-4">
+ <div className="flex items-center gap-1.5">
+ <Database className="h-4 w-4 text-blue-600" />
+ <h3 className="font-bold text-primary text-xs">System Administration</h3>
+ </div>
+
+ <div className="grid gap-2 sm:grid-cols-2">
+ <button
+ onClick={handleBackupExportJson}
+ className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-default bg-card py-2 text-xs font-medium text-secondary hover:bg-surface cursor-pointer"
+ >
+ <Download className="h-3.5 w-3.5" />
+ <span>JSON Complete Backup</span>
+ </button>
+
+ <button
+ onClick={handleProductCsvExport}
+ className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-default bg-card py-2 text-xs font-medium text-secondary hover:bg-surface cursor-pointer"
+ >
+ <Upload className="h-3.5 w-3.5" />
+ <span>CSV Catalog Export</span>
+ </button>
+ </div>
+
+ <div className="flex flex-col gap-2.5 rounded-xl border border-dashed border-default p-4">
+ <div className="flex items-start gap-2 text-[11px] text-muted">
+ <AlertCircle className="h-4 w-4 shrink-0 text-amber-500" />
+ <p>Import a JSON file to restore complete database structures or refresh standard session grids.</p>
+ </div>
+ <div className="flex gap-2">
+ <label className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-default bg-card px-3 py-2 text-xs font-semibold text-secondary hover:bg-surface cursor-pointer">
+ <Upload className="h-3.5 w-3.5" />
+ <span>Restore JSON backup</span>
+ <input
+ type="file"
+ accept=".json"
+ onChange={handleRestoreBackupJson}
+ className="hidden"
+ />
+ </label>
+ <button
+ onClick={handleResetDefaults}
+ className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-dashed border-red-200 hover:border-red-300 text-red-600 hover:bg-red-50/55 px-3 py-2 text-xs font-bold bg-transparent cursor-pointer"
+ >
+ <ShieldAlert className="h-3.5 w-3.5 text-red-500" />
+ <span>Reset Demo Logs</span>
+ </button>
+ </div>
+ </div>
+ </div>
+ </div>
+ </div>
+ ) : (
+ /* LOCK SCREEN ACCORDION PANEL FOR EMPLOYEES & MANAGERS */
+ <div className="rounded-xl border border-default dark:border-default bg-card p-8 shadow-sm text-center space-y-4 lg:col-span-2 flex flex-col justify-center items-center transition-colors">
+ <Lock className="h-10 w-10 text-amber-600 animate-bounce" />
+ <div className="max-w-[340px] space-y-1.5">
+ <h3 className="font-bold text-primary dark:text-primary text-sm">Clearance Bound Lockout</h3>
+ <p className="text-[11px] text-muted leading-relaxed font-sans">
+ Google Sheet synchronization, database migrations, backup configurations and full JSON data registers are managed exclusively by authorized <strong>System Administrators</strong>.
+ </p>
+ </div>
+ </div>
+ )}
+ </div>
+ );
+}
