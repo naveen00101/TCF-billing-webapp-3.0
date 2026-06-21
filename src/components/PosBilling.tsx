@@ -1231,9 +1231,16 @@ export default function PosBilling({
  }}
  className={`w-full rounded-md border bg-card px-3 py-1.5 text-xs font-semibold text-left focus:outline-none flex items-center justify-between shadow-sm transition-colors ${isSearching ? 'border-blue-500 text-blue-700' : 'border-default text-secondary dark:text-zinc-300 hover:border-blue-400'}`}
  >
- <span className={item.productId ?"text-primary dark:text-primary" :"text-muted"}>
- {item.productId ? (item.displayName || (selectedProd ? selectedProd.name :"Unnamed Product")) :"Click to select Product/SKU..."}
- </span>
+ <div className="flex items-center flex-wrap gap-2 pr-4">
+  <span className={item.productId ?"text-primary dark:text-primary font-semibold text-xs" :"text-muted text-xs"}>
+  {item.productId ? (item.displayName || (selectedProd ? selectedProd.name :"Unnamed Product")) :"Click to select Product/SKU..."}
+  </span>
+  {item.isCombo && (
+  <span className="bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-[10px] font-extrabold px-2 py-0.5 rounded uppercase tracking-wide">
+  Combo price - {item.customPrice || selectedProd?.price || 0}
+  </span>
+  )}
+  </div>
  <Search className="h-3.5 w-3.5 text-muted" />
  </button>
  {item.productId && (() => {
@@ -1346,48 +1353,83 @@ export default function PosBilling({
  </div>
 
  {item.isCombo && item.comboItems && (
- <div className="ml-8 border-l-2 border-blue-200 pl-4 space-y-2 mb-2 mt-2">
- <h4 className="text-[10px] font-bold text-secondary uppercase tracking-wider">Combo Contents:</h4>
- {item.comboItems.map((cItem, cIdx) => (
- <div key={cIdx} className="flex items-center gap-2 text-xs">
- <span className="text-muted mr-1">-</span>
- <input 
- className="bg-card border border-default px-2 py-1 rounded w-64 text-primary text-xs outline-none focus:border-blue-500" 
- value={cItem.productName}
- placeholder="Type product name..."
- onChange={(e) => {
- const updated = [...lineItems];
- updated[index].comboItems![cIdx].productName = e.target.value;
- setLineItems(updated);
- }}
- />
- <button 
- type="button" 
- className="text-red-500 hover:text-red-700 p-1 bg-red-50 hover:bg-red-100 rounded"
- onClick={() => {
- const updated = [...lineItems];
- updated[index].comboItems!.splice(cIdx, 1);
- setLineItems(updated);
- }}
- >
- <X className="w-3 h-3" />
- </button>
- </div>
- ))}
- <button 
- type="button"
- onClick={() => {
- const updated = [...lineItems];
- updated[index].comboItems!.push({ id: `ci_${Date.now()}`, productId: `custom_${Date.now()}`, quantity: 1, productName: "" });
- setLineItems(updated);
- }}
- className="text-[10px] font-bold text-blue-600 flex items-center gap-1 hover:text-blue-700 bg-blue-50 px-2 py-1 rounded mt-1 border-none cursor-pointer"
- >
- <Plus className="w-3 h-3" />
- Add Item
- </button>
- </div>
- )}
+  <div className="ml-8 border-l-2 border-blue-200 dark:border-blue-800 pl-4 space-y-2 mb-2 mt-2">
+  <h4 className="text-[10px] font-bold text-secondary uppercase tracking-wider">Combo Contents:</h4>
+  {item.comboItems.map((cItem, cIdx) => (
+  <div key={cIdx} className="flex items-center gap-3 text-xs">
+  <span className="text-muted mr-1">-</span>
+  <input 
+  className="bg-card border border-default px-2 py-1 rounded w-64 text-primary text-xs outline-none focus:border-blue-500" 
+  value={cItem.productName}
+  placeholder="Type product name..."
+  onChange={(e) => {
+  const updated = [...lineItems];
+  updated[index].comboItems![cIdx].productName = e.target.value;
+  setLineItems(updated);
+  saveDraftSilent();
+  }}
+  />
+  <div className="flex items-center gap-1">
+  <button
+  type="button"
+  onClick={() => {
+  const updated = [...lineItems];
+  const currentQty = updated[index].comboItems![cIdx].quantity || 1;
+  updated[index].comboItems![cIdx].quantity = Math.max(1, currentQty - 1);
+  setLineItems(updated);
+  saveDraftSilent();
+  }}
+  className="rounded bg-card-secondary hover:bg-gray-200 text-secondary dark:bg-zinc-800 dark:hover:bg-zinc-700 font-bold px-1.5 py-0.5 text-[10px] border-none cursor-pointer"
+  >
+  -
+  </button>
+  <span className="w-6 text-center font-mono font-bold text-xs text-primary">
+  {cItem.quantity || 1}
+  </span>
+  <button
+  type="button"
+  onClick={() => {
+  const updated = [...lineItems];
+  const currentQty = updated[index].comboItems![cIdx].quantity || 1;
+  updated[index].comboItems![cIdx].quantity = currentQty + 1;
+  setLineItems(updated);
+  saveDraftSilent();
+  }}
+  className="rounded bg-card-secondary hover:bg-gray-200 text-secondary dark:bg-zinc-800 dark:hover:bg-zinc-700 font-bold px-1.5 py-0.5 text-[10px] border-none cursor-pointer"
+  >
+  +
+  </button>
+  </div>
+  <button 
+  type="button" 
+  className="text-red-500 hover:text-red-700 p-1 bg-red-50 hover:bg-red-100 dark:bg-zinc-850 dark:hover:bg-zinc-800 rounded border-none cursor-pointer"
+  onClick={() => {
+  const updated = [...lineItems];
+  updated[index].comboItems!.splice(cIdx, 1);
+  setLineItems(updated);
+  saveDraftSilent();
+  }}
+  >
+  <X className="w-3.5 h-3.5" />
+  </button>
+  </div>
+  ))}
+  <button 
+  type="button"
+  onClick={() => {
+  const updated = [...lineItems];
+  updated[index].comboItems = updated[index].comboItems || [];
+  updated[index].comboItems!.push({ id: `ci_${Date.now()}`, productId: `custom_${Date.now()}`, variantId: "", productName: "", quantity: 1 });
+  setLineItems(updated);
+  saveDraftSilent();
+  }}
+  className="text-[10px] font-bold text-blue-600 flex items-center gap-1 hover:text-blue-700 bg-blue-50 dark:bg-zinc-850 dark:text-blue-400 px-2 py-1 rounded mt-1 border-none cursor-pointer w-fit"
+  >
+  <Plus className="w-3.5 h-3.5" />
+  Add Row
+  </button>
+  </div>
+  )}
  </div>
  );
  })}

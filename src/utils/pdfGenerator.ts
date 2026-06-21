@@ -424,6 +424,17 @@ export async function generateInvoicePDF(
     // Check available column width and split text automatically to support beautiful wrapping
     const maxColumnWidth = showHsn ? 65 : 84; 
     const lines: string[] = doc.splitTextToSize(printableName, maxColumnWidth);
+    if (item.isCombo && item.comboItems && item.comboItems.length > 0) {
+      item.comboItems.forEach(c => {
+        const cName = c.productName || "";
+        const cQty = c.quantity || 1;
+        if (cName) {
+          const indentedLine = `  - ${cName} (Qty: ${cQty})`;
+          const cLines: string[] = doc.splitTextToSize(indentedLine, maxColumnWidth);
+          lines.push(...cLines);
+        }
+      });
+    }
     const rowHeight = Math.max(6.5, 4.0 + lines.length * 4.0);
 
     if (idx % 2 === 1) {
