@@ -313,6 +313,10 @@ export class SheetsSyncEngine {
       // Skip the root dummy node or pure category nodes from legacy structure
       if (p.id === 'root' || p.id.startsWith('CAT-TEXT-') || p.nodeType === 'Category') return;
       
+      if (!p.inventoryType) {
+        p.inventoryType = "Stock Item";
+      }
+      
       if (!idMap.has(p.id)) {
         idMap.set(p.id, p);
       }
@@ -1265,7 +1269,7 @@ export class SheetsSyncEngine {
         action: "SYNC_UP",
         spreadsheetId: conn.spreadsheetId,
         payload: {
-          [conn.productsSheetName || "Products"]: this.getProducts().map(({ inventorySkus, productOptions, ...p }) => p),
+          [conn.productsSheetName || "Products"]: this.getProducts().map(({ inventorySkus, productOptions, inventoryType, ...p }) => p),
           [conn.customersSheetName || "Customers"]: this.getCustomers(),
           [conn.invoicesSheetName || "Invoices"]: this.getInvoices(),
           [conn.invoiceItemsSheetName || "InvoiceItems"]: this.getInvoiceItems(),
@@ -1312,7 +1316,7 @@ export class SheetsSyncEngine {
         action: "SYNC_UP",
         spreadsheetId: conn.spreadsheetId,
         payload: {
-          [conn.productsSheetName || "Products"]: this.getProducts().map(({ inventorySkus, productOptions, ...p }) => p),
+          [conn.productsSheetName || "Products"]: this.getProducts().map(({ inventorySkus, productOptions, inventoryType, ...p }) => p),
           [conn.customersSheetName || "Customers"]: this.getCustomers(),
           [conn.invoicesSheetName || "Invoices"]: this.getInvoices(),
           [conn.invoiceItemsSheetName || "InvoiceItems"]: this.getInvoiceItems(),
@@ -1367,7 +1371,7 @@ export class SheetsSyncEngine {
         action: "SYNC_UP",
         spreadsheetId: conn.spreadsheetId,
         payload: {
-          [conn.productsSheetName || "Products"]: this.getProducts().map(({ inventorySkus, productOptions, ...p }) => p),
+          [conn.productsSheetName || "Products"]: this.getProducts().map(({ inventorySkus, productOptions, inventoryType, ...p }) => p),
           [conn.customersSheetName || "Customers"]: this.getCustomers(),
           [conn.invoicesSheetName || "Invoices"]: this.getInvoices(),
           [conn.invoiceItemsSheetName || "InvoiceItems"]: this.getInvoiceItems(),
