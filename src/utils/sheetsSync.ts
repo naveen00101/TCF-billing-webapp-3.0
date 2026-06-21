@@ -1052,6 +1052,19 @@ export class SheetsSyncEngine {
     this.saveConnectionSettings(conn);
   }
 
+  // Clear all local database records (leaves settings intact)
+  public static clearLocalData(): void {
+    this.saveProducts([]);
+    this.saveCustomers([]);
+    this.saveInvoices([]);
+    this.saveInvoiceItems([]);
+    this.saveAgents([]);
+    this.savePaymentTransactions([]);
+    this.savePromoCodes([]);
+    this.saveAuditLogs([]);
+    this.saveUserActivities([]);
+  }
+
   private static isRateLimitError(e: any): boolean {
     if (!e) return false;
     const errString = typeof e === "string" ? e : (e.message || JSON.stringify(e)).toLowerCase();

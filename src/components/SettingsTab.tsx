@@ -408,6 +408,18 @@ export default function SettingsTab({
  onRefresh();
  };
 
+  const handleClearLocalData = () => {
+    if (!isAdmin) return;
+    const confirmClear = window.confirm(
+      "⚠️ WARNING: This will permanently delete all local products, customers, invoices, and transaction logs from this browser's cache! (Your Google Sheets database will NOT be affected). Are you sure you want to clear all local data?"
+    );
+    if (!confirmClear) return;
+
+    SheetsSyncEngine.clearLocalData();
+    onShowNotification("✓ All local billing data cleared successfully.", "success");
+    onRefresh();
+  };
+
  const handleBackupExportJson = () => {
  if (!isAdmin) return;
  const payload = {
@@ -1405,6 +1417,13 @@ export default function SettingsTab({
  >
  <ShieldAlert className="h-3.5 w-3.5 text-red-500" />
  <span>Reset Demo Logs</span>
+ </button>
+ <button
+ onClick={handleClearLocalData}
+ className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-dashed border-rose-200 hover:border-rose-300 text-rose-600 hover:bg-rose-50/55 px-3 py-2 text-xs font-bold bg-transparent cursor-pointer"
+ >
+ <ShieldAlert className="h-3.5 w-3.5 text-rose-500" />
+ <span>Remove Local Data</span>
  </button>
  </div>
  </div>
