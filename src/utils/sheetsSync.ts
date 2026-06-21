@@ -16,6 +16,10 @@ import {
   PaymentTransaction
 } from "../types";
 
+import { getTodayStr, isDateInCurrentWeek, getInvoiceDateStr, parseInvoiceDate, getCurrentTimeStr } from "./dateUtils";
+
+const TODAY = getTodayStr();
+
 // Professional mock data for immediate out-of-the-box loading
 const DEFAULT_EMPLOYEES: Employee[] = [];
 
