@@ -1169,25 +1169,30 @@ export class SheetsSyncEngine {
     }
   }
 
-  public static async pullDatabaseFromSQLite(conn?: ConnectionSettings): Promise<{ success: boolean; message: string }> {
+  public static async syncDownFromSheets(conn?: ConnectionSettings): Promise<{ success: boolean; message: string }> {
     try {
+      const activeConn = conn || this.getConnectionSettings();
+      if (!activeConn.appsScriptUrl) {
+        return { success: false, message: "No Apps Script URL configured." };
+      }
+
       const payload = {
-        action: "syncPull",
-        spreadsheetId: conn?.spreadsheetId || "sqlite-local",
+        action: "SYNC_DOWN",
+        spreadsheetId: activeConn.spreadsheetId,
         sheetsMapping: {
-          products: conn?.productsSheetName,
-          customers: conn?.customersSheetName,
-          invoices: conn?.invoicesSheetName,
-          invoiceItems: conn?.invoiceItemsSheetName,
-          settings: conn?.settingsSheetName,
-          agents: conn?.agentsSheetName,
-          paymentTransactions: conn?.paymentTransactionsSheetName || "PaymentTransactions",
+          products: activeConn.productsSheetName,
+          customers: activeConn.customersSheetName,
+          invoices: activeConn.invoicesSheetName,
+          invoiceItems: activeConn.invoiceItemsSheetName,
+          settings: activeConn.settingsSheetName,
+          agents: activeConn.agentsSheetName,
+          paymentTransactions: activeConn.paymentTransactionsSheetName || "PaymentTransactions",
         }
       };
 
-      const response = await fetch("/api/sync", {
+      const response = await fetch(activeConn.appsScriptUrl, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
         body: JSON.stringify(payload),
       });
 
@@ -1195,7 +1200,9 @@ export class SheetsSyncEngine {
         throw new Error(`Sync pull failure: ${response.status}`);
       }
 
-      const result = await response.json();
+      const resText = await response.text();
+      const result = JSON.parse(resText);
+      
       if (result.success) {
         if (result.products) {
           // Merge conflict resolution:
@@ -1275,7 +1282,7 @@ export class SheetsSyncEngine {
           });
         }
 
-        return { success: true, message: "Database synchronized successfully with local SQLite." };
+        return { success: true, message: "Database synchronized successfully with Google Sheets." };
       } else {
         const isRate = this.isRateLimitError(result.message);
         const friendlyMsg = isRate
@@ -1366,46 +1373,6 @@ export class SheetsSyncEngine {
       return { success: true, message: "Transaction queued for background sync." };
     } catch (e: any) {
       return { success: false, message: e.message || "Failed to queue sync." };
-    }
-  }
-
-  public static async backupToGoogleSheets(conn: ConnectionSettings): Promise<{ success: boolean; message: string }> {
-    try {
-      const response = await fetch("/api/backup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          appsScriptUrl: conn.appsScriptUrl,
-          spreadsheetId: conn.spreadsheetId
-        })
-      });
-      if (!response.ok) {
-        throw new Error(`Backup failed with HTTP status: ${response.status}`);
-      }
-      return await response.json();
-    } catch (e: any) {
-      console.error("Backup Error:", e);
-      return { success: false, message: e.message || e.toString() };
-    }
-  }
-
-  public static async restoreFromGoogleSheets(conn: ConnectionSettings): Promise<{ success: boolean; message: string }> {
-    try {
-      const response = await fetch("/api/restore", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          appsScriptUrl: conn.appsScriptUrl,
-          spreadsheetId: conn.spreadsheetId
-        })
-      });
-      if (!response.ok) {
-        throw new Error(`Restore failed with HTTP status: ${response.status}`);
-      }
-      return await response.json();
-    } catch (e: any) {
-      console.error("Restore Error:", e);
-      return { success: false, message: e.message || e.toString() };
     }
   }
 }

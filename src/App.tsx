@@ -329,17 +329,19 @@ export default function App() {
  // 2. Hydrate application state with newly synchronized settings
  reloadApplicationState();
  
- // 3. Attempt background sync from local SQLite unconditionally
+ // 3. Attempt background sync from Google Sheets unconditionally if configured
  const conn = SheetsSyncEngine.getConnectionSettings();
- SheetsSyncEngine.pullDatabaseFromSQLite(conn)
- .then((result) => {
- if (result.success) {
- reloadApplicationState();
+ if (conn.isConnected && conn.appsScriptUrl) {
+   SheetsSyncEngine.syncDownFromSheets(conn)
+     .then((result) => {
+       if (result.success) {
+         reloadApplicationState();
+       }
+     })
+     .catch(() => {
+       console.warn("Failed to automatically synchronize with Google Sheets.");
+     });
  }
- })
- .catch(() => {
- showNotification("Offline mode: Failed to connect to local database.","error");
- });
  }
 
  bootSequence();
@@ -347,8 +349,12 @@ export default function App() {
 
  const handleForceSync = async () => {
  const conn = SheetsSyncEngine.getConnectionSettings();
- showNotification("Refreshing data from local database...","info");
- const result = await SheetsSyncEngine.pullDatabaseFromSQLite(conn);
+ if (!conn.appsScriptUrl) {
+   showNotification("Database is offline. Configure Google Apps Script in Settings.", "error");
+   return;
+ }
+ showNotification("Refreshing data from Google Sheets...","info");
+ const result = await SheetsSyncEngine.syncDownFromSheets(conn);
  if (result.success) {
  reloadApplicationState();
  showNotification("✓ Data refreshed successfully.","success");

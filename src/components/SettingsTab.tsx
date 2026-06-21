@@ -319,7 +319,7 @@ export default function SettingsTab({
  SheetsSyncEngine.saveConnectionSettings(updatedConn);
  onShowNotification("✓ Sheets Database initialized successfully! Code mapped.","success");
  
- await SheetsSyncEngine.pullDatabaseFromSQLite(updatedConn);
+ await SheetsSyncEngine.syncDownFromSheets(updatedConn);
  onRefresh();
  } else {
  onShowNotification(`Database Initialization Failed: ${result.message}`,"error");
@@ -337,7 +337,7 @@ export default function SettingsTab({
  spreadsheetId.trim()
  );
 
- setIsSyncing(false);
+ setIsSyncing(true);
 
  if (result.success) {
  onShowNotification(`✓ ${result.message}`,"success");
@@ -351,18 +351,22 @@ export default function SettingsTab({
  const handleSyncPull = async () => {
     if (!isAdmin) return;
     const conn = SheetsSyncEngine.getConnectionSettings();
+    if (!conn.appsScriptUrl) {
+      onShowNotification("Database is offline. Configure Google Apps Script Web App URL first.", "error");
+      return;
+    }
     
     setIsSyncing(true);
-    onShowNotification("Refreshing local data from SQLite backend...","info");
+    onShowNotification("Refreshing local data cache from Google Sheets...","info");
     
-    const result = await SheetsSyncEngine.pullDatabaseFromSQLite(conn);
+    const result = await SheetsSyncEngine.syncDownFromSheets(conn);
     setIsSyncing(false);
 
     if (result.success) {
-      onShowNotification("✓ Local database cache refreshed successfully.","success");
+      onShowNotification("✓ Local cache refreshed successfully from Google Sheets.","success");
       onRefresh();
     } else {
-      onShowNotification(`Pull Error: ${result.message}`,"error");
+      onShowNotification(`Sync Error: ${result.message}`,"error");
     }
   };
 
@@ -1098,64 +1102,6 @@ export default function SettingsTab({
  {/* SENSITIVE BLOCKS: HIDDEN OR SEVERELY LOCKED FOR NON-ADMINS */}
  {isAdmin ? (
   <div className="space-y-6 lg:col-span-2 h-fit mb-6 animate-in zoom-in-95 duration-200">
-    {/* SQLite & Cloud Backup Controls Card */}
-    <div className="rounded-xl border border-default dark:border-default bg-card p-5 shadow-sm space-y-4 transition-colors">
-      <div className="flex items-center justify-between border-b border-default pb-3">
-        <div className="flex items-center gap-1.5">
-          <Database className="h-4 w-4 text-blue-600" />
-          <h2 className="font-bold text-primary dark:text-primary text-sm font-sans">SQLite &amp; Cloud Backup Controls</h2>
-        </div>
-        <span className="text-[10px] bg-emerald-500/15 border border-emerald-500/20 text-emerald-500 px-1.5 py-0.5 rounded font-extrabold font-mono flex items-center gap-0.5">
-          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-          SQLite Active
-        </span>
-      </div>
-
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-surface p-4 rounded-xl border border-default">
-        <div className="space-y-0.5 text-center sm:text-left">
-          <span className="text-[9px] uppercase font-bold text-muted">Products</span>
-          <p className="text-lg font-extrabold text-primary font-mono">{SheetsSyncEngine.getProducts().length}</p>
-        </div>
-        <div className="space-y-0.5 text-center sm:text-left border-l border-default pl-3">
-          <span className="text-[9px] uppercase font-bold text-muted">Customers</span>
-          <p className="text-lg font-extrabold text-primary font-mono">{SheetsSyncEngine.getCustomers().length}</p>
-        </div>
-        <div className="space-y-0.5 text-center sm:text-left border-l border-default pl-3">
-          <span className="text-[9px] uppercase font-bold text-muted">Invoices</span>
-          <p className="text-lg font-extrabold text-primary font-mono">{SheetsSyncEngine.getInvoices().length}</p>
-        </div>
-        <div className="space-y-0.5 text-center sm:text-left border-l border-default pl-3">
-          <span className="text-[9px] uppercase font-bold text-muted">Agents</span>
-          <p className="text-lg font-extrabold text-primary font-mono">{SheetsSyncEngine.getAgents().length}</p>
-        </div>
-      </div>
-
-      <div className="rounded-lg bg-blue-50/50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30 p-3 text-xs leading-relaxed text-muted dark:text-muted">
-        <p>
-          This app runs on a local <strong>SQLite database</strong>. Data is cached locally and written to disk. You can perform cloud backups to Google Sheets to keep your data safe and synced.
-        </p>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-        <button
-          onClick={handleBackupToSheets}
-          disabled={isSyncing}
-          className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-blue-600 py-2.5 text-xs font-bold text-white hover:bg-blue-700 disabled:opacity-50 cursor-pointer border-none"
-        >
-          <Upload className="h-4 w-4 text-white" />
-          <span>Backup to Google Sheets</span>
-        </button>
-        <button
-          onClick={handleRestoreFromSheets}
-          disabled={isSyncing}
-          className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-amber-600 bg-amber-50 dark:bg-amber-950/20 py-2.5 text-xs font-bold text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/20 disabled:opacity-50 cursor-pointer"
-        >
-          <Download className="h-4 w-4" />
-          <span>Restore from Google Sheets</span>
-        </button>
-      </div>
-    </div>
-
     {/* Google Sheets Backup Settings Card */}
     <div className="rounded-xl border border-default dark:border-default bg-card p-5 shadow-sm space-y-4 transition-colors">
       <div className="flex items-center gap-1.5 border-b border-default pb-3">
