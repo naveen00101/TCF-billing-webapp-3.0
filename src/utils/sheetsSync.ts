@@ -1299,6 +1299,13 @@ export class SheetsSyncEngine {
           });
         }
 
+        // Update lastSyncTime to current time
+        const updatedConn = {
+          ...activeConn,
+          lastSyncTime: new Date().toLocaleTimeString(),
+        };
+        this.saveConnectionSettings(updatedConn);
+
         return { success: true, message: "Database synchronized successfully with Google Sheets." };
       } else {
         const isRate = this.isRateLimitError(result.message);
