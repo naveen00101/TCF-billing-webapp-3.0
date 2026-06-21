@@ -1196,15 +1196,30 @@ export class SheetsSyncEngine {
           let email = companySettings.email;
           let gst = companySettings.gstNumber;
 
-          settingsList.forEach((s: { key: string; value: any }) => {
-            if (s.key === "nextInvoiceNumber") nextInvNum = parseInt(s.value) || nextInvNum;
-            if (s.key === "invoicePrefix") prefix = s.value || prefix;
-            if (s.key === "companyName") name = s.value || name;
-            if (s.key === "address") addr = s.value || addr;
-            if (s.key === "phone") phone = s.value || phone;
-            if (s.key === "email") email = s.value || email;
-            if (s.key === "gstNumber") gst = s.value || gst;
-          });
+          const firstRow = settingsList[0];
+          if (firstRow && (firstRow.nextInvoiceNumber !== undefined || firstRow.nextInvoiceNumber === null)) {
+            // Flat format
+            nextInvNum = parseInt(firstRow.nextInvoiceNumber) || nextInvNum;
+            prefix = firstRow.invoicePrefix || prefix;
+            name = firstRow.companyName || name;
+            addr = firstRow.address || addr;
+            phone = firstRow.phone || phone;
+            email = firstRow.email || email;
+            gst = firstRow.gstNumber || gst;
+          } else {
+            // Key-Value format
+            settingsList.forEach((s: any) => {
+              const key = s.key || s.Key;
+              const val = s.value !== undefined ? s.value : s.Value;
+              if (key === "nextInvoiceNumber") nextInvNum = parseInt(val) || nextInvNum;
+              if (key === "invoicePrefix") prefix = val || prefix;
+              if (key === "companyName") name = val || name;
+              if (key === "address") addr = val || addr;
+              if (key === "phone") phone = val || phone;
+              if (key === "email") email = val || email;
+              if (key === "gstNumber") gst = val || gst;
+            });
+          }
 
           this.saveCompanySettings({
             ...companySettings,

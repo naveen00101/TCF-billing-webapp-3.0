@@ -69,29 +69,24 @@ function initializeDatabase(existingSpreadsheetId, companyName) {
 
   // Protection Flag check
   var settingsSheet = ss.getSheetByName("Settings");
-  if (settingsSheet) {
-    var data = settingsSheet.getDataRange().getValues();
-    for (var r = 0; r < data.length; r++) {
-      if (data[r][0] === "DatabaseInitialized" && data[r][1] === true) {
-        return ContentService.createTextOutput(JSON.stringify({
-          success: true,
-          spreadsheetId: spreadsheetId,
-          spreadsheetName: ss.getName(),
-          message: "✓ Database is already initialized. Skipping recreation."
-        })).setMimeType(ContentService.MimeType.JSON);
-      }
-    }
+  if (settingsSheet && settingsSheet.getLastRow() > 0) {
+    return ContentService.createTextOutput(JSON.stringify({
+      success: true,
+      spreadsheetId: spreadsheetId,
+      spreadsheetName: ss.getName(),
+      message: "✓ Database is already initialized. Skipping recreation."
+    })).setMimeType(ContentService.MimeType.JSON);
   }
 
-  // Create required sheets and write columns
+  // Create required sheets and write columns (camelCase format)
   var sheetsSetup = {
-    "Products": ["Product ID", "Product Name", "Category", "Unit", "Price", "Inventory Type", "Color", "Material", "Brand", "Vendor", "Purchase Cost", "Selling Price", "Units Sold", "Revenue Generated", "Last Sold Date", "Stock Available", "Production Time", "Notes", "SKU", "Warranty", "Size", "Weight", "Image URL", "Status", "Parent ID", "Is Leaf", "Level", "Node Type", "Hierarchy Path", "Inventory SKUs JSON", "Color Variants JSON", "Attributes JSON", "Selected Options JSON"],
-    "Customers": ["Customer ID", "Customer Name", "Mobile Number", "Address", "Secondary Mobile", "Secondary Contact Name", "Notes", "Address History JSON"],
-    "Invoices": ["Invoice ID", "Invoice Number", "Invoice Category", "Date", "Customer Name", "Mobile Number", "Item Count", "Subtotal", "Discount", "Grand Total", "Fulfillment Status", "Payment Type", "Amount Paid", "Balance Due", "Payment Status", "GST Type", "GST Amount", "Referral Agent ID", "Referral Agent Name", "Referral Agent Category", "Referral Agent Type", "Last Updated", "Updated By"],
-    "InvoiceItems": ["Invoice ID", "Invoice Number", "Product ID", "Product Name", "Variant", "Quantity", "Unit Price", "Line Total", "Hierarchy Node ID", "SKU ID", "Hierarchy Path", "SKU Code"],
-    "Agents": ["Agent ID", "Agent Name", "Agent Category", "Commission Rate", "Phone Number", "Email", "Status", "Notes", "Created Date", "Created By"],
-    "Settings": ["Key", "Value"],
-    "PaymentTransactions": ["Transaction ID", "Invoice ID", "Date", "Amount", "Collected By", "Notes"]
+    "Products": ["id", "name", "category", "unit", "price", "color", "material", "brand", "vendor", "purchaseCost", "sellingPrice", "unitsSold", "revenueGenerated", "lastSoldDate", "stockAvailable", "productionTime", "notes", "sku", "warranty", "size", "weight", "imageUrl", "status", "parentId", "isLeaf", "level", "nodeType", "hierarchyPath", "colorVariantsJson", "attributesJson"],
+    "Customers": ["id", "name", "mobile", "address", "secondaryPhone", "secondaryContactName", "notes", "currentAddress", "addressHistory"],
+    "Invoices": ["invoiceId", "invoiceNo", "invoiceCategory", "date", "customerName", "mobile", "itemCount", "subtotal", "discount", "grandTotal", "status", "paymentType", "amountPaid", "balanceDue", "paymentStatus", "gstType", "taxAmount", "referralAgentId", "referralAgentName", "referralAgentCategory", "referralAgentType", "lastEditedDate", "lastEditedBy"],
+    "InvoiceItems": ["invoiceId", "invoiceNo", "productId", "productName", "variant", "quantity", "unitPrice", "amount", "hierarchyNodeId", "skuId", "hierarchyPath", "skuCode"],
+    "Agents": ["id", "name", "agentType", "commissionPercentage", "mobile", "email", "status", "notes", "createdDate"],
+    "Settings": ["companyName", "shortName", "address", "phone", "email", "gstNumber", "website", "invoiceFooter", "invoiceTerms", "invoicePrefix", "nextInvoiceNumber", "defaultPrintFormat", "defaultDownloadFormat", "companyState", "companyStateCode", "cgstPercentage", "sgstPercentage", "igstPercentage", "gstEnabledByDefault"],
+    "PaymentTransactions": ["id", "invoiceId", "invoiceNo", "date", "time", "amount", "collectedBy", "notes"]
   };
 
   for (var name in sheetsSetup) {
@@ -108,16 +103,38 @@ function initializeDatabase(existingSpreadsheetId, companyName) {
     headerRange.setHorizontalAlignment("left");
   }
 
-  // Populate default settings rows
+  // Populate default flat settings row
   if (!settingsSheet) settingsSheet = ss.getSheetByName("Settings");
-  settingsSheet.appendRow(["invoicePrefix", "YR"]);
-  settingsSheet.appendRow(["nextInvoiceNumber", 1001]);
-  settingsSheet.appendRow(["companyName", companyName || "My Smart Billing"]);
-  settingsSheet.appendRow(["address", "Update Company Address Here"]);
-  settingsSheet.appendRow(["phone", "+91 99999 99999"]);
-  settingsSheet.appendRow(["email", "contact@company.com"]);
-  settingsSheet.appendRow(["gstNumber", ""]);
-  settingsSheet.appendRow(["DatabaseInitialized", true]); // Protection Flag
+  var defaultSettings = {
+    "companyName": companyName || "My Smart Billing",
+    "shortName": "TCF Smart Billing",
+    "address": "Plot 42, Furniture Showroom Zone, Guntur Road, Tenali-522201",
+    "phone": "+91 8644 223400",
+    "email": "contact@tcfshowroom.com",
+    "gstNumber": "GSTIN-37AAAAT9876C1Z0",
+    "website": "www.tcfshowroom.com",
+    "invoiceFooter": "Thank you for buying premium furniture from Tenali Central Furniture! We guarantee quality craftsmanship in every piece.",
+    "invoiceTerms": "Goods once sold will not be taken back.\nDelivery timelines may vary depending on product availability.\nWarranty terms apply only to eligible products.\nFurniture color and finish may vary slightly from display samples.",
+    "invoicePrefix": "YR",
+    "nextInvoiceNumber": 1001,
+    "defaultPrintFormat": "Receipt",
+    "defaultDownloadFormat": "A4",
+    "companyState": "Andhra Pradesh",
+    "companyStateCode": "37",
+    "cgstPercentage": 9,
+    "sgstPercentage": 9,
+    "igstPercentage": 18,
+    "gstEnabledByDefault": false
+  };
+  
+  var settingsHeaders = sheetsSetup["Settings"];
+  var settingsValues = settingsHeaders.map(function(h) {
+    return defaultSettings[h] !== undefined ? defaultSettings[h] : "";
+  });
+  
+  settingsSheet.clear();
+  settingsSheet.appendRow(settingsHeaders);
+  settingsSheet.appendRow(settingsValues);
 
   // Delete redundant sheets if exist
   var sheets = ss.getSheets();
@@ -144,13 +161,13 @@ function updateDatabaseSchema(spreadsheetId) {
   
   var ss = SpreadsheetApp.openById(spreadsheetId);
   var sheetsSetup = {
-    "Products": ["Product ID", "Product Name", "Category", "Unit", "Price", "Inventory Type", "Color", "Material", "Brand", "Vendor", "Purchase Cost", "Selling Price", "Units Sold", "Revenue Generated", "Last Sold Date", "Stock Available", "Production Time", "Notes", "SKU", "Warranty", "Size", "Weight", "Image URL", "Status", "Parent ID", "Is Leaf", "Level", "Node Type", "Hierarchy Path", "Inventory SKUs JSON", "Color Variants JSON", "Attributes JSON", "Selected Options JSON"],
-    "Customers": ["Customer ID", "Customer Name", "Mobile Number", "Address", "Secondary Mobile", "Secondary Contact Name", "Notes", "Address History JSON"],
-    "Invoices": ["Invoice ID", "Invoice Number", "Invoice Category", "Date", "Customer Name", "Mobile Number", "Item Count", "Subtotal", "Discount", "Grand Total", "Fulfillment Status", "Payment Type", "Amount Paid", "Balance Due", "Payment Status", "GST Type", "GST Amount", "Referral Agent ID", "Referral Agent Name", "Referral Agent Category", "Referral Agent Type", "Last Updated", "Updated By"],
-    "InvoiceItems": ["Invoice ID", "Invoice Number", "Product ID", "Product Name", "Variant", "Quantity", "Unit Price", "Line Total", "Hierarchy Node ID", "SKU ID", "Hierarchy Path", "SKU Code"],
-    "Agents": ["Agent ID", "Agent Name", "Agent Category", "Commission Rate", "Phone Number", "Email", "Status", "Notes", "Created Date", "Created By"],
-    "Settings": ["Key", "Value"],
-    "PaymentTransactions": ["Transaction ID", "Invoice ID", "Date", "Amount", "Collected By", "Notes"]
+    "Products": ["id", "name", "category", "unit", "price", "color", "material", "brand", "vendor", "purchaseCost", "sellingPrice", "unitsSold", "revenueGenerated", "lastSoldDate", "stockAvailable", "productionTime", "notes", "sku", "warranty", "size", "weight", "imageUrl", "status", "parentId", "isLeaf", "level", "nodeType", "hierarchyPath", "colorVariantsJson", "attributesJson"],
+    "Customers": ["id", "name", "mobile", "address", "secondaryPhone", "secondaryContactName", "notes", "currentAddress", "addressHistory"],
+    "Invoices": ["invoiceId", "invoiceNo", "invoiceCategory", "date", "customerName", "mobile", "itemCount", "subtotal", "discount", "grandTotal", "status", "paymentType", "amountPaid", "balanceDue", "paymentStatus", "gstType", "taxAmount", "referralAgentId", "referralAgentName", "referralAgentCategory", "referralAgentType", "lastEditedDate", "lastEditedBy"],
+    "InvoiceItems": ["invoiceId", "invoiceNo", "productId", "productName", "variant", "quantity", "unitPrice", "amount", "hierarchyNodeId", "skuId", "hierarchyPath", "skuCode"],
+    "Agents": ["id", "name", "agentType", "commissionPercentage", "mobile", "email", "status", "notes", "createdDate"],
+    "Settings": ["companyName", "shortName", "address", "phone", "email", "gstNumber", "website", "invoiceFooter", "invoiceTerms", "invoicePrefix", "nextInvoiceNumber", "defaultPrintFormat", "defaultDownloadFormat", "companyState", "companyStateCode", "cgstPercentage", "sgstPercentage", "igstPercentage", "gstEnabledByDefault"],
+    "PaymentTransactions": ["id", "invoiceId", "invoiceNo", "date", "time", "amount", "collectedBy", "notes"]
   };
 
   var updates = [];
@@ -327,6 +344,9 @@ function repairCounters(spreadsheetId) {
   if (invoiceData.length > 1) {
     var headers = invoiceData[0];
     var invNoIdx = headers.indexOf("Invoice Number");
+    if (invNoIdx === -1) {
+      invNoIdx = headers.indexOf("invoiceNo");
+    }
     if (invNoIdx !== -1) {
       for (var i = 1; i < invoiceData.length; i++) {
         var invNo = String(invoiceData[i][invNoIdx]);
@@ -344,6 +364,16 @@ function repairCounters(spreadsheetId) {
   var nextInvoiceNumber = maxNum + 1;
   
   var settingsData = settingsSheet.getDataRange().getValues();
+  if (settingsData.length > 0) {
+    var headers = settingsData[0];
+    var nextInvColIdx = headers.indexOf("nextInvoiceNumber");
+    if (nextInvColIdx !== -1 && settingsData.length > 1) {
+      // Flat format: update in row 2
+      settingsSheet.getRange(2, nextInvColIdx + 1).setValue(nextInvoiceNumber);
+      return { success: true, message: "Invoice counters successfully repaired to next number: " + nextInvoiceNumber };
+    }
+  }
+  
   var updated = false;
   for (var r = 0; r < settingsData.length; r++) {
     if (settingsData[r][0] === "nextInvoiceNumber") {
