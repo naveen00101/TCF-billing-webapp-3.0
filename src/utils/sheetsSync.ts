@@ -1297,17 +1297,80 @@ export class SheetsSyncEngine {
     }
   }
 
+  private static isSyncingInProgress = false;
+  private static hasPendingSyncRequest = false;
+  private static backgroundSyncTimeout: any = null;
+
+  public static async triggerBackgroundSync(): Promise<void> {
+    const conn = this.getConnectionSettings();
+    if (!conn.isConnected || !conn.appsScriptUrl) return;
+
+    if (this.isSyncingInProgress) {
+      this.hasPendingSyncRequest = true;
+      return;
+    }
+
+    this.isSyncingInProgress = true;
+    this.hasPendingSyncRequest = false;
+
+    console.log(`[SYNC ENGINE] Triggering automatic background sync to Google Sheets...`);
+    try {
+      const payload = {
+        action: "SYNC_UP",
+        spreadsheetId: conn.spreadsheetId,
+        payload: {
+          [conn.productsSheetName || "Products"]: this.getProducts(),
+          [conn.customersSheetName || "Customers"]: this.getCustomers(),
+          [conn.invoicesSheetName || "Invoices"]: this.getInvoices(),
+          [conn.settingsSheetName || "Settings"]: [this.getCompanySettings()],
+          [conn.agentsSheetName || "Agents"]: this.getAgents(),
+          "PaymentTransactions": this.getPaymentTransactions(),
+          "Employees": this.getEmployees(),
+          "Users": this.getUsers(),
+          "PromoCodes": this.getPromoCodes(),
+          "UserActivity": this.getUserActivities(),
+          "AuditLog": this.getAuditLogs()
+        }
+      };
+
+      const response = await fetch(conn.appsScriptUrl, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify(payload),
+      });
+
+      if (response.ok) {
+        const resText = await response.text();
+        const result = JSON.parse(resText);
+        if (result.success) {
+          console.log(`[SYNC ENGINE] Automatic background sync completed successfully.`);
+        }
+      }
+    } catch (e) {
+      console.warn("[SYNC ENGINE] Automatic background sync failed:", e);
+    } finally {
+      this.isSyncingInProgress = false;
+      if (this.hasPendingSyncRequest) {
+        setTimeout(() => {
+          this.triggerBackgroundSync();
+        }, 1000);
+      }
+    }
+  }
+
   public static async pushTransaction(
     conn: ConnectionSettings,
     actionType: string,
     payloadData: any
   ): Promise<{ success: boolean; message: string }> {
     try {
-      // With our new architecture, we just trigger the queue processor asynchronously!
-      // The local queue has already stored the data.
-      setTimeout(() => {
-        this.processSyncQueue();
-      }, 500); // 500ms delay to let UI breathe
+      if (this.backgroundSyncTimeout) {
+        clearTimeout(this.backgroundSyncTimeout);
+      }
+
+      this.backgroundSyncTimeout = setTimeout(() => {
+        this.triggerBackgroundSync();
+      }, 1000);
       
       return { success: true, message: "Transaction queued for background sync." };
     } catch (e: any) {
