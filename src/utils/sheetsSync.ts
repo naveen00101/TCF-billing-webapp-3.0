@@ -1358,6 +1358,54 @@ export class SheetsSyncEngine {
     }
   }
 
+  public static async forceUploadAllToSheets(): Promise<{ success: boolean; message: string }> {
+    const conn = this.getConnectionSettings();
+    if (!conn.isConnected || !conn.appsScriptUrl) {
+      return { success: false, message: "No active Google Sheets connection." };
+    }
+
+    console.log(`[SYNC ENGINE] Force uploading all cache to Google Sheets...`);
+    try {
+      const payload = {
+        action: "SYNC_UP",
+        payload: {
+          [conn.productsSheetName || "Products"]: this.getProducts(),
+          [conn.customersSheetName || "Customers"]: this.getCustomers(),
+          [conn.invoicesSheetName || "Invoices"]: this.getInvoices(),
+          [conn.settingsSheetName || "Settings"]: [this.getCompanySettings()],
+          [conn.agentsSheetName || "Agents"]: this.getAgents(),
+          "PaymentTransactions": this.getPaymentTransactions(),
+          "Employees": this.getEmployees(),
+          "Users": this.getUsers(),
+          "PromoCodes": this.getPromoCodes(),
+          "UserActivity": this.getUserActivities(),
+          "AuditLog": this.getAuditLogs()
+        }
+      };
+
+      const response = await fetch(conn.appsScriptUrl, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify(payload),
+      });
+
+      if (response.ok) {
+        const resText = await response.text();
+        const result = JSON.parse(resText);
+        if (result.success) {
+          this.saveSyncQueue([]); // clear queue since everything is clean now
+          return { success: true, message: "Successfully uploaded local cache to Google Sheets." };
+        } else {
+          return { success: false, message: result.error || "Google Sheets returned sync failure." };
+        }
+      }
+      return { success: false, message: `Server error: HTTP ${response.status}` };
+    } catch (e: any) {
+      console.error("[SYNC ENGINE] Force upload failed:", e);
+      return { success: false, message: e.message || "Failed to contact Google Apps Script." };
+    }
+  }
+
   public static async pushTransaction(
     conn: ConnectionSettings,
     actionType: string,

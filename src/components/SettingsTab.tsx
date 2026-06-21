@@ -370,43 +370,24 @@ export default function SettingsTab({
     }
   };
 
- const handleBackupToSheets = async () => {
+  const handleSyncPush = async () => {
     if (!isAdmin) return;
     const conn = SheetsSyncEngine.getConnectionSettings();
     if (!conn.appsScriptUrl || !conn.spreadsheetId) {
-      onShowNotification("Google Sheets connection credentials (URL and Spreadsheet ID) are not configured.", "error");
+      onShowNotification("Google Sheets credentials are not configured.", "error");
+      return;
+    }
+    if (!window.confirm("⚠️ WARNING: This will overwrite Google Sheets with your local browser cache! Are you sure you want to proceed?")) {
       return;
     }
     setIsSyncing(true);
-    onShowNotification("Uploading local database backup to Google Sheets...", "info");
-    const result = await SheetsSyncEngine.backupToGoogleSheets(conn);
+    onShowNotification("Uploading local cache to Google Sheets...", "info");
+    const result = await SheetsSyncEngine.forceUploadAllToSheets();
     setIsSyncing(false);
     if (result.success) {
-      onShowNotification(result.message || "✓ SQLite database successfully backed up to Google Sheets.", "success");
+      onShowNotification("✓ Google Sheets database successfully updated from local cache!", "success");
     } else {
-      onShowNotification(`Backup Error: ${result.message}`, "error");
-    }
-  };
-
-  const handleRestoreFromSheets = async () => {
-    if (!isAdmin) return;
-    const conn = SheetsSyncEngine.getConnectionSettings();
-    if (!conn.appsScriptUrl || !conn.spreadsheetId) {
-      onShowNotification("Google Sheets connection credentials (URL and Spreadsheet ID) are not configured.", "error");
-      return;
-    }
-    if (!window.confirm("⚠️ WARNING: This will overwrite your local SQLite database with the backup from Google Sheets! Are you sure you want to proceed?")) {
-      return;
-    }
-    setIsSyncing(true);
-    onShowNotification("Restoring local database from Google Sheets...", "info");
-    const result = await SheetsSyncEngine.restoreFromGoogleSheets(conn);
-    setIsSyncing(false);
-    if (result.success) {
-      onShowNotification(result.message || "✓ SQLite database successfully restored from Google Sheets backup!", "success");
-      onRefresh();
-    } else {
-      onShowNotification(`Restore Error: ${result.message}`, "error");
+      onShowNotification(`Upload Error: ${result.message}`, "error");
     }
   };
 
@@ -1267,11 +1248,19 @@ export default function SettingsTab({
  </button>
   <button
     onClick={handleSyncPull}
-    disabled={isSyncing}
-    className="col-span-2 flex items-center justify-center gap-2 rounded-lg bg-blue-600 py-2.5 text-xs font-semibold text-primary hover:bg-blue-700 disabled:opacity-50 disabled:bg-gray-200 dark:disabled:bg-zinc-800 disabled:text-muted border-none cursor-pointer"
+    disabled={isSyncing || !isConnected}
+    className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-blue-600 py-2.5 text-xs font-semibold text-primary hover:bg-blue-700 disabled:opacity-50 border-none cursor-pointer"
   >
     <RefreshCw className={`h-4 w-4 ${isSyncing ? "animate-spin" : ""}`} />
-    <span>Refresh Local Cache</span>
+    <span>Refresh Cache (Pull)</span>
+  </button>
+  <button
+    onClick={handleSyncPush}
+    disabled={isSyncing || !isConnected}
+    className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-emerald-600 py-2.5 text-xs font-semibold text-primary hover:bg-emerald-700 disabled:opacity-50 border-none cursor-pointer"
+  >
+    <Upload className="h-4 w-4 text-white" />
+    <span>Upload Cache (Push)</span>
   </button>
   <button
     onClick={async () => {
