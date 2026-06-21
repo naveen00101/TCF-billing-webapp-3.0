@@ -19,13 +19,17 @@ function doPost(e) {
     const action = data.action;
     
     if (action === "SYNC_UP") {
-      return handleSyncUp(data.payload);
+      return handleSyncUp(data.spreadsheetId, data.payload);
     } else if (action === "SYNC_DOWN") {
-      return handleSyncDown();
+      return handleSyncDown(data.spreadsheetId);
     } else if (action === "initializeDatabase") {
       return initializeDatabase(data.spreadsheetId, data.companyName);
     } else if (action === "updateDatabaseSchema") {
       return updateDatabaseSchema(data.spreadsheetId);
+    } else if (action === "repairCounters") {
+      var res = repairCounters(data.spreadsheetId);
+      return ContentService.createTextOutput(JSON.stringify(res))
+        .setMimeType(ContentService.MimeType.JSON);
     }
     
     return ContentService.createTextOutput(JSON.stringify({ success: false, error: "Unknown action: " + action }))
@@ -39,7 +43,7 @@ function doPost(e) {
 // Optional GET handler for quick browser testing
 function doGet(e) {
   if (e.parameter.action === "SYNC_DOWN") {
-    return handleSyncDown();
+    return handleSyncDown(e.parameter.spreadsheetId);
   }
   return ContentService.createTextOutput("TCF POS Backend is running. Use POST to sync data.")
     .setMimeType(ContentService.MimeType.TEXT);
@@ -195,8 +199,8 @@ function updateDatabaseSchema(spreadsheetId) {
   })).setMimeType(ContentService.MimeType.JSON);
 }
 
-function handleSyncUp(payload) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+function handleSyncUp(spreadsheetId, payload) {
+  const ss = spreadsheetId ? SpreadsheetApp.openById(spreadsheetId) : SpreadsheetApp.getActiveSpreadsheet();
   
   for (const sheetName in payload) {
     let sheet = ss.getSheetByName(sheetName);
@@ -252,8 +256,8 @@ function handleSyncUp(payload) {
     .setMimeType(ContentService.MimeType.JSON);
 }
 
-function handleSyncDown() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+function handleSyncDown(spreadsheetId) {
+  const ss = spreadsheetId ? SpreadsheetApp.openById(spreadsheetId) : SpreadsheetApp.getActiveSpreadsheet();
   const sheets = ss.getSheets();
   const result = {};
   
@@ -302,4 +306,56 @@ function handleSyncDown() {
   
   return ContentService.createTextOutput(JSON.stringify({ success: true, payload: result }))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+function repairCounters(spreadsheetId) {
+  if (!spreadsheetId) {
+    return { success: false, message: "No Spreadsheet ID provided." };
+  }
+  
+  var ss = SpreadsheetApp.openById(spreadsheetId);
+  var invoiceSheet = ss.getSheetByName("Invoices");
+  var settingsSheet = ss.getSheetByName("Settings");
+  
+  if (!invoiceSheet || !settingsSheet) {
+    return { success: false, message: "Required sheets (Invoices/Settings) not found." };
+  }
+  
+  var invoiceData = invoiceSheet.getDataRange().getValues();
+  var maxNum = 1000;
+  
+  if (invoiceData.length > 1) {
+    var headers = invoiceData[0];
+    var invNoIdx = headers.indexOf("Invoice Number");
+    if (invNoIdx !== -1) {
+      for (var i = 1; i < invoiceData.length; i++) {
+        var invNo = String(invoiceData[i][invNoIdx]);
+        var match = invNo.match(/\d+$/);
+        if (match) {
+          var num = parseInt(match[0]);
+          if (num > maxNum) {
+            maxNum = num;
+          }
+        }
+      }
+    }
+  }
+  
+  var nextInvoiceNumber = maxNum + 1;
+  
+  var settingsData = settingsSheet.getDataRange().getValues();
+  var updated = false;
+  for (var r = 0; r < settingsData.length; r++) {
+    if (settingsData[r][0] === "nextInvoiceNumber") {
+      settingsSheet.getRange(r + 1, 2).setValue(nextInvoiceNumber);
+      updated = true;
+      break;
+    }
+  }
+  
+  if (!updated) {
+    settingsSheet.appendRow(["nextInvoiceNumber", nextInvoiceNumber]);
+  }
+  
+  return { success: true, message: "Invoice counters successfully repaired to next number: " + nextInvoiceNumber };
 }

@@ -1076,7 +1076,8 @@ export class SheetsSyncEngine {
   ): Promise<{ success: boolean; message: string; sheetsFound?: { [key: string]: boolean }; spreadsheetName?: string }> {
     try {
       const payload = {
-        action: "SYNC_DOWN"
+        action: "SYNC_DOWN",
+        spreadsheetId: spreadsheetId
       };
 
       const response = await fetch(url, {
@@ -1346,6 +1347,7 @@ export class SheetsSyncEngine {
     try {
       const payload = {
         action: "SYNC_UP",
+        spreadsheetId: conn.spreadsheetId,
         payload: {
           [conn.productsSheetName || "Products"]: this.getProducts(),
           [conn.customersSheetName || "Customers"]: this.getCustomers(),
@@ -1392,6 +1394,7 @@ export class SheetsSyncEngine {
     try {
       const payload = {
         action: "SYNC_UP",
+        spreadsheetId: conn.spreadsheetId,
         payload: {
           [conn.productsSheetName || "Products"]: this.getProducts(),
           [conn.customersSheetName || "Customers"]: this.getCustomers(),
