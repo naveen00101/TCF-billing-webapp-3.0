@@ -174,27 +174,44 @@ export async function generateInvoicePDF(
     const showWatermark = company.useLogoWatermark ?? true;
     if (!showWatermark) return;
     try {
-      // @ts-ignore
-      const gState = new docObj.GState({ opacity: 0.06 }); // Low opacity 5-8%
-      // @ts-ignore
-      docObj.saveGraphicsState();
-      // @ts-ignore
-      docObj.setGState(gState);
-      
       if (logoSrc) {
+        // @ts-ignore
+        const gState = new docObj.GState({ opacity: 0.06 }); // Low opacity 5-8%
+        // @ts-ignore
+        docObj.saveGraphicsState();
+        // @ts-ignore
+        docObj.setGState(gState);
+        
         const w = 110;
         const h = w / logoAspect;
         docObj.addImage(logoSrc, "JPEG", 105 - w / 2, 148.5 - h / 2, w, h);
+        
+        // @ts-ignore
+        docObj.restoreGraphicsState();
+        
+        // Explicitly set opacity back to 1.0 as a failsafe
+        // @ts-ignore
+        const resetGState = new docObj.GState({ opacity: 1.0 });
+        // @ts-ignore
+        docObj.setGState(resetGState);
       } else {
-        docObj.setTextColor(230, 230, 230);
+        // For text watermark, just use light gray color. No opacity changes needed!
+        docObj.setTextColor(240, 240, 240);
         docObj.setFont("helvetica", "bold");
         docObj.setFontSize(44);
         docObj.text("TCF FURNITURE", 105, 148.5, { align: "center", angle: 45 });
+        // Reset text color back to dark active color to prevent bleeding
+        docObj.setTextColor(colorTextActive[0], colorTextActive[1], colorTextActive[2]);
       }
-      // @ts-ignore
-      docObj.restoreGraphicsState();
     } catch (e) {
       console.warn("Watermark rendering warning:", e);
+      try {
+        // Failsafe reset in case of error
+        // @ts-ignore
+        const resetGState = new docObj.GState({ opacity: 1.0 });
+        // @ts-ignore
+        docObj.setGState(resetGState);
+      } catch (err) {}
     }
   };
 
