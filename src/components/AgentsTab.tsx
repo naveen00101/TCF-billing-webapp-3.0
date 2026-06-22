@@ -243,26 +243,26 @@ export default function AgentsTab({
  };
 
  const confirmDeleteAgent = async () => {
- if (!agentToDelete) return;
- const agt = agentToDelete;
+    if (!agentToDelete) return;
+    const agt = agentToDelete;
 
- const currentList = SheetsSyncEngine.getAgents();
- const updated = currentList.filter((a) => a.id !== agt.id);
- SheetsSyncEngine.saveAgents(updated);
- 
- await SheetsSyncEngine.pushTransaction(SheetsSyncEngine.getConnectionSettings(),"deleteAgent", { id: agt.id })
- .catch((e) => console.warn("Failed to delete agent remotely:", e));
+    const currentList = SheetsSyncEngine.getAgents();
+    const updated = currentList.map((a) => a.id === agt.id ? { ...a, isSoftDeleted: true } : a);
+    SheetsSyncEngine.saveAgents(updated);
+    
+    await SheetsSyncEngine.pushTransaction(SheetsSyncEngine.getConnectionSettings(), "upsertAgent", { ...agt, isSoftDeleted: true })
+    .catch((e) => console.warn("Failed to update agent remotely:", e));
 
- SheetsSyncEngine.addAuditLog(
-"Agent Deleted",
- currentUser?.fullName ||"System Admin",
- `Agent ID: ${agt.id}`,
- `Deleted agent '${agt.name}' from the dashboard database.`
- );
+    SheetsSyncEngine.addAuditLog(
+      "Agent Deleted",
+      currentUser?.fullName || "System Admin",
+      `Agent ID: ${agt.id}`,
+      `Deleted agent '${agt.name}' and moved to Trash.`
+    );
 
- onShowNotification(`✓ Agent record '${agt.name}' has been successfully removed.`,"success");
- setAgentToDelete(null);
- reloadData();
+    onShowNotification(`✓ Agent record '${agt.name}' has been moved to Trash.`, "success");
+    setAgentToDelete(null);
+    reloadData();
  };
 
  const confirmDeactivateAgent = async () => {

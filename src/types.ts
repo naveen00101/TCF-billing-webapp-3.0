@@ -134,6 +134,7 @@ export interface Product {
 
   // New SKUs list
   inventorySkus?: InventorySKU[];
+  isSoftDeleted?: boolean;
 }
 
 export interface AddressHistoryRecord {
@@ -430,6 +431,7 @@ export interface PromoCode {
   maximumUsage: number;
   usageCount: number;
   activeStatus: "Active" | "Disabled";
+  isSoftDeleted?: boolean;
 }
 
 export type AgentType =
@@ -453,6 +455,7 @@ export interface Agent {
   status: AgentStatus;
   notes: string;
   createdDate: string;
+  isSoftDeleted?: boolean;
 }
 
 export interface DraftInvoice {

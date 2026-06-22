@@ -28,7 +28,8 @@ import {
  Laptop,
  ChevronDown,
  TrendingUp,
- Save
+ Save,
+ Trash2
 } from"lucide-react";
 
 // Import custom tabs
@@ -43,6 +44,7 @@ import AiAssistant from"./components/AiAssistant";
 import PromoCodesTab from"./components/PromoCodesTab";
 import AgentsTab from"./components/AgentsTab";
 import RevenueAnalyticsTab from"./components/RevenueAnalyticsTab";
+import TrashTab from"./components/TrashTab";
 
 // RBAC user flow entries
 import LoginPage from"./components/LoginPage";
@@ -246,24 +248,24 @@ export default function App() {
  };
 
  // Synchronous State Initializer
- const reloadApplicationState = () => {
- const prods = SheetsSyncEngine.getProducts();
- const custs = SheetsSyncEngine.getCustomers();
- const invs = SheetsSyncEngine.getInvoices();
- const items = SheetsSyncEngine.getInvoiceItems();
- const conn = SheetsSyncEngine.getConnectionSettings();
- const comp = SheetsSyncEngine.getCompanySettings();
+  const reloadApplicationState = () => {
+    const prods = SheetsSyncEngine.getProducts().filter(p => !p.isSoftDeleted);
+    const custs = SheetsSyncEngine.getCustomers().filter(c => !c.isSoftDeleted);
+    const invs = SheetsSyncEngine.getInvoices().filter(i => !i.isSoftDeleted);
+    const items = SheetsSyncEngine.getInvoiceItems();
+    const conn = SheetsSyncEngine.getConnectionSettings();
+    const comp = SheetsSyncEngine.getCompanySettings();
 
- setProducts(prods);
- setCustomers(custs);
- setInvoices(invs);
- setInvoiceItems(items);
- setConnection(conn);
- setCompany(comp);
+    setProducts(prods);
+    setCustomers(custs);
+    setInvoices(invs);
+    setInvoiceItems(items);
+    setConnection(conn);
+    setCompany(comp);
 
- // Compute stats
- setStats(SheetsSyncEngine.calculateStats());
- };
+    // Compute stats
+    setStats(SheetsSyncEngine.calculateStats());
+  };
 
  // Auto Logout idle detection (Auto-Logout after 5 minutes of inactivity)
  useEffect(() => {
@@ -425,15 +427,16 @@ export default function App() {
  ];
 
  // Render extra tabs only for Admin users
- if (userRole ==="Admin") {
- menuItems.push(
- { id:"revenue", label:"Revenue Analytics", icon: TrendingUp },
- { id:"users", label:"User Management", icon: ShieldAlert },
- { id:"activities", label:"Operator Activities", icon: Activity },
- { id:"audit", label:"System Audit Trail", icon: ShieldCheck },
- { id:"promos", label:"Promo Manager", icon: Ticket }
- );
- }
+  if (userRole ==="Admin") {
+  menuItems.push(
+  { id:"revenue", label:"Revenue Analytics", icon: TrendingUp },
+  { id:"users", label:"User Management", icon: ShieldAlert },
+  { id:"activities", label:"Operator Activities", icon: Activity },
+  { id:"audit", label:"System Audit Trail", icon: ShieldCheck },
+  { id:"promos", label:"Promo Manager", icon: Ticket },
+  { id:"trash", label:"Trash Bin", icon: Trash2 }
+  );
+  }
 
  // Static items for everyone
  menuItems.push(
@@ -750,6 +753,7 @@ export default function App() {
  activeTab ==="revenue" ?"Revenue Analytics" : 
  activeTab ==="help" ?"System Documentation" :
  activeTab ==="settings" ?"Configuration Manager" :
+ activeTab ==="trash" ?"Trash Bin Manager" :
  activeTab}
  </h1>
  </div>
@@ -984,6 +988,13 @@ export default function App() {
  onClearSelected={() => setSelectedAuditId(null)}
  />
  )}
+
+ {activeTab ==="trash" && userRole ==="Admin" && (
+    <TrashTab
+      onRefresh={reloadApplicationState}
+      onShowNotification={showNotification}
+    />
+  )}
 
  {activeTab ==="help" && (
  <HelpSetupTab />

@@ -179,7 +179,13 @@ export class SheetsSyncEngine {
   }
 
   public static saveProducts(products: Product[]): void {
-    const validated = this.validateAndRepairProductTree(products);
+    const existingSoftDeleted = this.getProducts().filter(p => p.isSoftDeleted);
+    const activeIds = new Set(products.filter(p => !p.isSoftDeleted).map(p => p.id));
+    const merged = [
+      ...products,
+      ...existingSoftDeleted.filter(p => !activeIds.has(p.id))
+    ];
+    const validated = this.validateAndRepairProductTree(merged);
     this.setStorageItem("billing_products", validated);
     this.queueAutomaticSync();
   }
@@ -646,7 +652,13 @@ export class SheetsSyncEngine {
   }
 
   public static saveAgents(agents: Agent[]): void {
-    this.setStorageItem("billing_agents_registry", agents);
+    const existingSoftDeleted = this.getAgents().filter(a => a.isSoftDeleted);
+    const activeIds = new Set(agents.filter(a => !a.isSoftDeleted).map(a => a.id));
+    const merged = [
+      ...agents,
+      ...existingSoftDeleted.filter(a => !activeIds.has(a.id))
+    ];
+    this.setStorageItem("billing_agents_registry", merged);
     this.queueAutomaticSync();
   }
 
@@ -656,7 +668,13 @@ export class SheetsSyncEngine {
   }
 
   public static savePromoCodes(promos: PromoCode[]): void {
-    this.setStorageItem("billing_promo_codes", promos);
+    const existingSoftDeleted = this.getPromoCodes().filter(p => p.isSoftDeleted);
+    const activeCodes = new Set(promos.filter(p => !p.isSoftDeleted).map(p => p.promoCode));
+    const merged = [
+      ...promos,
+      ...existingSoftDeleted.filter(p => !activeCodes.has(p.promoCode))
+    ];
+    this.setStorageItem("billing_promo_codes", merged);
     this.queueAutomaticSync();
   }
 

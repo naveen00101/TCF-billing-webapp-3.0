@@ -226,47 +226,94 @@ function handleSyncUp(spreadsheetId, payload) {
     }
     
     const records = payload[sheetName];
-    if (records && records.length > 0) {
-      // Find all unique keys across all records to use as headers
-      const headerSet = new Set();
-      records.forEach(r => Object.keys(r).forEach(k => headerSet.add(k)));
-      const headers = Array.from(headerSet);
+    if (!records || records.length === 0) {
+      continue; // Skip if no records, NEVER clear/overwrite the sheet!
+    }
+    
+    // Get existing data to find existing headers and rows
+    let existingData = sheet.getDataRange().getValues();
+    let existingHeaders = [];
+    if (existingData.length > 0) {
+      existingHeaders = existingData[0];
+    }
+    
+    // Find all unique keys across all records to merge with existing headers
+    const headerSet = new Set(existingHeaders.filter(h => h !== ""));
+    records.forEach(r => Object.keys(r).forEach(k => headerSet.add(k)));
+    const headers = Array.from(headerSet);
+    
+    // Ensure headers are written if we have new columns
+    if (headers.length > existingHeaders.length) {
+      sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+      sheet.getRange(1, 1, 1, headers.length).setFontWeight("bold").setBackground("#e0f2fe");
+      sheet.setFrozenRows(1);
+      // Re-read data range
+      existingData = sheet.getDataRange().getValues();
+    }
+    
+    // Determine the key extraction function for this sheet name
+    const getKey = (rowOrRecord, isRecord) => {
+      const getVal = (field) => {
+        if (isRecord) {
+          return rowOrRecord[field] !== undefined ? String(rowOrRecord[field]) : "";
+        } else {
+          const idx = headers.indexOf(field);
+          return idx !== -1 ? String(rowOrRecord[idx]) : "";
+        }
+      };
       
-      // Map records to 2D array
-      const rows = records.map(record => {
-        return headers.map(header => {
-          let val = record[header];
-          if (typeof val === 'object' && val !== null) {
-            return JSON.stringify(val); // Serialize nested objects (like invoice lineItems)
-          }
-          if (val === undefined || val === null) {
-            return "";
-          }
-          return val;
-        });
+      if (sheetName === "InvoiceItems") {
+        return getVal("invoiceId") + "|" + getVal("productId") + "|" + getVal("skuId") + "|" + getVal("variant");
+      } else if (sheetName === "PromoCodes") {
+        return getVal("promoCode");
+      } else if (sheetName === "Invoices") {
+        return getVal("invoiceNo") || getVal("invoiceId");
+      } else if (sheetName === "Settings") {
+        return "SETTINGS_ROW"; // Settings is always a single row (row 2)
+      } else {
+        // Products, Customers, Agents, PaymentTransactions, Users, UserActivity, AuditLog
+        return getVal("id");
+      }
+    };
+    
+    // Build a map of existing keys to their row indexes (1-based index)
+    const keyToRowIndex = {};
+    for (let i = 1; i < existingData.length; i++) {
+      const key = getKey(existingData[i], false);
+      if (key) {
+        keyToRowIndex[key] = i + 1;
+      }
+    }
+    
+    // Process each record for upsert
+    records.forEach(record => {
+      const key = getKey(record, true);
+      if (!key) return; // Skip if empty key
+      
+      // Construct row values matching the headers
+      const rowValues = headers.map(header => {
+        let val = record[header];
+        if (typeof val === 'object' && val !== null) {
+          return JSON.stringify(val); // Serialize nested objects (like invoice lineItems)
+        }
+        if (val === undefined || val === null) {
+          return "";
+        }
+        return val;
       });
       
-      sheet.clear();
-      
-      // Write headers and freeze them
-      sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
-      sheet.getRange(1, 1, 1, headers.length).setFontWeight("bold").setBackground("#f3f4f6");
-      sheet.setFrozenRows(1);
-      
-      // Write data
-      sheet.getRange(2, 1, rows.length, headers.length).setValues(rows);
-    } else {
-       // If empty array passed, just keep headers or clear everything
-       const lastCol = sheet.getLastColumn();
-       if (lastCol > 0) {
-         const lastRow = sheet.getLastRow();
-         if (lastRow > 1) {
-           sheet.getRange(2, 1, lastRow - 1, lastCol).clearContent();
-         }
-       } else {
-         sheet.clear();
-       }
-    }
+      const existingRow = keyToRowIndex[key];
+      if (existingRow) {
+        // Update existing row
+        sheet.getRange(existingRow, 1, 1, headers.length).setValues([rowValues]);
+      } else {
+        // Append new row
+        sheet.appendRow(rowValues);
+        // Track the newly added row to prevent duplicates in the same batch
+        const nextRow = sheet.getLastRow();
+        keyToRowIndex[key] = nextRow;
+      }
+    });
   }
   
   return ContentService.createTextOutput(JSON.stringify({ success: true }))

@@ -43,10 +43,10 @@ export default function ProductsTab({ products, onRefresh, onShowNotification }:
 
   const executeDeleteProduct = async (product: Product) => {
     try {
-      const newProducts = products.filter(p => p.id !== product.id);
+      const newProducts = products.map(p => p.id === product.id ? { ...p, isSoftDeleted: true } : p);
       await SheetsSyncEngine.saveProducts(newProducts);
-      SheetsSyncEngine.pushTransaction(SheetsSyncEngine.getConnectionSettings(), "deleteProduct", product).catch(console.error);
-      onShowNotification("Product deleted successfully", "success");
+      SheetsSyncEngine.pushTransaction(SheetsSyncEngine.getConnectionSettings(), "upsertProduct", { ...product, isSoftDeleted: true }).catch(console.error);
+      onShowNotification("Product moved to Trash successfully", "success");
       onRefresh();
     } catch (e) {
       console.error(e);
