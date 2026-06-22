@@ -1,7 +1,7 @@
 import React, { useState } from"react";
 import { Info, Settings, Database, Server, RefreshCw, Copy, Check, ShieldAlert, Download, Upload, AlertCircle, Sparkles, Lock, ShieldCheck, Sun, Moon, Laptop, User } from"lucide-react";
 import { ConnectionSettings, CompanySettings } from"../types";
-import { SheetsSyncEngine } from"../utils/sheetsSync";
+import { SheetsSyncEngine, HARDCODED_APPS_SCRIPT_URL, HARDCODED_SPREADSHEET_ID } from"../utils/sheetsSync";
 import { SYSTEM_LOGO } from"../constants/branding";
 import codeGsStr from "../../backend/Code.gs?raw";
 
@@ -35,8 +35,15 @@ export default function SettingsTab({
  );
 
  // Connection settings states
- const [appsScriptUrl, setAppsScriptUrl] = useState(connSettings.appsScriptUrl);
- const [spreadsheetId, setSpreadsheetId] = useState(connSettings.spreadsheetId);
+ const [connectionMode, setConnectionMode] = useState<"auto" | "manual">(
+  connSettings.connectionMode || "auto"
+ );
+ const [appsScriptUrl, setAppsScriptUrl] = useState(
+  connSettings.connectionMode === "auto" ? HARDCODED_APPS_SCRIPT_URL : (connSettings.appsScriptUrl || "")
+ );
+ const [spreadsheetId, setSpreadsheetId] = useState(
+  connSettings.connectionMode === "auto" ? HARDCODED_SPREADSHEET_ID : (connSettings.spreadsheetId || "")
+ );
  const [apiKey, setApiKey] = useState(connSettings.apiKey ||"");
  const [spreadsheetName, setSpreadsheetName] = useState(connSettings.spreadsheetName ||"Not Connected");
  const [isConnected, setIsConnected] = useState(connSettings.isConnected);
@@ -257,6 +264,7 @@ export default function SettingsTab({
  isConnected: true,
  lastSyncTime: new Date().toLocaleTimeString(),
  ...activeMapping,
+ connectionMode: connectionMode,
  };
 
  SheetsSyncEngine.saveConnectionSettings(updatedConn);
@@ -314,6 +322,7 @@ export default function SettingsTab({
  isConnected: true,
  lastSyncTime: new Date().toLocaleTimeString(),
  ...activeMapping,
+ connectionMode: connectionMode,
  };
 
  SheetsSyncEngine.saveConnectionSettings(updatedConn);
@@ -1119,37 +1128,85 @@ export default function SettingsTab({
 
  {/* CONNECTION SETTINGS FIELDS */}
  <div className="space-y-3 pt-2">
- <div className="space-y-1">
- <div className="flex justify-between items-center">
- <label className="text-[10px] uppercase font-bold text-muted">Apps Script URL</label>
- <button
- onClick={copyScriptCode}
- className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
- >
- {copiedCode ? <Check className="h-3.5 w-3.5 text-green-600" /> : <Copy className="h-3.5 w-3.5" />}
- <span>Copy Script Code</span>
- </button>
- </div>
- <input
- type="text"
- placeholder="https://script.google.com/macros/s/.../exec"
- value={appsScriptUrl}
- onChange={(e) => setAppsScriptUrl(e.target.value)}
- className="w-full rounded-lg border border-default bg-surface px-3 py-2 text-xs focus:border-blue-500 outline-none font-mono text-primary dark:text-gray-100"
- />
- </div>
+    {/* CONNECTION MODE SELECTOR */}
+    <div className="space-y-1">
+      <label className="text-[10px] uppercase font-bold text-muted">Connection Mode</label>
+      <div className="flex gap-1.5 p-1 bg-surface border border-default rounded-lg w-fit transition-colors">
+        <button
+          type="button"
+          onClick={() => {
+            setConnectionMode("auto");
+            setAppsScriptUrl(HARDCODED_APPS_SCRIPT_URL);
+            setSpreadsheetId(HARDCODED_SPREADSHEET_ID);
+          }}
+          className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all cursor-pointer ${
+            connectionMode === "auto"
+              ? "bg-blue-600 text-white shadow-sm"
+              : "text-muted hover:text-primary"
+          }`}
+        >
+          Automatic Setup
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setConnectionMode("manual");
+            if (connSettings.connectionMode === "manual") {
+              setAppsScriptUrl(connSettings.appsScriptUrl || "");
+              setSpreadsheetId(connSettings.spreadsheetId || "");
+            } else {
+              setAppsScriptUrl("");
+              setSpreadsheetId("");
+            }
+          }}
+          className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all cursor-pointer ${
+            connectionMode === "manual"
+              ? "bg-blue-600 text-white shadow-sm"
+              : "text-muted hover:text-primary"
+          }`}
+        >
+          Manual Setup
+        </button>
+      </div>
+    </div>
 
- <div className="grid gap-3 grid-cols-2">
- <div className="space-y-1 col-span-1">
- <label className="text-[10px] uppercase font-bold text-muted">Spreadsheet ID</label>
- <input
- type="text"
- placeholder="1aBcD-EfgHiJklMn..."
- value={spreadsheetId}
- onChange={(e) => setSpreadsheetId(e.target.value)}
- className="w-full rounded-lg border border-default bg-surface px-3 py-2 text-xs focus:border-blue-500 outline-none font-mono text-primary dark:text-gray-100"
- />
- </div>
+    <div className="space-y-1">
+      <div className="flex justify-between items-center">
+        <label className="text-[10px] uppercase font-bold text-muted">
+          Apps Script URL {connectionMode === "auto" && "(Auto)"}
+        </label>
+        <button
+          onClick={copyScriptCode}
+          className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+        >
+          {copiedCode ? <Check className="h-3.5 w-3.5 text-green-600" /> : <Copy className="h-3.5 w-3.5" />}
+          <span>Copy Script Code</span>
+        </button>
+      </div>
+      <input
+        type="text"
+        placeholder="https://script.google.com/macros/s/.../exec"
+        value={appsScriptUrl}
+        onChange={(e) => setAppsScriptUrl(e.target.value)}
+        disabled={connectionMode === "auto"}
+        className="w-full rounded-lg border border-default bg-surface px-3 py-2 text-xs focus:border-blue-500 outline-none font-mono text-primary dark:text-gray-100 disabled:opacity-60 disabled:cursor-not-allowed"
+      />
+    </div>
+
+    <div className="grid gap-3 grid-cols-2">
+      <div className="space-y-1 col-span-1">
+        <label className="text-[10px] uppercase font-bold text-muted">
+          Spreadsheet ID {connectionMode === "auto" && "(Auto)"}
+        </label>
+        <input
+          type="text"
+          placeholder="1aBcD-EfgHiJklMn..."
+          value={spreadsheetId}
+          onChange={(e) => setSpreadsheetId(e.target.value)}
+          disabled={connectionMode === "auto"}
+          className="w-full rounded-lg border border-default bg-surface px-3 py-2 text-xs focus:border-blue-500 outline-none font-mono text-primary dark:text-gray-100 disabled:opacity-60 disabled:cursor-not-allowed"
+        />
+      </div>
 
  <div className="space-y-1 col-span-1">
  <label className="text-[10px] uppercase font-bold text-muted">Spreadsheet Name</label>
@@ -1186,6 +1243,7 @@ export default function SettingsTab({
  isConnected: isConnected,
  lastSyncTime: connSettings.lastSyncTime || new Date().toLocaleTimeString(),
  ...activeMapping,
+ connectionMode: connectionMode,
  };
  SheetsSyncEngine.saveConnectionSettings(updatedConn);
  onShowNotification("Database Connection Settings permanently saved.","success");
@@ -1212,6 +1270,7 @@ export default function SettingsTab({
  setSpreadsheetId("");
  setSpreadsheetName("");
  setIsConnected(false);
+ setConnectionMode("manual");
  
  const activeMapping = {
  productsSheetName: productsSheet,
@@ -1229,6 +1288,7 @@ export default function SettingsTab({
  isConnected: false,
  lastSyncTime:"",
  ...activeMapping,
+ connectionMode: "manual",
  };
  SheetsSyncEngine.saveConnectionSettings(updatedConn);
  onShowNotification("Connection defaults cleared globally.","info");

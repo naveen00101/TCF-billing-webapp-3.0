@@ -35,12 +35,15 @@ const DEFAULT_INVOICES: Invoice[] = [];
 
 const DEFAULT_INVOICE_ITEMS: InvoiceItem[] = [];
 
+export const HARDCODED_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzqUssk0H36Cw607L0uaQEq4AEPmCa-Jb9_QawW_zRKflfBpwKgSYqGDoD0r9ymmbz6/exec";
+export const HARDCODED_SPREADSHEET_ID = "1JscNP77-TXRIjKUCDz7fk40oxp-dEKVmPoXLFnmDjx8";
+
 const DEFAULT_CONNECTION_SETTINGS: ConnectionSettings = {
-  spreadsheetId: "",
-  spreadsheetName: "",
-  appsScriptUrl: "",
+  spreadsheetId: HARDCODED_SPREADSHEET_ID,
+  spreadsheetName: "Tenali Central Furniture Billing Database",
+  appsScriptUrl: HARDCODED_APPS_SCRIPT_URL,
   apiKey: "",
-  isConnected: false,
+  isConnected: true, // Default to connected out-of-the-box
   lastSyncTime: "",
   productsSheetName: "Products",
   customersSheetName: "Customers",
@@ -49,6 +52,7 @@ const DEFAULT_CONNECTION_SETTINGS: ConnectionSettings = {
   settingsSheetName: "Settings",
   agentsSheetName: "Agents",
   paymentTransactionsSheetName: "PaymentTransactions",
+  connectionMode: "auto",
 };
 
 const DEFAULT_COMPANY_SETTINGS: CompanySettings = {

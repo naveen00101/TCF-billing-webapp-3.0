@@ -1,5 +1,5 @@
 {
-  "spreadsheetId": "1yTCgZ4pT8BLLpEjGqxIceJ6QO-ndIUs_COorLFpMS9A",
+  "spreadsheetId": "1JscNP77-TXRIjKUCDz7fk40oxp-dEKVmPoXLFnmDjx8",
   "spreadsheetName": "Tenali Central Furniture Billing Database",
   "appsScriptUrl": "https://script.google.com/macros/s/AKfycbzqUssk0H36Cw607L0uaQEq4AEPmCa-Jb9_QawW_zRKflfBpwKgSYqGDoD0r9ymmbz6/exec",
   "apiKey": "",
@@ -11,5 +11,6 @@
   "invoiceItemsSheetName": "InvoiceItems",
   "settingsSheetName": "Settings",
   "agentsSheetName": "Agents",
-  "paymentTransactionsSheetName": "PaymentTransactions"
+  "paymentTransactionsSheetName": "PaymentTransactions",
+  "connectionMode": "auto"
 }

@@ -303,49 +303,71 @@ export default function App() {
 
  // Mount loading
  useEffect(() => {
- async function bootSequence() {
- // 1. First, attempt to load persistent deployment configuration
- try {
- const configRes = await fetch("/api/config/db");
- if (configRes.ok) {
- const configData = await configRes.json();
- if (configData && configData.appsScriptUrl) {
- const currentConn = SheetsSyncEngine.getConnectionSettings();
- 
- // Only update if missing or if the server config is more recent/valid
- // Overwrite local if we have a valid global config
- currentConn.appsScriptUrl = configData.appsScriptUrl;
- if (configData.spreadsheetId) currentConn.spreadsheetId = configData.spreadsheetId;
- if (configData.spreadsheetName) currentConn.spreadsheetName = configData.spreadsheetName;
- if (configData.isConnected !== undefined) currentConn.isConnected = configData.isConnected;
- 
- SheetsSyncEngine.saveConnectionSettings(currentConn);
- }
- }
- } catch (err) {
- console.warn("Failed to fetch persistent DB config:", err);
- }
+    async function bootSequence() {
+      // 1. First, attempt to load persistent deployment configuration
+      try {
+        const configRes = await fetch("/api/config/db");
+        if (configRes.ok) {
+          const configData = await configRes.json();
+          if (configData && configData.appsScriptUrl) {
+            const currentConn = SheetsSyncEngine.getConnectionSettings();
+            
+            // Only update if missing or if the server config is more recent/valid
+            // Overwrite local if we have a valid global config
+            currentConn.appsScriptUrl = configData.appsScriptUrl;
+            if (configData.spreadsheetId) currentConn.spreadsheetId = configData.spreadsheetId;
+            if (configData.spreadsheetName) currentConn.spreadsheetName = configData.spreadsheetName;
+            if (configData.isConnected !== undefined) currentConn.isConnected = configData.isConnected;
+            if (configData.connectionMode !== undefined) currentConn.connectionMode = configData.connectionMode;
+            
+            SheetsSyncEngine.saveConnectionSettings(currentConn);
+          }
+        }
+      } catch (err) {
+        console.warn("Failed to fetch persistent DB config:", err);
+      }
 
- // 2. Hydrate application state with newly synchronized settings
- reloadApplicationState();
- 
- // 3. Attempt background sync from Google Sheets unconditionally if configured
- const conn = SheetsSyncEngine.getConnectionSettings();
- if (conn.isConnected && conn.appsScriptUrl) {
-   SheetsSyncEngine.syncDownFromSheets(conn)
-     .then((result) => {
-       if (result.success) {
-         reloadApplicationState();
-       }
-     })
-     .catch(() => {
-       console.warn("Failed to automatically synchronize with Google Sheets.");
-     });
- }
- }
+      // 2. Hydrate application state with newly synchronized settings
+      reloadApplicationState();
+      
+      // 3. Attempt background sync from Google Sheets unconditionally if configured
+      const conn = SheetsSyncEngine.getConnectionSettings();
+      if (conn.isConnected && conn.appsScriptUrl) {
+        SheetsSyncEngine.syncDownFromSheets(conn)
+          .then((result) => {
+            if (result.success) {
+              reloadApplicationState();
+            }
+          })
+          .catch(() => {
+            console.warn("Failed to automatically synchronize with Google Sheets.");
+          });
+      }
+    }
 
- bootSequence();
- }, []);
+    bootSequence();
+
+    // Start 30-second periodic auto-sync (pull remote updates)
+    const syncInterval = setInterval(() => {
+      const conn = SheetsSyncEngine.getConnectionSettings();
+      if (conn.isConnected && conn.appsScriptUrl) {
+        console.log("[Auto-Sync] Periodically fetching latest Google Sheets data...");
+        SheetsSyncEngine.syncDownFromSheets(conn)
+          .then((result) => {
+            if (result.success) {
+              reloadApplicationState();
+            }
+          })
+          .catch((err) => {
+            console.warn("[Auto-Sync] Periodic sync failed:", err);
+          });
+      }
+    }, 30000); // 30 seconds
+
+    return () => {
+      clearInterval(syncInterval);
+    };
+  }, []);
 
  const handleForceSync = async () => {
  const conn = SheetsSyncEngine.getConnectionSettings();

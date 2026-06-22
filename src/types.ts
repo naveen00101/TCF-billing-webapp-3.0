@@ -307,6 +307,7 @@ export interface ConnectionSettings {
   settingsSheetName: string;
   agentsSheetName: string;
   paymentTransactionsSheetName?: string;
+  connectionMode?: "auto" | "manual";
 }
 
 export interface PaymentTransaction {
