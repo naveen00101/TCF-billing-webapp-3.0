@@ -42,7 +42,7 @@ export default function SettingsTab({
   connSettings.connectionMode === "auto" ? HARDCODED_APPS_SCRIPT_URL : (connSettings.appsScriptUrl || "")
  );
  const [spreadsheetId, setSpreadsheetId] = useState(
-  connSettings.connectionMode === "auto" ? HARDCODED_SPREADSHEET_ID : (connSettings.spreadsheetId || "")
+  connSettings.spreadsheetId || ""
  );
  const [apiKey, setApiKey] = useState(connSettings.apiKey ||"");
  const [spreadsheetName, setSpreadsheetName] = useState(connSettings.spreadsheetName ||"Not Connected");
@@ -1137,7 +1137,7 @@ export default function SettingsTab({
           onClick={() => {
             setConnectionMode("auto");
             setAppsScriptUrl(HARDCODED_APPS_SCRIPT_URL);
-            setSpreadsheetId(HARDCODED_SPREADSHEET_ID);
+            setSpreadsheetId(connSettings.spreadsheetId || "");
           }}
           className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all cursor-pointer ${
             connectionMode === "auto"
