@@ -147,8 +147,34 @@ export async function generateInvoicePDF(
             img.onload = resolve;
             img.onerror = resolve;
           });
+          
           if (img.width && img.height) {
             logoAspect = img.width / img.height;
+            
+            // Draw to canvas to strip progressive encoding/CMYK and resize large images
+            const canvas = document.createElement("canvas");
+            const ctx = canvas.getContext("2d");
+            
+            // Limit max width to 600px for the logo to keep PDF size small
+            let targetWidth = img.width;
+            let targetHeight = img.height;
+            if (targetWidth > 600) {
+              targetWidth = 600;
+              targetHeight = 600 / logoAspect;
+            }
+            
+            canvas.width = targetWidth;
+            canvas.height = targetHeight;
+            
+            if (ctx) {
+              // Fill white background in case of transparency, though JPEG doesn't support it, 
+              // it's a good safety measure if the source was actually a PNG masking as JPEG.
+              ctx.fillStyle = "#FFFFFF";
+              ctx.fillRect(0, 0, targetWidth, targetHeight);
+              ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
+              // Extract clean baseline JPEG base64
+              logoBase64 = canvas.toDataURL("image/jpeg", 0.8);
+            }
           }
         }
       }
