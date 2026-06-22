@@ -130,6 +130,26 @@ export class SheetsSyncEngine {
   private static backgroundSyncTimeout: any = null;
   private static hasSyncedDownThisSession = false;
 
+  private static syncStatus: "idle" | "syncing" | "success" | "error" = "idle";
+  private static lastSyncError: string | null = null;
+  private static syncStatusListeners: ((status: "idle" | "syncing" | "success" | "error", error: string | null) => void)[] = [];
+
+  public static registerSyncStatusListener(cb: (status: "idle" | "syncing" | "success" | "error", error: string | null) => void) {
+    this.syncStatusListeners.push(cb);
+    cb(this.syncStatus, this.lastSyncError);
+    return () => {
+      this.syncStatusListeners = this.syncStatusListeners.filter(l => l !== cb);
+    };
+  }
+
+  private static updateSyncStatus(status: "idle" | "syncing" | "success" | "error", error: string | null = null) {
+    this.syncStatus = status;
+    this.lastSyncError = error;
+    this.syncStatusListeners.forEach(cb => {
+      try { cb(status, error); } catch(e) {}
+    });
+  }
+
   private static queueAutomaticSync(): void {
     if (this.isSyncingDown) return;
     const conn = this.getConnectionSettings();
@@ -1115,6 +1135,7 @@ export class SheetsSyncEngine {
 
   public static async syncDownFromSheets(conn?: ConnectionSettings): Promise<{ success: boolean; message: string }> {
     this.isSyncingDown = true;
+    this.updateSyncStatus("syncing");
     try {
       const activeConn = conn || this.getConnectionSettings();
       if (!activeConn.appsScriptUrl) {
@@ -1274,6 +1295,7 @@ export class SheetsSyncEngine {
         };
         this.saveConnectionSettings(updatedConn);
         this.hasSyncedDownThisSession = true;
+        this.updateSyncStatus("success");
 
         return { success: true, message: "Database synchronized successfully with Google Sheets." };
       } else {
@@ -1281,6 +1303,7 @@ export class SheetsSyncEngine {
         const friendlyMsg = isRate
           ? "⚠️ Rate limit exceeded."
           : (result.message || "Database returned sync error.");
+        this.updateSyncStatus("error", friendlyMsg);
         return { success: false, message: friendlyMsg };
       }
     } catch (e: any) {
@@ -1289,6 +1312,7 @@ export class SheetsSyncEngine {
       const friendlyMsg = isRate
         ? "⚠️ Google Sheets API quota/rate limit exceeded. All billing data is safely preserved offline. Active features are 100% operational!"
         : `Sync pulling failed: ${e.message || e}`;
+      this.updateSyncStatus("error", friendlyMsg);
       return { success: false, message: friendlyMsg };
     } finally {
       this.isSyncingDown = false;
@@ -1421,6 +1445,7 @@ export class SheetsSyncEngine {
     this.hasPendingSyncRequest = false;
 
     console.log(`[SYNC ENGINE] Triggering automatic background sync to Google Sheets...`);
+    this.updateSyncStatus("syncing");
     try {
       const payload = {
         action: "SYNC_UP",
@@ -1451,10 +1476,17 @@ export class SheetsSyncEngine {
         const result = JSON.parse(resText);
         if (result.success) {
           console.log(`[SYNC ENGINE] Automatic background sync completed successfully.`);
+          this.updateSyncStatus("success");
+        } else {
+          console.warn("[SYNC ENGINE] Background sync failed:", result.error);
+          this.updateSyncStatus("error", result.error || "Google Sheets sync returned failure.");
         }
+      } else {
+        throw new Error(`Server returned HTTP ${response.status}`);
       }
-    } catch (e) {
+    } catch (e: any) {
       console.warn("[SYNC ENGINE] Automatic background sync failed:", e);
+      this.updateSyncStatus("error", e.message || String(e));
     } finally {
       this.isSyncingInProgress = false;
       if (this.hasPendingSyncRequest) {

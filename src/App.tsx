@@ -229,9 +229,13 @@ export default function App() {
  const [products, setProducts] = useState<Product[]>([]);
  const [customers, setCustomers] = useState<Customer[]>([]);
  const [invoices, setInvoices] = useState<Invoice[]>([]);
- const [invoiceItems, setInvoiceItems] = useState<InvoiceItem[]>([]);
- const [connection, setConnection] = useState<ConnectionSettings | null>(null);
- const [company, setCompany] = useState<CompanySettings | null>(null);
+  const [invoiceItems, setInvoiceItems] = useState<InvoiceItem[]>([]);
+  const [connection, setConnection] = useState<ConnectionSettings | null>(null);
+  const [company, setCompany] = useState<CompanySettings | null>(null);
+
+  // Background Sync Status State
+  const [syncStatus, setSyncStatus] = useState<"idle" | "syncing" | "success" | "error">("idle");
+  const [syncError, setSyncError] = useState<string | null>(null);
 
  // Computed dashboard statistics
  const [stats, setStats] = useState(SheetsSyncEngine.calculateStats());
@@ -302,6 +306,15 @@ export default function App() {
  window.removeEventListener("scroll", handleResetIdle);
  };
  }, [currentUser]); // renew on auth status switches
+
+  // Subscribe to SheetsSyncEngine status changes
+  useEffect(() => {
+    const unsubscribe = SheetsSyncEngine.registerSyncStatusListener((status, err) => {
+      setSyncStatus(status);
+      setSyncError(err);
+    });
+    return () => unsubscribe();
+  }, []);
 
  // Mount loading
  useEffect(() => {
@@ -579,23 +592,43 @@ export default function App() {
  </button>
  </div>
 
- {/* Database Synchronization Status Bar */}
- <div className="m-4 rounded-xl bg-card-secondary/60 border border-default p-3.5 space-y-1.5">
- <div className="flex items-baseline justify-between text-[10px] uppercase font-bold text-muted font-sans">
- <span>Database Sync</span>
- <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[8px] font-bold ${
- connection?.isConnected ?"bg-emerald-500/10 text-emerald-400" :"bg-amber-500/10 text-amber-400"
- }`}>
- {connection?.isConnected ?"Online" :"Sandbox"}
- </span>
- </div>
- <div className="text-xs truncate font-semibold text-primary font-sans">
- {connection?.isConnected ? connection.spreadsheetName :"Offline Session Storage"}
- </div>
- {connection?.isConnected && (
- <p className="text-[9px] text-muted font-mono">Synced {connection.lastSyncTime ||"just now"}</p>
- )}
- </div>
+  {/* Database Synchronization Status Bar */}
+  <div className="m-4 rounded-xl bg-card-secondary/60 border border-default p-3.5 space-y-1.5 animate-fade-in">
+    <div className="flex items-baseline justify-between text-[10px] uppercase font-bold text-muted font-sans">
+      <span>Database Sync</span>
+      <div className="flex items-center gap-1.5">
+        {syncStatus === "syncing" && (
+          <span className="h-1.5 w-1.5 rounded-full bg-blue-500 animate-ping shrink-0" />
+        )}
+        <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[8px] font-bold transition-all ${
+          !connection?.isConnected 
+            ? "bg-amber-500/10 text-amber-400"
+            : (syncStatus === "error" 
+                ? "bg-rose-500/10 text-rose-400 animate-pulse" 
+                : (syncStatus === "syncing" ? "bg-blue-500/10 text-blue-400" : "bg-emerald-500/10 text-emerald-400"))
+        }`}>
+          {!connection?.isConnected 
+            ? "Sandbox" 
+            : (syncStatus === "error" 
+                ? "Sync Error" 
+                : (syncStatus === "syncing" ? "Syncing..." : "Online"))}
+        </span>
+      </div>
+    </div>
+    <div className="text-xs truncate font-semibold text-primary font-sans">
+      {connection?.isConnected ? connection.spreadsheetName :"Offline Session Storage"}
+    </div>
+    {connection?.isConnected && (
+      <div className="space-y-1">
+        <p className="text-[9px] text-muted font-mono">Synced {connection.lastSyncTime || "just now"}</p>
+        {syncStatus === "error" && syncError && (
+          <p className="text-[9px] text-rose-400 leading-tight bg-rose-500/5 border border-rose-500/20 rounded p-1.5 font-sans whitespace-pre-wrap select-text break-all" title={syncError}>
+            ⚠️ {syncError.length > 120 ? syncError.substring(0, 120) + "..." : syncError}
+          </p>
+        )}
+      </div>
+    )}
+  </div>
 
  {/* Sidebar Menu options */}
  <nav className="flex-1 px-4 py-2 space-y-1 overflow-y-auto">
