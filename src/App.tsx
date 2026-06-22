@@ -398,22 +398,34 @@ export default function App() {
  };
 
  // If no user is logged in, show the absolute secure LoginPage gate
- if (!currentUser) {
- return (
- <div className="min-h-screen bg-surface flex items-center justify-center font-sans">
- {notification && (
- <div className="fixed top-4 right-4 z-[9999] flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold text-white bg-blue-600 shadow-2xl animate-in slide-in-from-top-6 duration-300">
- <CheckCircle2 className="h-4 w-4 shrink-0" />
- <span>{notification.text}</span>
- </div>
- )}
- <LoginPage
- onLoginSuccess={(u) => reloadApplicationState()}
- onShowNotification={showNotification}
- />
- </div>
- );
- }
+  if (!currentUser) {
+    const isStorageFallback = (window.localStorage as any)?.isPolyfill === true;
+    return (
+      <div className="min-h-screen bg-surface flex flex-col justify-center items-center font-sans relative">
+        {isStorageFallback && (
+          <div className="absolute top-0 left-0 right-0 bg-amber-500 text-amber-950 px-4 py-2.5 text-xs font-semibold text-center flex items-center justify-center gap-2 border-b border-amber-600 shadow-sm z-50">
+            <AlertTriangle className="h-4 w-4 shrink-0" />
+            <span>
+              <strong>Warning:</strong> Browser Local Storage is disabled. Running in <strong>In-Memory Fallback</strong> mode. 
+              Data will sync to Google Sheets, but offline changes are lost on reload. Enable cookies in settings.
+            </span>
+          </div>
+        )}
+        <div className="flex-1 flex items-center justify-center w-full">
+          {notification && (
+            <div className="fixed top-4 right-4 z-[9999] flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold text-white bg-blue-600 shadow-2xl animate-in slide-in-from-top-6 duration-300">
+              <CheckCircle2 className="h-4 w-4 shrink-0" />
+              <span>{notification.text}</span>
+            </div>
+          )}
+          <LoginPage
+            onLoginSuccess={(u) => reloadApplicationState()}
+            onShowNotification={showNotification}
+          />
+        </div>
+      </div>
+    );
+  }
 
  // Sidebar Menu options construction based on RBAC roles
  const menuItems = [
@@ -444,10 +456,22 @@ export default function App() {
  { id:"settings", label:"Settings Panel", icon: Settings }
  );
 
- return (
- <div className="min-h-screen bg-surface flex flex-col font-sans">
- 
- {/* GLOBAL TOAST BANNER SLIDEOUT */}
+  const isStorageFallback = (window.localStorage as any)?.isPolyfill === true;
+
+  return (
+    <div className="min-h-screen bg-surface flex flex-col font-sans">
+      {isStorageFallback && (
+        <div className="bg-amber-500 text-amber-950 px-4 py-2 text-xs font-semibold text-center flex items-center justify-center gap-2 border-b border-amber-600 shadow-sm z-50">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <span>
+            <strong>Warning:</strong> Browser Local Storage is disabled. Running in <strong>In-Memory Fallback</strong> mode. 
+            Data will sync to Google Sheets, but refreshing the page while offline will lose unsaved changes. 
+            Please enable cookies/site data in your browser settings.
+          </span>
+        </div>
+      )}
+      
+      {/* GLOBAL TOAST BANNER SLIDEOUT */}
  {notification && (
  <div
  id="toast-notification"

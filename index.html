@@ -4,6 +4,88 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>TCF Smart Billing</title>
+    <!-- Polyfill localStorage/sessionStorage if blocked by browser settings -->
+    <script>
+      (function() {
+        var storagePolyfilled = false;
+        var storagePolyfillError = null;
+
+        function createInMemoryStorage() {
+          var store = {};
+          var s = {
+            isPolyfill: true,
+            getItem: function(key) {
+              return store.hasOwnProperty(key) ? store[key] : null;
+            },
+            setItem: function(key, value) {
+              store[key] = String(value);
+            },
+            removeItem: function(key) {
+              delete store[key];
+            },
+            clear: function() {
+              store = {};
+            },
+            key: function(index) {
+              var keys = Object.keys(store);
+              return keys[index] || null;
+            },
+            get length() {
+              return Object.keys(store).length;
+            }
+          };
+          return s;
+        }
+
+        // Test and Polyfill localStorage
+        try {
+          var testLS = window.localStorage;
+          if (!testLS) throw new Error("localStorage is null/undefined");
+          testLS.setItem('__storage_test__', '1');
+          testLS.removeItem('__storage_test__');
+        } catch (e) {
+          console.warn("localStorage is blocked or unavailable. Applying in-memory polyfill.");
+          try {
+            var mockLS = createInMemoryStorage();
+            Object.defineProperty(window, 'localStorage', {
+              get: function() { return mockLS; },
+              set: function() { },
+              configurable: true,
+              enumerable: true
+            });
+            storagePolyfilled = true;
+          } catch (err) {
+            storagePolyfillError = err.message || String(err);
+            console.error("Failed to polyfill localStorage:", err);
+          }
+        }
+
+        // Test and Polyfill sessionStorage
+        try {
+          var testSS = window.sessionStorage;
+          if (!testSS) throw new Error("sessionStorage is null/undefined");
+          testSS.setItem('__storage_test__', '1');
+          testSS.removeItem('__storage_test__');
+        } catch (e) {
+          console.warn("sessionStorage is blocked or unavailable. Applying in-memory polyfill.");
+          try {
+            var mockSS = createInMemoryStorage();
+            Object.defineProperty(window, 'sessionStorage', {
+              get: function() { return mockSS; },
+              set: function() { },
+              configurable: true,
+              enumerable: true
+            });
+          } catch (err) {
+            console.error("Failed to polyfill sessionStorage:", err);
+          }
+        }
+
+        // Expose global flags for diagnostic check
+        window.__storagePolyfilled = storagePolyfilled;
+        window.__storagePolyfillError = storagePolyfillError;
+      })();
+    </script>
     <script>
       (function() {
         try {
@@ -45,7 +127,7 @@
           esModules: 'noModule' in document.createElement('script'),
           arrowFunctions: true,
           optionalChaining: true,
-          localStorage: false
+          localStorage: 'supported'
         };
 
         try {
@@ -56,20 +138,28 @@
           eval('var o = {}; o?.prop;');
         } catch(e) { features.optionalChaining = false; }
 
-        try {
-          localStorage.setItem('__test__', '1');
-          localStorage.removeItem('__test__');
-          features.localStorage = true;
-        } catch(e) {}
+        if (window.__storagePolyfilled) {
+          features.localStorage = 'fallback';
+        } else if (window.__storagePolyfillError) {
+          features.localStorage = 'error';
+        } else {
+          try {
+            localStorage.setItem('__test__', '1');
+            localStorage.removeItem('__test__');
+          } catch(e) {
+            features.localStorage = 'error';
+          }
+        }
 
         function showDiagnosticsIfNeeded() {
-          // If we already have errors, or if we determine basic ES modules or arrow functions are missing
-          if (!features.esModules || !features.arrowFunctions || !features.optionalChaining || errors.length > 0) {
+          // If we already have errors, or if we determine basic ES modules or arrow functions are missing, or if local storage failed completely
+          if (!features.esModules || !features.arrowFunctions || !features.optionalChaining || features.localStorage === 'error' || errors.length > 0) {
             renderErrorUI();
           }
         }
 
         function renderErrorUI() {
+          if (window.appLoaded) return; // Never block if app loaded successfully
           if (document.getElementById('compat-error-screen')) return;
           
           var root = document.getElementById('root');
@@ -102,7 +192,10 @@
                   '<li>ES Modules (Modern Scripting): ' + (features.esModules ? '✅ Supported' : '❌ NOT Supported') + '</li>' +
                   '<li>Modern JS Syntax (Arrow functions): ' + (features.arrowFunctions ? '✅ Supported' : '❌ NOT Supported') + '</li>' +
                   '<li>ES2020 Syntax (Optional chaining): ' + (features.optionalChaining ? '✅ Supported' : '❌ NOT Supported') + '</li>' +
-                  '<li>Local Storage: ' + (features.localStorage ? '✅ Supported' : '❌ NOT Supported') + '</li>' +
+                  '<li>Local Storage: ' + 
+                    (features.localStorage === 'supported' ? '✅ Supported' : 
+                     (features.localStorage === 'fallback' ? '⚠️ In-Memory Fallback (Cookies Blocked)' : '❌ NOT Supported')) + 
+                  '</li>' +
                 '</ul>' +
                 (errors.length > 0 ? 
                   ('<div style="margin-top:16px;border-top:1px solid #334155;padding-top:12px;">' +
