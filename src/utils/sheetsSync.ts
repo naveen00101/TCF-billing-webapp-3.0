@@ -574,6 +574,13 @@ export class SheetsSyncEngine {
   // Connections and configuration
   public static getConnectionSettings(): ConnectionSettings {
     const settings = this.getStorageItem<ConnectionSettings>("billing_conn_settings", DEFAULT_CONNECTION_SETTINGS);
+    
+    // FORCE global hardcoded values if in auto mode to overwrite any stale cached data across devices
+    if (!settings.connectionMode || settings.connectionMode === "auto") {
+      settings.appsScriptUrl = HARDCODED_APPS_SCRIPT_URL;
+      settings.spreadsheetId = HARDCODED_SPREADSHEET_ID;
+    }
+
     if (!settings.productsSheetName) settings.productsSheetName = "Products";
     if (!settings.customersSheetName) settings.customersSheetName = "Customers";
     if (!settings.invoicesSheetName) settings.invoicesSheetName = "Invoices";
