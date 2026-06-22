@@ -141,7 +141,7 @@ export class SheetsSyncEngine {
 
     this.backgroundSyncTimeout = setTimeout(() => {
       this.triggerBackgroundSync();
-    }, 1000);
+    }, 50);
   }
   private static getStorageItem<T>(key: string, defaultValue: T): T {
     const value = localStorage.getItem(key);
@@ -1460,7 +1460,7 @@ export class SheetsSyncEngine {
       if (this.hasPendingSyncRequest) {
         setTimeout(() => {
           this.triggerBackgroundSync();
-        }, 1000);
+        }, 50);
       }
     }
   }
@@ -1477,7 +1477,7 @@ export class SheetsSyncEngine {
 
       this.backgroundSyncTimeout = setTimeout(() => {
         this.triggerBackgroundSync();
-      }, 1000);
+      }, 50);
       
       return { success: true, message: "Transaction queued for background sync." };
     } catch (e: any) {
