@@ -472,7 +472,7 @@ export async function generateInvoicePDF(
     });
 
     if (showHsn) {
-      const hsnValue = item.hsnCode || "9403";
+      const hsnValue = String(item.hsnCode || "9403");
       doc.text(hsnValue, marginX + 82, centerYOffset - 1.0);
     }
 
