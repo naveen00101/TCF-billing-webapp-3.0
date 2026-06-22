@@ -128,6 +128,7 @@ export class SheetsSyncEngine {
   private static isSyncingInProgress = false;
   private static hasPendingSyncRequest = false;
   private static backgroundSyncTimeout: any = null;
+  private static hasSyncedDownThisSession = false;
 
   private static queueAutomaticSync(): void {
     if (this.isSyncingDown) return;
@@ -942,6 +943,7 @@ export class SheetsSyncEngine {
       const conn = this.getConnectionSettings();
       conn.isConnected = false;
       this.saveConnectionSettings(conn);
+      this.hasSyncedDownThisSession = false;
     } finally {
       this.isSyncingDown = false;
     }
@@ -960,6 +962,7 @@ export class SheetsSyncEngine {
       this.savePromoCodes([]);
       this.saveAuditLogs([]);
       this.saveUserActivities([]);
+      this.hasSyncedDownThisSession = false;
     } finally {
       this.isSyncingDown = false;
     }
@@ -1243,6 +1246,7 @@ export class SheetsSyncEngine {
           lastSyncTime: new Date().toLocaleTimeString(),
         };
         this.saveConnectionSettings(updatedConn);
+        this.hasSyncedDownThisSession = true;
 
         return { success: true, message: "Database synchronized successfully with Google Sheets." };
       } else {
@@ -1375,6 +1379,11 @@ export class SheetsSyncEngine {
   public static async triggerBackgroundSync(): Promise<void> {
     const conn = this.getConnectionSettings();
     if (!conn.isConnected || !conn.appsScriptUrl) return;
+
+    if (!this.hasSyncedDownThisSession) {
+      console.warn("[SYNC ENGINE] Skipping automatic background sync up because initial sync down has not completed successfully in this session. This prevents overwriting remote database with empty/stale local state.");
+      return;
+    }
 
     if (this.isSyncingInProgress) {
       this.hasPendingSyncRequest = true;
