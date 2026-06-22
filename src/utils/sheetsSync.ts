@@ -35,8 +35,8 @@ const DEFAULT_INVOICES: Invoice[] = [];
 
 const DEFAULT_INVOICE_ITEMS: InvoiceItem[] = [];
 
-export const HARDCODED_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzqUssk0H36Cw607L0uaQEq4AEPmCa-Jb9_QawW_zRKflfBpwKgSYqGDoD0r9ymmbz6/exec";
-export const HARDCODED_SPREADSHEET_ID = "1JscNP77-TXRIjKUCDz7fk40oxp-dEKVmPoXLFnmDjx8";
+export const HARDCODED_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwbE6busg-nHjZ_w5XX4euz4rVd0jX1d-gMJAdNiD0Z77xPpGfQsD6p8p5TDPzNwVvhuA/exec";
+export const HARDCODED_SPREADSHEET_ID = "";
 
 const DEFAULT_CONNECTION_SETTINGS: ConnectionSettings = {
   spreadsheetId: HARDCODED_SPREADSHEET_ID,
