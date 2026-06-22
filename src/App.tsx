@@ -320,8 +320,12 @@ export default function App() {
  useEffect(() => {
     async function bootSequence() {
       // 1. First, attempt to load persistent deployment configuration
+      // Use a very short timeout since this endpoint only exists on custom backends, not static hosting
       try {
-        const configRes = await fetch("/api/config/db");
+        const abortController = new AbortController();
+        const configTimeout = setTimeout(() => abortController.abort(), 1500);
+        const configRes = await fetch("/api/config/db", { signal: abortController.signal });
+        clearTimeout(configTimeout);
         if (configRes.ok) {
           const configData = await configRes.json();
             if (configData && configData.appsScriptUrl) {
@@ -341,24 +345,31 @@ export default function App() {
           }
         }
       } catch (err) {
-        console.warn("Failed to fetch persistent DB config:", err);
+        // Expected on static hosting (Render) - silently ignore
       }
 
       // 2. Hydrate application state with newly synchronized settings
       reloadApplicationState();
       
-      // 3. Attempt background sync from Google Sheets unconditionally if configured
-      const conn = SheetsSyncEngine.getConnectionSettings();
-      if (conn.isConnected && conn.appsScriptUrl) {
-        SheetsSyncEngine.syncDownFromSheets(conn)
-          .then((result) => {
-            if (result.success) {
-              reloadApplicationState();
-            }
-          })
-          .catch(() => {
-            console.warn("Failed to automatically synchronize with Google Sheets.");
-          });
+      // Mark app as loaded IMMEDIATELY so the diagnostic screen doesn't trigger
+      (window as any).appLoaded = true;
+
+      // 3. Attempt background sync from Google Sheets (fire-and-forget, never blocks app)
+      try {
+        const conn = SheetsSyncEngine.getConnectionSettings();
+        if (conn.isConnected && conn.appsScriptUrl) {
+          SheetsSyncEngine.syncDownFromSheets(conn)
+            .then((result) => {
+              if (result.success) {
+                reloadApplicationState();
+              }
+            })
+            .catch(() => {
+              console.warn("Failed to automatically synchronize with Google Sheets.");
+            });
+        }
+      } catch (syncErr) {
+        console.warn("Sync init error (ignored):", syncErr);
       }
     }
 

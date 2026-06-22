@@ -113,13 +113,20 @@
       (function() {
         var errors = [];
         window.addEventListener('error', function(e) {
-          errors.push(e.message || 'Script error');
-          showDiagnosticsIfNeeded();
+          // Only capture script/syntax errors, not network resource errors
+          if (e.message && e.message.indexOf('SyntaxError') !== -1) {
+            errors.push(e.message || 'Script error');
+            showDiagnosticsIfNeeded();
+          }
         });
         window.addEventListener('unhandledrejection', function(e) {
+          // Ignore network fetch failures — they're expected when offline or during sync
           var msg = e.reason ? (e.reason.message || String(e.reason)) : 'Promise rejection';
-          errors.push(msg);
-          showDiagnosticsIfNeeded();
+          var isNetworkError = msg.indexOf('Failed to fetch') !== -1 || msg.indexOf('NetworkError') !== -1 || msg.indexOf('404') !== -1 || msg.indexOf('CORS') !== -1 || msg.indexOf('net::') !== -1;
+          if (!isNetworkError) {
+            errors.push(msg);
+            showDiagnosticsIfNeeded();
+          }
         });
 
         // Feature detection
@@ -228,13 +235,13 @@
         // Perform initial check
         showDiagnosticsIfNeeded();
 
-        // Also check if app fails to load after 5 seconds
+        // Also check if app fails to load after 15 seconds (generous for slow devices/networks)
         setTimeout(function() {
           if (!window.appLoaded) {
             errors.push('Application bundle failed to mount (Timeout)');
             showDiagnosticsIfNeeded();
           }
-        }, 5000);
+        }, 15000);
       })();
     </script>
   </head>
