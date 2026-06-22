@@ -178,13 +178,16 @@ export class SheetsSyncEngine {
     return this.validateAndRepairProductTree(raw);
   }
 
-  public static saveProducts(products: Product[]): void {
-    const existingSoftDeleted = this.getProducts().filter(p => p.isSoftDeleted);
-    const activeIds = new Set(products.filter(p => !p.isSoftDeleted).map(p => p.id));
-    const merged = [
-      ...products,
-      ...existingSoftDeleted.filter(p => !activeIds.has(p.id))
-    ];
+  public static saveProducts(products: Product[], isSyncPull = false): void {
+    let merged = products;
+    if (!isSyncPull) {
+      const existingSoftDeleted = this.getProducts().filter(p => p.isSoftDeleted);
+      const activeIds = new Set(products.filter(p => !p.isSoftDeleted).map(p => p.id));
+      merged = [
+        ...products,
+        ...existingSoftDeleted.filter(p => !activeIds.has(p.id))
+      ];
+    }
     const validated = this.validateAndRepairProductTree(merged);
     this.setStorageItem("billing_products", validated);
     this.queueAutomaticSync();
@@ -651,13 +654,16 @@ export class SheetsSyncEngine {
     return this.getStorageItem<Agent[]>("billing_agents_registry", DEFAULT_AGENTS);
   }
 
-  public static saveAgents(agents: Agent[]): void {
-    const existingSoftDeleted = this.getAgents().filter(a => a.isSoftDeleted);
-    const activeIds = new Set(agents.filter(a => !a.isSoftDeleted).map(a => a.id));
-    const merged = [
-      ...agents,
-      ...existingSoftDeleted.filter(a => !activeIds.has(a.id))
-    ];
+  public static saveAgents(agents: Agent[], isSyncPull = false): void {
+    let merged = agents;
+    if (!isSyncPull) {
+      const existingSoftDeleted = this.getAgents().filter(a => a.isSoftDeleted);
+      const activeIds = new Set(agents.filter(a => !a.isSoftDeleted).map(a => a.id));
+      merged = [
+        ...agents,
+        ...existingSoftDeleted.filter(a => !activeIds.has(a.id))
+      ];
+    }
     this.setStorageItem("billing_agents_registry", merged);
     this.queueAutomaticSync();
   }
@@ -667,13 +673,16 @@ export class SheetsSyncEngine {
     return this.getStorageItem<PromoCode[]>("billing_promo_codes", DEFAULT_PROMO_CODES);
   }
 
-  public static savePromoCodes(promos: PromoCode[]): void {
-    const existingSoftDeleted = this.getPromoCodes().filter(p => p.isSoftDeleted);
-    const activeCodes = new Set(promos.filter(p => !p.isSoftDeleted).map(p => p.promoCode));
-    const merged = [
-      ...promos,
-      ...existingSoftDeleted.filter(p => !activeCodes.has(p.promoCode))
-    ];
+  public static savePromoCodes(promos: PromoCode[], isSyncPull = false): void {
+    let merged = promos;
+    if (!isSyncPull) {
+      const existingSoftDeleted = this.getPromoCodes().filter(p => p.isSoftDeleted);
+      const activeCodes = new Set(promos.filter(p => !p.isSoftDeleted).map(p => p.promoCode));
+      merged = [
+        ...promos,
+        ...existingSoftDeleted.filter(p => !activeCodes.has(p.promoCode))
+      ];
+    }
     this.setStorageItem("billing_promo_codes", merged);
     this.queueAutomaticSync();
   }
@@ -1197,17 +1206,17 @@ export class SheetsSyncEngine {
             }
           });
 
-          this.saveProducts(mergedProducts);
+          this.saveProducts(mergedProducts, true);
         }
         if (customersList) this.saveCustomers(customersList);
         if (invoicesList) this.saveInvoices(invoicesList);
         if (invoiceItemsList) this.saveInvoiceItems(invoiceItemsList);
-        if (agentsList && Array.isArray(agentsList)) this.saveAgents(agentsList);
+        if (agentsList && Array.isArray(agentsList)) this.saveAgents(agentsList, true);
         if (paymentTransactionsList && Array.isArray(paymentTransactionsList)) {
           this.savePaymentTransactions(paymentTransactionsList);
         }
         if (usersList && Array.isArray(usersList) && usersList.length > 0) this.saveUsers(usersList);
-        if (promoCodesList && Array.isArray(promoCodesList)) this.savePromoCodes(promoCodesList);
+        if (promoCodesList && Array.isArray(promoCodesList)) this.savePromoCodes(promoCodesList, true);
         if (userActivityList && Array.isArray(userActivityList)) this.saveUserActivities(userActivityList);
         if (auditLogList && Array.isArray(auditLogList)) this.saveAuditLogs(auditLogList);
 
