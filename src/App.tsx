@@ -324,18 +324,20 @@ export default function App() {
         const configRes = await fetch("/api/config/db");
         if (configRes.ok) {
           const configData = await configRes.json();
-          if (configData && configData.appsScriptUrl) {
-            const currentConn = SheetsSyncEngine.getConnectionSettings();
-            
-            // Only update if missing or if the server config is more recent/valid
-            // Overwrite local if we have a valid global config
-            currentConn.appsScriptUrl = configData.appsScriptUrl;
-            if (configData.spreadsheetId) currentConn.spreadsheetId = configData.spreadsheetId;
-            if (configData.spreadsheetName) currentConn.spreadsheetName = configData.spreadsheetName;
-            if (configData.isConnected !== undefined) currentConn.isConnected = configData.isConnected;
-            if (configData.connectionMode !== undefined) currentConn.connectionMode = configData.connectionMode;
-            
-            SheetsSyncEngine.saveConnectionSettings(currentConn);
+            if (configData && configData.appsScriptUrl) {
+              const currentConn = SheetsSyncEngine.getConnectionSettings();
+              
+              // Only update if the user is in automatic mode (or on first load).
+              // Do NOT overwrite manual custom configurations with the server's default config on page reload.
+              if (currentConn.connectionMode !== "manual") {
+                currentConn.appsScriptUrl = configData.appsScriptUrl;
+                if (configData.spreadsheetId) currentConn.spreadsheetId = configData.spreadsheetId;
+                if (configData.spreadsheetName) currentConn.spreadsheetName = configData.spreadsheetName;
+                if (configData.isConnected !== undefined) currentConn.isConnected = configData.isConnected;
+                if (configData.connectionMode !== undefined) currentConn.connectionMode = configData.connectionMode;
+                
+                SheetsSyncEngine.saveConnectionSettings(currentConn);
+            }
           }
         }
       } catch (err) {
