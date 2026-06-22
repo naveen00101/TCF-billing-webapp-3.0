@@ -1345,7 +1345,7 @@ export default function SettingsTab({
       try {
         const payload = { action: "repairCounters", spreadsheetId: spreadsheetId };
         const res = await fetch(appsScriptUrl, { 
-          method: "POST", mode: "cors", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(payload)
+          method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(payload), redirect: "follow"
         });
         const resJson = await res.json();
         if(resJson.success) {

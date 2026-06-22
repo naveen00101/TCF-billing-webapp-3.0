@@ -1077,9 +1077,9 @@ export class SheetsSyncEngine {
 
       const response = await fetch(url, {
         method: "POST",
-        mode: "cors",
         headers: { "Content-Type": "text/plain;charset=utf-8" },
         body: JSON.stringify(payload),
+        redirect: "follow",
       });
 
       if (!response.ok) {
@@ -1113,9 +1113,9 @@ export class SheetsSyncEngine {
 
       const response = await fetch(url, {
         method: "POST",
-        mode: "cors",
         headers: { "Content-Type": "text/plain;charset=utf-8" },
         body: JSON.stringify(payload),
+        redirect: "follow",
       });
 
       if (!response.ok) {
