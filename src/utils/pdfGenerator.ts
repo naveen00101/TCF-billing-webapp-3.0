@@ -55,6 +55,13 @@ function drawRupeeVector(doc: jsPDF, x: number, y: number, fontSize: number = 9)
   doc.setLineWidth(currentLineWidth);
 }
 
+export function sanitizePdfText(text: string): string {
+  if (!text) return "";
+  return String(text)
+    .replace(/[\u200B-\u200D\u2060-\u206F\uFEFF]/g, "") // remove zero-width / hidden characters
+    .replace(/[\u00A0\u202F]/g, " "); // replace non-breaking spaces with normal spaces
+}
+
 // Wrapper utility to draw text with seamless Indian Rupee symbols
 export function drawTextWithRupee(
   doc: jsPDF,
@@ -248,6 +255,26 @@ export async function generateInvoicePDF(
 
   // Invoice is strictly 100% formatted using professional A4 sheet layout
   const doc = new jsPDF("p", "mm", "a4");
+
+  // Wrap doc.text and doc.splitTextToSize to automatically sanitize text of unsupported characters
+  const originalText = doc.text;
+  doc.text = function(text: any, ...args: any[]) {
+    if (typeof text === "string") {
+      text = sanitizePdfText(text);
+    } else if (Array.isArray(text)) {
+      text = text.map(line => typeof line === "string" ? sanitizePdfText(line) : line);
+    }
+    return originalText.apply(this, [text, ...args] as any);
+  };
+
+  const originalSplitTextToSize = doc.splitTextToSize;
+  doc.splitTextToSize = function(text: any, ...args: any[]) {
+    if (typeof text === "string") {
+      text = sanitizePdfText(text);
+    }
+    return originalSplitTextToSize.apply(this, [text, ...args] as any);
+  };
+
   const marginX = 16;
   let currentY = 16;
 
