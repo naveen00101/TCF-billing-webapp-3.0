@@ -179,20 +179,21 @@ export default function SettingsTab({
  }
 
  const payload: CompanySettings = {
- companyName: companyName.trim(),
- shortName: shortName.trim(),
- address: address.trim(),
- phone: phone.trim(),
- email: email.trim(),
- gstNumber: gstNumber.trim(),
- website: website.trim(),
- invoiceFooter: invoiceFooter.trim(),
- invoiceTerms: invoiceTerms,
- invoicePrefix: invoicePrefix.trim().toUpperCase(),
- nextInvoiceNumber: Number(nextInvoiceNumber) || 1001,
- defaultPrintFormat,
- defaultDownloadFormat,
- useLogoWatermark,
+  ...companySettings,
+  companyName: companyName.trim(),
+  shortName: shortName.trim(),
+  address: address.trim(),
+  phone: phone.trim(),
+  email: email.trim(),
+  gstNumber: gstNumber.trim(),
+  website: website.trim(),
+  invoiceFooter: invoiceFooter.trim(),
+  invoiceTerms: invoiceTerms,
+  invoicePrefix: invoicePrefix.trim().toUpperCase(),
+  nextInvoiceNumber: Number(nextInvoiceNumber) || 1001,
+  defaultPrintFormat,
+  defaultDownloadFormat,
+  useLogoWatermark,
  };
 
  SheetsSyncEngine.saveCompanySettings(payload);

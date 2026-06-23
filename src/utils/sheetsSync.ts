@@ -672,8 +672,11 @@ export class SheetsSyncEngine {
     return settings;
   }
 
-  public static saveCompanySettings(settings: CompanySettings): void {
+  public static saveCompanySettings(settings: CompanySettings, isSyncPull: boolean = false): void {
     this.setStorageItem("billing_company_settings", settings);
+    if (!isSyncPull) {
+      this.trackLocalChange("settings", "SETTINGS_ROW");
+    }
     this.queueAutomaticSync();
   }
 
@@ -1462,23 +1465,31 @@ export class SheetsSyncEngine {
             nextInvNum = maxRemoteSequence + 1;
           }
 
-          this.saveCompanySettings({
-            ...companySettings,
-            nextInvoiceNumber: nextInvNum,
-            invoicePrefix: prefix,
-            companyName: name,
-            address: addr,
-            phone: phone,
-            email: email,
-            gstNumber: gst,
-          });
+          // Only overwrite settings from sheet if they are not locally modified
+          if (this.isLocalChangeDirty("settings", "SETTINGS_ROW")) {
+            this.saveCompanySettings({
+              ...companySettings,
+              nextInvoiceNumber: Math.max(companySettings.nextInvoiceNumber, nextInvNum)
+            }, true);
+          } else {
+            this.saveCompanySettings({
+              ...companySettings,
+              nextInvoiceNumber: nextInvNum,
+              invoicePrefix: prefix,
+              companyName: name,
+              address: addr,
+              phone: phone,
+              email: email,
+              gstNumber: gst,
+            }, true);
+          }
         } else if (maxRemoteSequence > 0) {
           const companySettings = this.getCompanySettings();
           if (maxRemoteSequence >= companySettings.nextInvoiceNumber) {
             this.saveCompanySettings({
               ...companySettings,
               nextInvoiceNumber: maxRemoteSequence + 1,
-            });
+            }, true);
           }
         }
 
