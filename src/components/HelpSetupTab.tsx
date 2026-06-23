@@ -53,6 +53,10 @@ export default function HelpSetupTab() {
  a:"Yes. Setting 'Anyone has access' is a requirement for Google Apps Script Web Apps to accept incoming HTTPS POST requests from external domains. We safeguard your write actions with an internal API token that is verified on every transaction run."
  },
  {
+ q:"Why does backup creation fail with a Google Drive permission error?",
+ a:"This happens because Google Apps Script requires explicit permission from you to access your Google Drive (specifically to create the backup folder and copy files). To resolve this, open the Apps Script editor inside your spreadsheet ('Extensions' > 'Apps Script'), select the 'createSpreadsheetBackup' function from the top dropdown, and click the 'Run' button. Follow the 'Authorization Required' prompt to click 'Review Permissions', select your account, click 'Advanced' > 'Go to TCF POS Backend (unsafe)', and click 'Allow'. After authorizing, redeploy the web app ('Deploy' > 'Manage Deployments' > select active deployment > edit icon > version 'New version' > click 'Deploy') so the permissions take effect."
+ },
+ {
  q:"How can I restore default data to play around?",
  a:"Inside the Settings Panel under Database Settings, click 'Reset Demo Defaults'. It will instantly seed your workspace with test invoices, mock customers, and default usernames."
  }
