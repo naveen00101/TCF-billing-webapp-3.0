@@ -291,7 +291,7 @@ export async function generateInvoicePDF(
     try {
       if (logoSrc) {
         // @ts-ignore
-        const gState = new docObj.GState({ opacity: 0.06 }); // Low opacity 5-8%
+        const gState = new docObj.GState({ opacity: 0.10 }); // Low opacity 10%
         // @ts-ignore
         docObj.saveGraphicsState();
         // @ts-ignore
