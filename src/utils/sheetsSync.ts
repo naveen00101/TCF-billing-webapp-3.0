@@ -1427,36 +1427,111 @@ export class SheetsSyncEngine {
 
         if (settingsList) {
           const companySettings = this.getCompanySettings();
-          let nextInvNum = companySettings.nextInvoiceNumber;
-          let prefix = companySettings.invoicePrefix;
           let name = companySettings.companyName;
+          let shortName = companySettings.shortName;
           let addr = companySettings.address;
           let phone = companySettings.phone;
           let email = companySettings.email;
           let gst = companySettings.gstNumber;
+          let website = companySettings.website;
+          let invoiceFooter = companySettings.invoiceFooter;
+          let prefix = companySettings.invoicePrefix;
+          let nextInvNum = companySettings.nextInvoiceNumber;
+          let defaultPrintFormat = companySettings.defaultPrintFormat;
+          let defaultDownloadFormat = companySettings.defaultDownloadFormat;
+          let useLogoWatermark = companySettings.useLogoWatermark;
+          let invoiceTerms = companySettings.invoiceTerms;
+          let companyState = companySettings.companyState;
+          let companyStateCode = companySettings.companyStateCode;
+          let cgstPercentage = companySettings.cgstPercentage;
+          let sgstPercentage = companySettings.sgstPercentage;
+          let igstPercentage = companySettings.igstPercentage;
+          let gstEnabledByDefault = companySettings.gstEnabledByDefault;
 
           const firstRow = settingsList[0];
           if (firstRow && (firstRow.nextInvoiceNumber !== undefined || firstRow.nextInvoiceNumber === null)) {
             // Flat format
-            nextInvNum = parseInt(firstRow.nextInvoiceNumber) || nextInvNum;
-            prefix = firstRow.invoicePrefix || prefix;
-            name = firstRow.companyName || name;
-            addr = firstRow.address || addr;
-            phone = firstRow.phone || phone;
-            email = firstRow.email || email;
-            gst = firstRow.gstNumber || gst;
+            if (firstRow.companyName !== undefined && firstRow.companyName !== null) name = String(firstRow.companyName);
+            if (firstRow.shortName !== undefined && firstRow.shortName !== null) shortName = String(firstRow.shortName);
+            if (firstRow.address !== undefined && firstRow.address !== null) addr = String(firstRow.address);
+            if (firstRow.phone !== undefined && firstRow.phone !== null) phone = String(firstRow.phone);
+            if (firstRow.email !== undefined && firstRow.email !== null) email = String(firstRow.email);
+            if (firstRow.gstNumber !== undefined && firstRow.gstNumber !== null) gst = String(firstRow.gstNumber);
+            if (firstRow.website !== undefined && firstRow.website !== null) website = String(firstRow.website);
+            if (firstRow.invoiceFooter !== undefined && firstRow.invoiceFooter !== null) invoiceFooter = String(firstRow.invoiceFooter);
+            if (firstRow.invoicePrefix !== undefined && firstRow.invoicePrefix !== null) prefix = String(firstRow.invoicePrefix);
+            
+            const parsedNextInv = parseInt(firstRow.nextInvoiceNumber);
+            if (!isNaN(parsedNextInv)) nextInvNum = parsedNextInv;
+            
+            if (firstRow.defaultPrintFormat !== undefined && firstRow.defaultPrintFormat !== null) defaultPrintFormat = String(firstRow.defaultPrintFormat) as any;
+            if (firstRow.defaultDownloadFormat !== undefined && firstRow.defaultDownloadFormat !== null) defaultDownloadFormat = String(firstRow.defaultDownloadFormat) as any;
+            
+            if (firstRow.useLogoWatermark !== undefined && firstRow.useLogoWatermark !== null) {
+              useLogoWatermark = String(firstRow.useLogoWatermark) === "true" || firstRow.useLogoWatermark === true;
+            }
+            if (firstRow.invoiceTerms !== undefined && firstRow.invoiceTerms !== null) invoiceTerms = String(firstRow.invoiceTerms);
+            if (firstRow.companyState !== undefined && firstRow.companyState !== null) companyState = String(firstRow.companyState);
+            if (firstRow.companyStateCode !== undefined && firstRow.companyStateCode !== null) companyStateCode = String(firstRow.companyStateCode);
+            
+            const parsedCgst = parseFloat(firstRow.cgstPercentage);
+            if (!isNaN(parsedCgst)) cgstPercentage = parsedCgst;
+            const parsedSgst = parseFloat(firstRow.sgstPercentage);
+            if (!isNaN(parsedSgst)) sgstPercentage = parsedSgst;
+            const parsedIgst = parseFloat(firstRow.igstPercentage);
+            if (!isNaN(parsedIgst)) igstPercentage = parsedIgst;
+            
+            if (firstRow.gstEnabledByDefault !== undefined && firstRow.gstEnabledByDefault !== null) {
+              gstEnabledByDefault = String(firstRow.gstEnabledByDefault) === "true" || firstRow.gstEnabledByDefault === true;
+            }
           } else {
             // Key-Value format
             settingsList.forEach((s: any) => {
               const key = s.key || s.Key;
               const val = s.value !== undefined ? s.value : s.Value;
-              if (key === "nextInvoiceNumber") nextInvNum = parseInt(val) || nextInvNum;
-              if (key === "invoicePrefix") prefix = val || prefix;
-              if (key === "companyName") name = val || name;
-              if (key === "address") addr = val || addr;
-              if (key === "phone") phone = val || phone;
-              if (key === "email") email = val || email;
-              if (key === "gstNumber") gst = val || gst;
+              if (val === undefined || val === null) return;
+              
+              if (key === "companyName") name = String(val);
+              if (key === "shortName") shortName = String(val);
+              if (key === "address") addr = String(val);
+              if (key === "phone") phone = String(val);
+              if (key === "email") email = String(val);
+              if (key === "gstNumber") gst = String(val);
+              if (key === "website") website = String(val);
+              if (key === "invoiceFooter") invoiceFooter = String(val);
+              if (key === "invoicePrefix") prefix = String(val);
+              
+              if (key === "nextInvoiceNumber") {
+                const parsed = parseInt(val);
+                if (!isNaN(parsed)) nextInvNum = parsed;
+              }
+              
+              if (key === "defaultPrintFormat") defaultPrintFormat = String(val) as any;
+              if (key === "defaultDownloadFormat") defaultDownloadFormat = String(val) as any;
+              
+              if (key === "useLogoWatermark") {
+                useLogoWatermark = String(val) === "true" || val === true;
+              }
+              if (key === "invoiceTerms") invoiceTerms = String(val);
+              if (key === "companyState") companyState = String(val);
+              if (key === "companyStateCode") companyStateCode = String(val);
+              
+              if (key === "cgstPercentage") {
+                const parsed = parseFloat(val);
+                if (!isNaN(parsed)) cgstPercentage = parsed;
+              }
+              if (key === "sgstPercentage") {
+                const parsed = parseFloat(val);
+                if (!isNaN(parsed)) sgstPercentage = parsed;
+              }
+              if (key === "igstPercentage") {
+                const parsed = parseFloat(val);
+                if (!isNaN(parsed)) igstPercentage = parsed;
+              }
+              
+              if (key === "gstEnabledByDefault") {
+                gstEnabledByDefault = String(val) === "true" || val === true;
+              }
             });
           }
 
@@ -1474,13 +1549,26 @@ export class SheetsSyncEngine {
           } else {
             this.saveCompanySettings({
               ...companySettings,
-              nextInvoiceNumber: nextInvNum,
-              invoicePrefix: prefix,
               companyName: name,
+              shortName,
               address: addr,
-              phone: phone,
-              email: email,
+              phone,
+              email,
               gstNumber: gst,
+              website,
+              invoiceFooter,
+              invoicePrefix: prefix,
+              nextInvoiceNumber: nextInvNum,
+              defaultPrintFormat,
+              defaultDownloadFormat,
+              useLogoWatermark,
+              invoiceTerms,
+              companyState,
+              companyStateCode,
+              cgstPercentage,
+              sgstPercentage,
+              igstPercentage,
+              gstEnabledByDefault,
             }, true);
           }
         } else if (maxRemoteSequence > 0) {
