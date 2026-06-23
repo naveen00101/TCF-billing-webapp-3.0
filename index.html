@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TCF Smart Billing</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    <!-- Polyfill localStorage/sessionStorage if blocked by browser settings -->
+    <script>
+      (function() {
+        var storagePolyfilled = false;
+        var storagePolyfillError = null;
+
+        function createInMemoryStorage() {
+          var store = {};
+          var s = {
+            isPolyfill: true,
+            getItem: function(key) {
+              return store.hasOwnProperty(key) ? store[key] : null;
+            },
+            setItem: function(key, value) {
+              store[key] = String(value);
+            },
+            removeItem: function(key) {
+              delete store[key];
+            },
+            clear: function() {
+              store = {};
+            },
+            key: function(index) {
+              var keys = Object.keys(store);
+              return keys[index] || null;
+            },
+            get length() {
+              return Object.keys(store).length;
+            }
+          };
+          return s;
+        }
+
+        // Test and Polyfill localStorage
+        try {
+          var testLS = window.localStorage;
+          if (!testLS) throw new Error("localStorage is null/undefined");
+          testLS.setItem('__storage_test__', '1');
+          testLS.removeItem('__storage_test__');
+        } catch (e) {
+          console.warn("localStorage is blocked or unavailable. Applying in-memory polyfill.");
+          try {
+            var mockLS = createInMemoryStorage();
+            Object.defineProperty(window, 'localStorage', {
+              get: function() { return mockLS; },
+              set: function() { },
+              configurable: true,
+              enumerable: true
+            });
+            storagePolyfilled = true;
+          } catch (err) {
+            storagePolyfillError = err.message || String(err);
+            console.error("Failed to polyfill localStorage:", err);
+          }
+        }
+
+        // Test and Polyfill sessionStorage
+        try {
+          var testSS = window.sessionStorage;
+          if (!testSS) throw new Error("sessionStorage is null/undefined");
+          testSS.setItem('__storage_test__', '1');
+          testSS.removeItem('__storage_test__');
+        } catch (e) {
+          console.warn("sessionStorage is blocked or unavailable. Applying in-memory polyfill.");
+          try {
+            var mockSS = createInMemoryStorage();
+            Object.defineProperty(window, 'sessionStorage', {
+              get: function() { return mockSS; },
+              set: function() { },
+              configurable: true,
+              enumerable: true
+            });
+          } catch (err) {
+            console.error("Failed to polyfill sessionStorage:", err);
+          }
+        }
+
+        // Expose global flags for diagnostic check
+        window.__storagePolyfilled = storagePolyfilled;
+        window.__storagePolyfillError = storagePolyfillError;
+      })();
+    </script>
+    <script>
+      (function() {
+        try {
+          var storedGlobal = localStorage.getItem("theme_pref_global") || "system";
+          var userStr = localStorage.getItem("billing_current_user");
+          var theme = storedGlobal;
+          if (userStr) {
+            var user = JSON.parse(userStr);
+            if (user && user.username) {
+              theme = localStorage.getItem("theme_pref_" + user.username) || "system";
+            }
+          }
+          var actualTheme = theme;
+          if (theme === "system") {
+            actualTheme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+          }
+          document.documentElement.classList.remove("light", "dark");
+          document.documentElement.classList.add(actualTheme);
+        } catch (e) {
+          console.error("Theme preload error:", e);
+        }
+      })();
+    </script>
+    <script>
+      (function() {
+        var errors = [];
+        window.addEventListener('error', function(e) {
+          // Only capture script/syntax errors, not network resource errors
+          if (e.message && e.message.indexOf('SyntaxError') !== -1) {
+            errors.push(e.message || 'Script error');
+            showDiagnosticsIfNeeded();
+          }
+        });
+        window.addEventListener('unhandledrejection', function(e) {
+          // Ignore network fetch failures — they're expected when offline or during sync
+          var msg = e.reason ? (e.reason.message || String(e.reason)) : 'Promise rejection';
+          var isNetworkError = msg.indexOf('Failed to fetch') !== -1 || msg.indexOf('NetworkError') !== -1 || msg.indexOf('404') !== -1 || msg.indexOf('CORS') !== -1 || msg.indexOf('net::') !== -1;
+          if (!isNetworkError) {
+            errors.push(msg);
+            showDiagnosticsIfNeeded();
+          }
+        });
+
+        // Feature detection
+        var features = {
+          esModules: 'noModule' in document.createElement('script'),
+          arrowFunctions: true,
+          optionalChaining: true,
+          localStorage: 'supported'
+        };
+
+        try {
+          eval('() => {}');
+        } catch(e) { features.arrowFunctions = false; }
+
+        try {
+          eval('var o = {}; o?.prop;');
+        } catch(e) { features.optionalChaining = false; }
+
+        if (window.__storagePolyfilled) {
+          features.localStorage = 'fallback';
+        } else if (window.__storagePolyfillError) {
+          features.localStorage = 'error';
+        } else {
+          try {
+            localStorage.setItem('__test__', '1');
+            localStorage.removeItem('__test__');
+          } catch(e) {
+            features.localStorage = 'error';
+          }
+        }
+
+        function showDiagnosticsIfNeeded() {
+          // If we already have errors, or if we determine basic ES modules or arrow functions are missing, or if local storage failed completely
+          if (!features.esModules || !features.arrowFunctions || !features.optionalChaining || features.localStorage === 'error' || errors.length > 0) {
+            renderErrorUI();
+          }
+        }
+
+        function renderErrorUI() {
+          if (window.appLoaded) return; // Never block if app loaded successfully
+          if (document.getElementById('compat-error-screen')) return;
+          
+          var root = document.getElementById('root');
+          if (root) {
+            root.style.display = 'none';
+          }
+          
+          var div = document.createElement('div');
+          div.id = 'compat-error-screen';
+          div.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:#0f172a;color:#f8fafc;font-family:system-ui, -apple-system, sans-serif;display:flex;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;z-index:99999;overflow-y:auto;';
+          
+          var errorListHtml = errors.map(function(err) {
+            return '<li style="color:#f87171;margin-bottom:8px;font-family:monospace;font-size:13px;word-break:break-all;">' + err + '</li>';
+          }).join('');
+          
+          div.innerHTML = 
+            '<div style="background:#1e293b;border:1px solid #334155;border-radius:16px;padding:32px;max-width:550px;width:100%;box-shadow:0 10px 25px -5px rgba(0,0,0,0.3);box-sizing:border-box;">' +
+              '<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">' +
+                '<span style="font-size:32px;">⚠️</span>' +
+                '<h1 style="font-size:20px;font-weight:600;margin:0;color:#f1f5f9;">Browser Compatibility Issue</h1>' +
+              '</div>' +
+              '<p style="font-size:14px;line-height:1.6;color:#cbd5e1;margin:0 0 20px 0;">' +
+                'This application uses modern web features to ensure high performance and reliable offline data synchronization. ' +
+                'Your current browser or tablet WebView is outdated and cannot load the application.' +
+              '</p>' +
+              
+              '<div style="background:#0f172a;border-radius:8px;padding:16px;margin-bottom:24px;border:1px solid #334155;">' +
+                '<h2 style="font-size:13px;text-transform:uppercase;letter-spacing:0.05em;color:#94a3b8;margin:0 0 12px 0;font-weight:600;">System Diagnostics</h2>' +
+                '<ul style="margin:0;padding-left:20px;font-size:13px;color:#cbd5e1;line-height:1.6;">' +
+                  '<li>ES Modules (Modern Scripting): ' + (features.esModules ? '✅ Supported' : '❌ NOT Supported') + '</li>' +
+                  '<li>Modern JS Syntax (Arrow functions): ' + (features.arrowFunctions ? '✅ Supported' : '❌ NOT Supported') + '</li>' +
+                  '<li>ES2020 Syntax (Optional chaining): ' + (features.optionalChaining ? '✅ Supported' : '❌ NOT Supported') + '</li>' +
+                  '<li>Local Storage: ' + 
+                    (features.localStorage === 'supported' ? '✅ Supported' : 
+                     (features.localStorage === 'fallback' ? '⚠️ In-Memory Fallback (Cookies Blocked)' : '❌ NOT Supported')) + 
+                  '</li>' +
+                '</ul>' +
+                (errors.length > 0 ? 
+                  ('<div style="margin-top:16px;border-top:1px solid #334155;padding-top:12px;">' +
+                    '<h3 style="font-size:12px;color:#f87171;margin:0 0 8px 0;font-weight:600;">Detected Errors:</h3>' +
+                    '<ul style="margin:0;padding-left:20px;list-style-type:disc;">' + errorListHtml + '</ul>' +
+                   '</div>') : ''
+                ) +
+              '</div>' +
+              
+              '<h3 style="font-size:14px;color:#f1f5f9;margin:0 0 12px 0;font-weight:600;">How to resolve this:</h3>' +
+              '<ol style="margin:0;padding-left:20px;font-size:14px;color:#cbd5e1;line-height:1.6;display:flex;flex-direction:column;gap:12px;">' +
+                '<li>' +
+                  '<strong>Use Google Chrome:</strong> If you are using the default Samsung Internet browser or another built-in browser, please download and open the app in <strong>Google Chrome</strong> instead.' +
+                '</li>' +
+                '<li>' +
+                  '<strong>Update Chrome & WebView:</strong> Open the Google Play Store on this Samsung Tab, search for <strong>"Google Chrome"</strong> and <strong>"Android System WebView"</strong>, and make sure both are fully updated to their latest versions.' +
+                '</li>' +
+                '<li>' +
+                  '<strong>Update Tablet Software:</strong> Go to Tablet Settings &rarr; Software Update (or System Update) and install any pending system updates.' +
+                '</li>' +
+              '</ol>' +
+              '<div style="margin-top:28px;text-align:right;">' +
+                '<button onclick="window.location.reload()" style="background:#2563eb;color:#ffffff;border:none;padding:10px 20px;border-radius:8px;font-weight:500;cursor:pointer;font-size:14px;transition:background 0.2s;">Reload App</button>' +
+              '</div>' +
+            '</div>';
+          
+          document.body.appendChild(div);
+        }
+
+        // Perform initial check
+        showDiagnosticsIfNeeded();
+
+        // Also check if app fails to load after 15 seconds (generous for slow devices/networks)
+        setTimeout(function() {
+          if (!window.appLoaded) {
+            errors.push('Application bundle failed to mount (Timeout)');
+            showDiagnosticsIfNeeded();
+          }
+        }, 15000);
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+
