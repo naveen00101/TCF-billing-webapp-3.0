@@ -29,7 +29,8 @@ import {
  ChevronDown,
  TrendingUp,
  Save,
- Trash2
+ Trash2,
+ RefreshCw
 } from"lucide-react";
 
 // Import custom tabs
@@ -245,6 +246,26 @@ export default function App() {
  }, 4500);
  };
 
+  const handleManualSync = async () => {
+    const conn = SheetsSyncEngine.getConnectionSettings();
+    if (!conn.isConnected || !conn.appsScriptUrl) {
+      showNotification("⚠️ No active Google Sheets connection configured.", "error");
+      return;
+    }
+    showNotification("Refreshing database from Google Sheets...", "info");
+    try {
+      const result = await SheetsSyncEngine.syncDownFromSheets(conn);
+      if (result.success) {
+        reloadApplicationState();
+        showNotification("✓ Database sync completed successfully.", "success");
+      } else {
+        showNotification(`⚠️ Sync failed: ${result.message}`, "error");
+      }
+    } catch (err: any) {
+      showNotification(`⚠️ Sync failed: ${err.message || err}`, "error");
+    }
+  };
+
  // Synchronous State Initializer
   const reloadApplicationState = () => {
     const prods = SheetsSyncEngine.getProducts().filter(p => !p.isSoftDeleted);
@@ -429,22 +450,6 @@ export default function App() {
       window.removeEventListener("focus", handleFocusSync);
     };
   }, []);
-
- const handleForceSync = async () => {
- const conn = SheetsSyncEngine.getConnectionSettings();
- if (!conn.appsScriptUrl) {
-   showNotification("Database is offline. Configure Google Apps Script in Settings.", "error");
-   return;
- }
- showNotification("Refreshing data from Google Sheets...","info");
- const result = await SheetsSyncEngine.syncDownFromSheets(conn);
- if (result.success) {
- reloadApplicationState();
- showNotification("✓ Data refreshed successfully.","success");
- } else {
- showNotification(`Failed to refresh: ${result.message}`,"error");
- }
- };
 
  const handleLogout = () => {
  if (currentUser) {
@@ -717,6 +722,16 @@ export default function App() {
             ⚠️ {syncError.length > 120 ? syncError.substring(0, 120) + "..." : syncError}
           </p>
         )}
+        <div className="pt-1.5">
+          <button
+            onClick={handleManualSync}
+            disabled={syncStatus === "syncing"}
+            className="w-full flex items-center justify-center gap-1.5 rounded-lg bg-zinc-200 hover:bg-zinc-300 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-[10px] font-bold py-1 px-2.5 transition-all cursor-pointer active:scale-95 disabled:opacity-50 disabled:pointer-events-none"
+          >
+            <RefreshCw className={`h-3 w-3 ${syncStatus === "syncing" ? "animate-spin" : ""}`} />
+            {syncStatus === "syncing" ? "Syncing..." : "Sync Now"}
+          </button>
+        </div>
       </div>
     )}
   </div>
@@ -781,15 +796,27 @@ export default function App() {
  </div>
 
  {/* Status block inside mobile panel */}
- <div className="m-4 rounded-xl bg-card-secondary p-3.5 space-y-1 text-xs text-primary border border-default">
- <div className="flex items-center justify-between text-[10px] font-bold text-muted uppercase">
- <span>Database status</span>
- <span>{connection?.isConnected ?"🟢 Online" :"🟡 Sandbox"}</span>
- </div>
- <div className="font-semibold text-primary truncate">
- {connection?.isConnected ? connection.spreadsheetName :"Offline Sandbox Session"}
- </div>
- </div>
+  <div className="m-4 rounded-xl bg-card-secondary p-3.5 space-y-1 text-xs text-primary border border-default">
+    <div className="flex items-center justify-between text-[10px] font-bold text-muted uppercase">
+      <span>Database status</span>
+      <span>{connection?.isConnected ?"🟢 Online" :"🟡 Sandbox"}</span>
+    </div>
+    <div className="font-semibold text-primary truncate">
+      {connection?.isConnected ? connection.spreadsheetName :"Offline Sandbox Session"}
+    </div>
+    {connection?.isConnected && (
+      <div className="pt-2">
+        <button
+          onClick={handleManualSync}
+          disabled={syncStatus === "syncing"}
+          className="w-full flex items-center justify-center gap-1.5 rounded-lg bg-zinc-200 hover:bg-zinc-300 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-[10px] font-bold py-1.5 px-2.5 transition-all cursor-pointer active:scale-95 disabled:opacity-50 disabled:pointer-events-none"
+        >
+          <RefreshCw className={`h-3 w-3 ${syncStatus === "syncing" ? "animate-spin" : ""}`} />
+          {syncStatus === "syncing" ? "Syncing..." : "Sync Now"}
+        </button>
+      </div>
+    )}
+  </div>
 
  {/* Navigation lists */}
  <nav className="flex-1 px-3 py-2 space-y-1 overflow-y-auto">
@@ -1009,7 +1036,7 @@ export default function App() {
  {activeTab ==="dashboard" && (
  <Dashboard
  stats={stats}
- onRefresh={handleForceSync}
+ onRefresh={handleManualSync}
  onNavigateToTab={handleNavigateToTab}
  userRole={userRole}
  />
