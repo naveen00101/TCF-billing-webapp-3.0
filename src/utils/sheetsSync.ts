@@ -70,6 +70,7 @@ const DEFAULT_COMPANY_SETTINGS: CompanySettings = {
   nextInvoiceNumber: 1004,
   defaultPrintFormat: "Receipt",
   defaultDownloadFormat: "A4",
+  useLogoWatermark: true,
   invoiceTerms: `Goods once sold will not be taken back.
 Delivery timelines may vary depending on product availability.
 Warranty terms apply only to eligible products.
@@ -663,6 +664,7 @@ export class SheetsSyncEngine {
     const settings = this.getStorageItem<CompanySettings>("billing_company_settings", DEFAULT_COMPANY_SETTINGS);
     if (!settings.defaultPrintFormat) settings.defaultPrintFormat = "Receipt";
     if (!settings.defaultDownloadFormat) settings.defaultDownloadFormat = "A4";
+    if (settings.useLogoWatermark === undefined) settings.useLogoWatermark = true;
     if (settings.companyState === undefined) settings.companyState = "Andhra Pradesh";
     if (settings.companyStateCode === undefined) settings.companyStateCode = "37";
     if (settings.cgstPercentage === undefined) settings.cgstPercentage = 9;
@@ -1467,8 +1469,10 @@ export class SheetsSyncEngine {
             if (firstRow.defaultPrintFormat !== undefined && firstRow.defaultPrintFormat !== null) defaultPrintFormat = String(firstRow.defaultPrintFormat) as any;
             if (firstRow.defaultDownloadFormat !== undefined && firstRow.defaultDownloadFormat !== null) defaultDownloadFormat = String(firstRow.defaultDownloadFormat) as any;
             
-            if (firstRow.useLogoWatermark !== undefined && firstRow.useLogoWatermark !== null) {
+            if (firstRow.useLogoWatermark !== undefined && firstRow.useLogoWatermark !== null && firstRow.useLogoWatermark !== "") {
               useLogoWatermark = String(firstRow.useLogoWatermark) === "true" || firstRow.useLogoWatermark === true;
+            } else if (firstRow.useLogoWatermark === "") {
+              useLogoWatermark = true;
             }
             if (firstRow.invoiceTerms !== undefined && firstRow.invoiceTerms !== null) invoiceTerms = String(firstRow.invoiceTerms);
             if (firstRow.companyState !== undefined && firstRow.companyState !== null) companyState = String(firstRow.companyState);
@@ -1510,7 +1514,7 @@ export class SheetsSyncEngine {
               if (key === "defaultDownloadFormat") defaultDownloadFormat = String(val) as any;
               
               if (key === "useLogoWatermark") {
-                useLogoWatermark = String(val) === "true" || val === true;
+                useLogoWatermark = val === "" ? true : (String(val) === "true" || val === true);
               }
               if (key === "invoiceTerms") invoiceTerms = String(val);
               if (key === "companyState") companyState = String(val);
