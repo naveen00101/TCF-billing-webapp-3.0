@@ -110,15 +110,15 @@ function initializeDatabase(existingSpreadsheetId, companyName) {
   // Populate default flat settings row
   if (!settingsSheet) settingsSheet = ss.getSheetByName("Settings");
   var defaultSettings = {
-    "companyName": companyName || "My Smart Billing",
+    "companyName": "Tenali Central Furniture",
     "shortName": "TCF Smart Billing",
-    "address": "Plot 42, Furniture Showroom Zone, Guntur Road, Tenali-522201",
-    "phone": "+91 8644 223400",
-    "email": "contact@tcfshowroom.com",
-    "gstNumber": "GSTIN-37AAAAT9876C1Z0",
-    "website": "www.tcfshowroom.com",
+    "address": "Opp R.C.M Church, Amaravathi Yards, Chenchupet, Tenali, Andhra Pradesh 522202",
+    "phone": "8919546858",
+    "email": "tenalicentralfurnitures@gmail.com",
+    "gstNumber": "GSTIN-37AIIPM1793Q1ZE",
+    "website": "www.tenalicentralfurniture.com",
     "invoiceFooter": "Thank you for buying premium furniture from Tenali Central Furniture! We guarantee quality craftsmanship in every piece.",
-    "invoiceTerms": "Goods once sold will not be taken back.\nDelivery timelines may vary depending on product availability.\nWarranty terms apply only to eligible products.\nFurniture color and finish may vary slightly from display samples.",
+    "invoiceTerms": "1. Cancellation Policy: A 10% deduction will be applied to the advance payment in the event of an order cancellation.\n\n2. Colour Variance (Online Orders): Please note that the actual color of the furniture may vary slightly from the images displayed on your screen due to lighting and monitor settings.\n\n3. Payment Terms: The full outstanding balance must be cleared prior to the delivery of the goods.\n\n4. Warranty Coverage: Major internal wood breakage or deep structural cracks occurring during the warranty period are eligible for replacement.\n\n5. Wear and Tear Exclusions: The warranty does not cover natural wear and tear, including fading polish, minor paint damage, superficial surface cracks, or naturally loosened joints.\n\n6. Customer Damage: Products will not be eligible for replacement if physical damage has been caused by mishandling or misuse by the customer.\n\n7. Transportation Costs: All transport charges related to warranty claims, repairs, or replacements will be borne by the customer.\n\n8. As disputes or subject to tenali jurisdiction only. Terms and conditions are mentioned in our website",
     "invoicePrefix": "YR",
     "nextInvoiceNumber": 1001,
     "defaultPrintFormat": "Receipt",

@@ -58,10 +58,11 @@ import HelpSetupTab from"./components/HelpSetupTab";
 import { Product, Customer, Invoice, InvoiceItem, ConnectionSettings, CompanySettings, MessageFeedback } from"./types";
 import { SheetsSyncEngine } from"./utils/sheetsSync";
 import { SYSTEM_LOGO } from"./constants/branding";
-import { preloadPDFLogo } from "./utils/pdfGenerator";
+import { preloadPDFLogo, generateInvoicePDF } from "./utils/pdfGenerator";
 
 export default function App() {
   (window as any).SheetsSyncEngine = SheetsSyncEngine;
+  (window as any).generateInvoicePDF = generateInvoicePDF;
 
   const [isDbLoaded, setIsDbLoaded] = useState(false);
   const currentUser = isDbLoaded ? SheetsSyncEngine.getCurrentUser() : null;

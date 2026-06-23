@@ -60,21 +60,32 @@ const DEFAULT_CONNECTION_SETTINGS: ConnectionSettings = {
 const DEFAULT_COMPANY_SETTINGS: CompanySettings = {
   companyName: "Tenali Central Furniture",
   shortName: "TCF Smart Billing",
-  address: "Plot 42, Furniture Showroom Zone, Guntur Road, Tenali-522201",
-  phone: "+91 8644 223400",
-  email: "contact@tcfshowroom.com",
-  gstNumber: "GSTIN-37AAAAT9876C1Z0",
-  website: "www.tcfshowroom.com",
+  address: "Opp R.C.M Church, Amaravathi Yards, Chenchupet, Tenali, Andhra Pradesh 522202",
+  phone: "8919546858",
+  email: "tenalicentralfurnitures@gmail.com",
+  gstNumber: "GSTIN-37AIIPM1793Q1ZE",
+  website: "www.tenalicentralfurniture.com",
   invoiceFooter: "Thank you for buying premium furniture from Tenali Central Furniture! We guarantee quality craftsmanship in every piece.",
   invoicePrefix: "YR",
   nextInvoiceNumber: 1004,
   defaultPrintFormat: "Receipt",
   defaultDownloadFormat: "A4",
   useLogoWatermark: true,
-  invoiceTerms: `Goods once sold will not be taken back.
-Delivery timelines may vary depending on product availability.
-Warranty terms apply only to eligible products.
-Furniture color and finish may vary slightly from display samples.`,
+  invoiceTerms: `1. Cancellation Policy: A 10% deduction will be applied to the advance payment in the event of an order cancellation.
+
+2. Colour Variance (Online Orders): Please note that the actual color of the furniture may vary slightly from the images displayed on your screen due to lighting and monitor settings.
+
+3. Payment Terms: The full outstanding balance must be cleared prior to the delivery of the goods.
+
+4. Warranty Coverage: Major internal wood breakage or deep structural cracks occurring during the warranty period are eligible for replacement.
+
+5. Wear and Tear Exclusions: The warranty does not cover natural wear and tear, including fading polish, minor paint damage, superficial surface cracks, or naturally loosened joints.
+
+6. Customer Damage: Products will not be eligible for replacement if physical damage has been caused by mishandling or misuse by the customer.
+
+7. Transportation Costs: All transport charges related to warranty claims, repairs, or replacements will be borne by the customer.
+
+8. As disputes or subject to tenali jurisdiction only. Terms and conditions are mentioned in our website`,
   companyState: "Andhra Pradesh",
   companyStateCode: "37",
   cgstPercentage: 9,
@@ -1755,23 +1766,28 @@ export class SheetsSyncEngine {
     console.log(`[SYNC ENGINE] Triggering automatic background sync to Google Sheets...`);
     this.updateSyncStatus("syncing");
     try {
+      const syncUpPayload: any = {
+        [conn.productsSheetName || "Products"]: this.getProducts().map(({ inventoryType, ...p }) => p),
+        [conn.customersSheetName || "Customers"]: this.getCustomers(),
+        [conn.invoicesSheetName || "Invoices"]: this.getInvoices(),
+        [conn.invoiceItemsSheetName || "InvoiceItems"]: this.getInvoiceItems(),
+        [conn.agentsSheetName || "Agents"]: this.getAgents(),
+        "PaymentTransactions": this.getPaymentTransactions(),
+        "Users": this.getUsers(),
+        "PromoCodes": this.getPromoCodes(),
+        "UserActivity": this.getUserActivities(),
+        "AuditLog": this.getAuditLogs()
+      };
+
+      if (this.isLocalChangeDirty("settings", "SETTINGS_ROW")) {
+        syncUpPayload[conn.settingsSheetName || "Settings"] = [this.getCompanySettings()];
+      }
+
       const payload = {
         action: "SYNC_UP",
         spreadsheetId: conn.spreadsheetId,
         backupInterval: conn.backupInterval || "1_day",
-        payload: {
-          [conn.productsSheetName || "Products"]: this.getProducts().map(({ inventoryType, ...p }) => p),
-          [conn.customersSheetName || "Customers"]: this.getCustomers(),
-          [conn.invoicesSheetName || "Invoices"]: this.getInvoices(),
-          [conn.invoiceItemsSheetName || "InvoiceItems"]: this.getInvoiceItems(),
-          [conn.settingsSheetName || "Settings"]: [this.getCompanySettings()],
-          [conn.agentsSheetName || "Agents"]: this.getAgents(),
-          "PaymentTransactions": this.getPaymentTransactions(),
-          "Users": this.getUsers(),
-          "PromoCodes": this.getPromoCodes(),
-          "UserActivity": this.getUserActivities(),
-          "AuditLog": this.getAuditLogs()
-        }
+        payload: syncUpPayload
       };
 
       const response = await fetch(conn.appsScriptUrl, {
