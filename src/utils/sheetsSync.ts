@@ -16,7 +16,7 @@ import {
   PaymentTransaction
 } from "../types";
 
-import { getTodayStr, isDateInCurrentWeek, getInvoiceDateStr, parseInvoiceDate, getCurrentTimeStr } from "./dateUtils";
+import { getTodayStr, isDateInCurrentWeek, getInvoiceDateStr, parseInvoiceDate, getCurrentTimeStr, getThirtyDaysAgoStr } from "./dateUtils";
 import { supabase, updateSupabaseClient, getSupabaseConfig } from "./supabaseClient";
 import { createClient } from "@supabase/supabase-js";
 
@@ -754,6 +754,18 @@ export class SheetsSyncEngine {
 
     console.log("[SyncEngine] Preloading cache from Supabase...");
     try {
+      // Purge audit logs and operator activities older than 30 days to optimize database space
+      try {
+        const thresholdDateStr = getThirtyDaysAgoStr();
+        console.log(`[SyncEngine] Purging audit logs & operator activities older than 30 days (${thresholdDateStr})...`);
+        await Promise.all([
+          supabase.from("audit_logs").delete().lt("date", thresholdDateStr),
+          supabase.from("user_activities").delete().lt("login_date", thresholdDateStr)
+        ]);
+      } catch (purgeErr) {
+        console.error("[SyncEngine] Failed to purge old audits/activities from Supabase:", purgeErr);
+      }
+
       await Promise.all([
         this.reloadTable("company_settings"),
         this.reloadTable("users"),
@@ -1355,7 +1367,9 @@ export class SheetsSyncEngine {
       newValue
     };
     logs.unshift(newLog);
-    this.memoryCache["billing_audit_logs"] = logs;
+    const thresholdDateStr = getThirtyDaysAgoStr();
+    const cleanLogs = logs.filter(log => (log.date || "") >= thresholdDateStr);
+    this.memoryCache["billing_audit_logs"] = cleanLogs;
     
     if (supabase) {
       supabase.from("audit_logs").insert(mapAuditLogToDb(newLog)).then(({ error }) => {
@@ -1403,7 +1417,9 @@ export class SheetsSyncEngine {
     };
 
     list.unshift(newActivity);
-    this.memoryCache["billing_user_activities"] = list;
+    const thresholdDateStr = getThirtyDaysAgoStr();
+    const cleanList = list.filter(act => (act.loginDate || "") >= thresholdDateStr);
+    this.memoryCache["billing_user_activities"] = cleanList;
     
     if (supabase) {
       supabase.from("user_activities").insert(mapUserActivityToDb(newActivity)).then(({ error }) => {

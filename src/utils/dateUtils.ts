@@ -1,4 +1,4 @@
-import { format, parseISO, isValid, startOfWeek, endOfWeek, isWithinInterval, startOfMonth, endOfMonth, startOfYear, endOfYear } from "date-fns";
+import { format, parseISO, isValid, startOfWeek, endOfWeek, isWithinInterval, startOfMonth, endOfMonth, startOfYear, endOfYear, subDays } from "date-fns";
 import { formatInTimeZone, toDate } from "date-fns-tz";
 
 const TIMEZONE = "Asia/Kolkata";
@@ -66,6 +66,14 @@ export function parseInvoiceDate(dateInput: string | Date | number | undefined |
  */
 export function getTodayStr(): string {
   return formatInTimeZone(new Date(), TIMEZONE, "yyyy-MM-dd");
+}
+
+/**
+ * Returns the date 30 days ago formatted as YYYY-MM-DD in Asia/Kolkata timezone
+ */
+export function getThirtyDaysAgoStr(): string {
+  const thirtyDaysAgo = subDays(new Date(), 30);
+  return formatInTimeZone(thirtyDaysAgo, TIMEZONE, "yyyy-MM-dd");
 }
 
 /**
