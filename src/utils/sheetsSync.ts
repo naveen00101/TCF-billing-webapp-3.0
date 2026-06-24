@@ -1089,26 +1089,26 @@ export class SheetsSyncEngine {
   // Connections and Configuration
   public static getConnectionSettings(): ConnectionSettings {
     const defaultSettings: ConnectionSettings = {
-      supabaseUrl: "",
-      supabaseAnonKey: "",
-      isConnected: false,
+      supabaseUrl: "https://xzfrbhtrcjtaafjkonbo.supabase.co",
+      supabaseAnonKey: "sb_publishable_6hdjwsq0hLbulI0k2LiZjA_d9ItftE0",
+      isConnected: true,
       lastSyncTime: "",
       // Keep legacy properties matching interface to prevent compile errors
       spreadsheetId: "",
-      spreadsheetName: "",
+      spreadsheetName: "Supabase Database",
       appsScriptUrl: "",
       apiKey: "",
-      productsSheetName: "",
-      customersSheetName: "",
-      invoicesSheetName: "",
-      invoiceItemsSheetName: "",
-      settingsSheetName: "",
-      agentsSheetName: ""
+      productsSheetName: "products",
+      customersSheetName: "customers",
+      invoicesSheetName: "invoices",
+      invoiceItemsSheetName: "invoice_items",
+      settingsSheetName: "company_settings",
+      agentsSheetName: "agents"
     };
     
     if (typeof window !== "undefined") {
-      const url = localStorage.getItem("VITE_SUPABASE_URL") || "";
-      const key = localStorage.getItem("VITE_SUPABASE_ANON_KEY") || "";
+      const url = localStorage.getItem("VITE_SUPABASE_URL") || "https://xzfrbhtrcjtaafjkonbo.supabase.co";
+      const key = localStorage.getItem("VITE_SUPABASE_ANON_KEY") || "sb_publishable_6hdjwsq0hLbulI0k2LiZjA_d9ItftE0";
       const isConnected = !!(url && key);
       return {
         supabaseUrl: url,

@@ -1,13 +1,19 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-let supabaseUrl = (import.meta.env.VITE_SUPABASE_URL || "").trim();
-let supabaseAnonKey = (import.meta.env.VITE_SUPABASE_ANON_KEY || "").trim();
+const HARDCODED_URL = "https://xzfrbhtrcjtaafjkonbo.supabase.co";
+const HARDCODED_KEY = "sb_publishable_6hdjwsq0hLbulI0k2LiZjA_d9ItftE0";
+
+let supabaseUrl = (import.meta.env.VITE_SUPABASE_URL || HARDCODED_URL).trim();
+let supabaseAnonKey = (import.meta.env.VITE_SUPABASE_ANON_KEY || HARDCODED_KEY).trim();
 
 if (typeof window !== "undefined") {
   const storedUrl = localStorage.getItem("VITE_SUPABASE_URL");
   const storedKey = localStorage.getItem("VITE_SUPABASE_ANON_KEY");
   if (storedUrl) supabaseUrl = storedUrl.trim();
+  else if (!supabaseUrl) supabaseUrl = HARDCODED_URL;
+
   if (storedKey) supabaseAnonKey = storedKey.trim();
+  else if (!supabaseAnonKey) supabaseAnonKey = HARDCODED_KEY;
 }
 
 export let supabase: SupabaseClient | null = null;
