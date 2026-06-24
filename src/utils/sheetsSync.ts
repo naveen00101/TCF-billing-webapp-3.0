@@ -1704,6 +1704,7 @@ export class SheetsSyncEngine {
         action: "SYNC_UP",
         spreadsheetId: conn.spreadsheetId,
         backupInterval: conn.backupInterval || "1_day",
+        settingsExplicitUpdate: true,
         payload: {
           [conn.productsSheetName || "Products"]: this.getProducts().map(({ inventoryType, ...p }) => p),
           [conn.customersSheetName || "Customers"]: this.getCustomers(),
@@ -1787,6 +1788,7 @@ export class SheetsSyncEngine {
         action: "SYNC_UP",
         spreadsheetId: conn.spreadsheetId,
         backupInterval: conn.backupInterval || "1_day",
+        settingsExplicitUpdate: this.isLocalChangeDirty("settings", "SETTINGS_ROW"),
         payload: syncUpPayload
       };
 

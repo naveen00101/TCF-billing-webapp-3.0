@@ -19,7 +19,7 @@ function doPost(e) {
     const action = data.action;
     
     if (action === "SYNC_UP") {
-      return handleSyncUp(data.spreadsheetId, data.payload, data.backupInterval);
+      return handleSyncUp(data.spreadsheetId, data.payload, data.backupInterval, data.settingsExplicitUpdate);
     } else if (action === "SYNC_DOWN") {
       return handleSyncDown(data.spreadsheetId);
     } else if (action === "initializeDatabase") {
@@ -251,7 +251,7 @@ function updateDatabaseSchema(spreadsheetId) {
   })).setMimeType(ContentService.MimeType.JSON);
 }
 
-function handleSyncUp(spreadsheetId, payload, backupInterval) {
+function handleSyncUp(spreadsheetId, payload, backupInterval, settingsExplicitUpdate) {
   const ss = spreadsheetId ? SpreadsheetApp.openById(spreadsheetId) : SpreadsheetApp.getActiveSpreadsheet();
   
   // Daily automatic background backup check
@@ -289,6 +289,12 @@ function handleSyncUp(spreadsheetId, payload, backupInterval) {
     const records = payload[sheetName];
     if (!records || records.length === 0) {
       continue; // Skip if no records, NEVER clear/overwrite the sheet!
+    }
+    
+    if (sheetName === "Settings") {
+      if (!settingsExplicitUpdate) {
+        continue; // Skip updating Settings sheet unless explicitly flagged!
+      }
     }
     
     // Get existing data to find existing headers and rows
