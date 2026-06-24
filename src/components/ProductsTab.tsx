@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { Plus, Package } from "lucide-react";
+import React, { useState, useMemo } from "react";
+import { Plus, Package, Search } from "lucide-react";
 import { Product, Invoice, InvoiceItem } from "../types";
 import { SheetsSyncEngine } from "../utils/sheetsSync";
 import { SimpleProductForm } from "./SimpleProductForm";
@@ -19,6 +19,65 @@ export default function ProductsTab({ products, onRefresh, onShowNotification }:
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [activeTab, setActiveTab] = useState<"products" | "combos">("products");
+
+  // Search & Sort states
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("All");
+  const [sortKey, setSortKey] = useState<"name_asc" | "name_desc" | "price_asc" | "price_desc" | "category">("name_asc");
+
+  const categories = useMemo(() => {
+    const cats = products.filter(p => !p.isCombo && p.category).map(p => p.category);
+    return Array.from(new Set(cats));
+  }, [products]);
+
+  const filteredAndSortedProducts = useMemo(() => {
+    const list = products.filter(p => !p.isCombo);
+    
+    // Filter
+    let filtered = list.filter(p => {
+      const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                            (p.category && p.category.toLowerCase().includes(searchQuery.toLowerCase())) ||
+                            (p.hsnCode && p.hsnCode.toLowerCase().includes(searchQuery.toLowerCase()));
+      const matchesCategory = selectedCategory === "All" || p.category === selectedCategory;
+      return matchesSearch && matchesCategory;
+    });
+
+    // Sort
+    filtered.sort((a, b) => {
+      if (sortKey === "name_asc") return a.name.localeCompare(b.name);
+      if (sortKey === "name_desc") return b.name.localeCompare(a.name);
+      if (sortKey === "price_asc") return a.price - b.price;
+      if (sortKey === "price_desc") return b.price - a.price;
+      if (sortKey === "category") return (a.category || "").localeCompare(b.category || "");
+      return 0;
+    });
+
+    return filtered;
+  }, [products, searchQuery, selectedCategory, sortKey]);
+
+  const filteredAndSortedCombos = useMemo(() => {
+    const list = products.filter(p => p.isCombo);
+
+    // Filter
+    let filtered = list.filter(p => {
+      return p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+             (p.comboItems && p.comboItems.some((item: any) => 
+               (item.productName && item.productName.toLowerCase().includes(searchQuery.toLowerCase())) ||
+               (item.variantName && item.variantName.toLowerCase().includes(searchQuery.toLowerCase()))
+             ));
+    });
+
+    // Sort
+    filtered.sort((a, b) => {
+      if (sortKey === "name_asc") return a.name.localeCompare(b.name);
+      if (sortKey === "name_desc") return b.name.localeCompare(a.name);
+      if (sortKey === "price_asc") return a.price - b.price;
+      if (sortKey === "price_desc") return b.price - a.price;
+      return 0;
+    });
+
+    return filtered;
+  }, [products, searchQuery, sortKey]);
 
   const handleSaveSimpleProduct = async (productData: any) => {
     try {
@@ -83,19 +142,63 @@ export default function ProductsTab({ products, onRefresh, onShowNotification }:
       </div>
 
       {!showAddForm && (
-        <div className="px-6 py-2 border-b border-default bg-surface/50 flex items-center gap-4">
-          <button 
-            onClick={() => setActiveTab("products")}
-            className={`pb-2 px-1 border-b-2 font-bold text-sm transition-colors ${activeTab === "products" ? "border-blue-600 text-blue-600" : "border-transparent text-muted hover:text-primary"}`}
-          >
-            Standard Products
-          </button>
-          <button 
-            onClick={() => setActiveTab("combos")}
-            className={`pb-2 px-1 border-b-2 font-bold text-sm transition-colors ${activeTab === "combos" ? "border-blue-600 text-blue-600" : "border-transparent text-muted hover:text-primary"}`}
-          >
-            Combo Products
-          </button>
+        <div className="px-6 py-3 border-b border-default bg-surface/50 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          {/* Tabs */}
+          <div className="flex items-center gap-4">
+            <button 
+              onClick={() => setActiveTab("products")}
+              className={`pb-2 px-1 border-b-2 font-bold text-sm transition-colors ${activeTab === "products" ? "border-blue-600 text-blue-600" : "border-transparent text-muted hover:text-primary"}`}
+            >
+              Standard Products
+            </button>
+            <button 
+              onClick={() => setActiveTab("combos")}
+              className={`pb-2 px-1 border-b-2 font-bold text-sm transition-colors ${activeTab === "combos" ? "border-blue-600 text-blue-600" : "border-transparent text-muted hover:text-primary"}`}
+            >
+              Combo Products
+            </button>
+          </div>
+
+          {/* Search, Sort and Category filters */}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="relative w-64">
+              <input
+                type="text"
+                placeholder={activeTab === "combos" ? "Search combos..." : "Search products, category, HSN..."}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full rounded-lg border border-default bg-card pl-9 pr-3 py-1.5 text-xs text-primary outline-none focus:border-blue-500"
+              />
+              <span className="absolute left-3 top-2 text-muted">
+                <Search className="h-3.5 w-3.5" />
+              </span>
+            </div>
+
+            {activeTab === "products" && (
+              <select
+                value={selectedCategory}
+                onChange={(e) => setSelectedCategory(e.target.value)}
+                className="rounded-lg border border-default bg-card px-3 py-1.5 text-xs text-secondary outline-none focus:border-blue-500 font-bold"
+              >
+                <option value="All">All Categories</option>
+                {categories.map(cat => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
+              </select>
+            )}
+
+            <select
+              value={sortKey}
+              onChange={(e) => setSortKey(e.target.value as any)}
+              className="rounded-lg border border-default bg-card px-3 py-1.5 text-xs text-secondary outline-none focus:border-blue-500 font-bold"
+            >
+              <option value="name_asc">Name (A-Z)</option>
+              <option value="name_desc">Name (Z-A)</option>
+              <option value="price_asc">Price (Low to High)</option>
+              <option value="price_desc">Price (High to Low)</option>
+              {activeTab === "products" && <option value="category">Category</option>}
+            </select>
+          </div>
         </div>
       )}
 
@@ -120,7 +223,7 @@ export default function ProductsTab({ products, onRefresh, onShowNotification }:
           <div className="space-y-6">
             {activeTab === "products" ? (
               <ProductRegistryTable
-                products={products.filter(p => !p.isCombo)}
+                products={filteredAndSortedProducts}
                 onEdit={(prod) => {
                   setEditingProduct(prod);
                   setShowAddForm(true);
@@ -129,7 +232,7 @@ export default function ProductsTab({ products, onRefresh, onShowNotification }:
               />
             ) : (
               <ComboRegistryTable
-                combos={products.filter(p => p.isCombo)}
+                combos={filteredAndSortedCombos}
                 onEdit={(combo) => {
                   setEditingProduct(combo);
                   setShowAddForm(true);
