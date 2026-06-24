@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Users, UserPlus, Trash2, Edit2, Key, ToggleLeft, ToggleRight, CheckCircle2, ShieldAlert, BadgeCheck } from "lucide-react";
+import { Users, UserPlus, Trash2, Edit2, Key, ToggleLeft, ToggleRight, CheckCircle2, ShieldAlert, BadgeCheck, Eye, EyeOff } from "lucide-react";
 import { User, UserRole } from "../types";
 import { SheetsSyncEngine } from "../utils/sheetsSync";
 import MD5 from "crypto-js/md5";
@@ -25,6 +25,8 @@ export default function UserControlsTab({ onShowNotification, onRefresh }: UserC
  const [role, setRole] = useState<UserRole>("Employee");
  const [password, setPassword] = useState("");
  const [newPasswordValue, setNewPasswordValue] = useState("");
+ const [showPassword, setShowPassword] = useState(false);
+ const [showResetPassword, setShowResetPassword] = useState(false);
 
  const reloadUsers = () => {
  const list = SheetsSyncEngine.getUsers();
@@ -237,28 +239,6 @@ export default function UserControlsTab({ onShowNotification, onRefresh }: UserC
  )}
  </div>
 
- {/* COMPACT SUMMARY <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
- <div className="rounded-xl border border-default bg-card  p-4 font-sans shadow-sm">
- <span className="text-[10px] uppercase font-bold text-muted dark:text-muted">Total Enrolled</span>
- <p className="text-xl font-bold text-primary dark:text-primary mt-1">{users.length} STAFF</p>
- </div>
- 
- <div className="rounded-xl border border-default bg-card  p-4 font-sans shadow-sm">
- <span className="text-[10px] uppercase font-bold text-muted dark:text-muted">Administrators</span>
- <p className="text-xl font-bold text-blue-600 dark:text-blue-400 mt-1">{users.filter(u => u.role ==="Admin").length} MASTER</p>
- </div>
-
- <div className="rounded-xl border border-default bg-card  p-4 font-sans shadow-sm">
- <span className="text-[10px] uppercase font-bold text-muted dark:text-muted">Active Operators</span>
- <p className="text-xl font-bold text-green-600 dark:text-green-400 mt-1">{users.filter(u => u.status ==="Active").length} ONLINE</p>
- </div>
-
- <div className="rounded-xl border border-default bg-card  p-4 font-sans shadow-sm">
- <span className="text-[10px] uppercase font-bold text-muted dark:text-muted">Disabled Logs</span>
- <p className="text-xl font-bold text-red-650 dark:text-red-500 mt-1">{users.filter(u => u.status ==="Disabled").length} REVOKED</p>
- </div>
- </div>
-
  {/* FORM: ADDING NEW USER */}
  {isAdding && (
  <div className="rounded-xl border border-blue-500/25 bg-blue-600/5 p-5 animate-in slide-in-from-top-4 duration-300 space-y-4">
@@ -297,14 +277,23 @@ export default function UserControlsTab({ onShowNotification, onRefresh }: UserC
 
  <div className="space-y-1">
  <label className="text-[10px] uppercase font-bold text-muted dark:text-muted">Security Password</label>
+ <div className="relative">
  <input
- type="password"
+ type={showPassword ? "text" : "password"}
  required
  value={password}
  onChange={(e) => setPassword(e.target.value)}
- placeholder="••••••"
- className="w-full rounded-lg border border-default bg-surface px-3 py-2 text-xs focus:border-blue-500 outline-none text-primary dark:text-primary font-mono"
+ placeholder="•••••"
+ className="w-full rounded-lg border border-default bg-surface pl-3 pr-9 py-2 text-xs focus:border-blue-500 outline-none text-primary dark:text-primary font-mono"
  />
+ <button
+ type="button"
+ onClick={() => setShowPassword(!showPassword)}
+ className="absolute right-3 top-2.5 text-muted dark:text-muted hover:text-primary dark:hover:text-primary focus:outline-none"
+ >
+ {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+ </button>
+ </div>
  </div>
 
  <div className="space-y-1">
@@ -446,14 +435,23 @@ export default function UserControlsTab({ onShowNotification, onRefresh }: UserC
  <form onSubmit={handleResetPassword} className="flex gap-4 items-end max-w-md">
  <div className="space-y-1 flex-1">
  <label className="text-[10px] uppercase font-bold text-muted">Enter New Password PIN</label>
+ <div className="relative">
  <input
- type="password"
+ type={showResetPassword ? "text" : "password"}
  required
  value={newPasswordValue}
  onChange={(e) => setNewPasswordValue(e.target.value)}
  placeholder="Enter raw secret"
- className="w-full rounded-lg border border-default bg-surface px-3 py-2 text-xs focus:border-blue-500 outline-none text-primary dark:text-primary font-mono"
+ className="w-full rounded-lg border border-default bg-surface pl-3 pr-9 py-2 text-xs focus:border-blue-500 outline-none text-primary dark:text-primary font-mono"
  />
+ <button
+ type="button"
+ onClick={() => setShowResetPassword(!showResetPassword)}
+ className="absolute right-3 top-2.5 text-muted dark:text-muted hover:text-primary dark:hover:text-primary focus:outline-none"
+ >
+ {showResetPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+ </button>
+ </div>
  </div>
  <button
  type="submit"

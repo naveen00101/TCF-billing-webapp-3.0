@@ -1,5 +1,5 @@
 import React, { useState } from"react";
-import { Lock, User, Check, ShieldAlert, Key } from"lucide-react";
+import { Lock, User, Check, ShieldAlert, Key, Eye, EyeOff } from"lucide-react";
 import { SheetsSyncEngine } from"../utils/sheetsSync";
 import { User as UserType } from"../types";
 import { SYSTEM_LOGO } from"../constants/branding";
@@ -15,6 +15,7 @@ export default function LoginPage({ onLoginSuccess, onShowNotification }: LoginP
  const [password, setPassword] = useState("");
  const [rememberMe, setRememberMe] = useState(true);
  const [isLoading, setIsLoading] = useState(false);
+ const [showPassword, setShowPassword] = useState(false);
 
  // Read Company Settings for dynamic Logo & Titles
  const company = SheetsSyncEngine.getCompanySettings();
@@ -179,13 +180,20 @@ export default function LoginPage({ onLoginSuccess, onShowNotification }: LoginP
  <div className="relative">
  <Lock className="absolute left-3 top-2.5 h-4 w-4 text-muted dark:text-muted" />
  <input
- type="password"
+ type={showPassword ? "text" : "password"}
  required
  value={password}
  onChange={(e) => setPassword(e.target.value)}
  placeholder="••••••••"
- className="w-full rounded-lg border border-default bg-surface  pl-9 pr-3 py-2 text-xs focus:border-blue-500 outline-none text-primary dark:text-primary font-mono"
+ className="w-full rounded-lg border border-default bg-surface  pl-9 pr-9 py-2 text-xs focus:border-blue-500 outline-none text-primary dark:text-primary font-mono"
  />
+ <button
+ type="button"
+ onClick={() => setShowPassword(!showPassword)}
+ className="absolute right-3 top-2.5 text-muted dark:text-muted hover:text-primary dark:hover:text-primary focus:outline-none"
+ >
+ {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+ </button>
  </div>
  </div>
 
