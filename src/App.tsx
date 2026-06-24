@@ -19,7 +19,6 @@ import {
  ShieldCheck,
  Activity,
  LogOut,
- HelpCircle,
  FileCheck,
  Award,
  Ticket,
@@ -52,7 +51,6 @@ import LoginPage from"./components/LoginPage";
 import UserControlsTab from"./components/UserControlsTab";
 import UserActivitiesTab from"./components/UserActivitiesTab";
 import AuditTrailTab from"./components/AuditTrailTab";
-import HelpSetupTab from"./components/HelpSetupTab";
 
 // Import modules
 import { Product, Customer, Invoice, InvoiceItem, ConnectionSettings, CompanySettings, MessageFeedback } from"./types";
@@ -534,7 +532,6 @@ export default function App() {
 
  // Static items for everyone
  menuItems.push(
- { id:"help", label:"Google Sheets Guide", icon: HelpCircle },
  { id:"settings", label:"Settings Panel", icon: Settings }
  );
 
@@ -899,7 +896,6 @@ export default function App() {
  activeTab ==="promos" ?"Voucher Operations" : 
  activeTab ==="users" ?"Personnel Security" : 
  activeTab ==="revenue" ?"Revenue Analytics" : 
- activeTab ==="help" ?"System Documentation" :
  activeTab ==="settings" ?"Configuration Manager" :
  activeTab ==="trash" ?"Trash Bin Manager" :
  activeTab}
@@ -1143,10 +1139,6 @@ export default function App() {
       onShowNotification={showNotification}
     />
   )}
-
- {activeTab ==="help" && (
- <HelpSetupTab />
- )}
 
  {activeTab ==="settings" && connection && company && (
  <SettingsTab
