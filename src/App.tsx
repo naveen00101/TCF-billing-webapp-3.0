@@ -623,7 +623,7 @@ export default function App() {
  </div>
  </header>
 
- <div className="flex-1 flex max-w-[1600px] w-full mx-auto relative">
+  <div className="flex-1 flex w-full relative">
  
  {/* DESKTOP SIDEBAR PANEL */}
  <aside className="hidden lg:flex w-64 border-r border-default bg-card flex-col shrink-0 sticky top-0 h-screen select-none text-primary">
