@@ -5,8 +5,10 @@ import { SheetsSyncEngine } from"../utils/sheetsSync";
 import { getTodayStr, getCurrentTimeStr, getCurrentTimestamp } from '../utils/dateUtils';
 import { generateInvoicePDF } from"../utils/pdfGenerator";
 import { ProductSearchModal } from "./ProductSearchModal";
-import { SimpleProductConfiguratorModal } from"./SimpleProductConfiguratorModal";
-import confetti from"canvas-confetti";
+import { SimpleProductConfiguratorModal } from "./SimpleProductConfiguratorModal";
+import { SimpleProductForm } from "./SimpleProductForm";
+import CustomersTab from "./CustomersTab";
+import confetti from "canvas-confetti";
 
 interface PosBillingProps {
  products: Product[];
@@ -106,6 +108,31 @@ export default function PosBilling({
  const [allowDuplicateCustomer, setAllowDuplicateCustomer] = useState(false);
  const [quickCustomerSearch, setQuickCustomerSearch] = useState("");
  const [showQuickCustomerSearchList, setShowQuickCustomerSearchList] = useState(false);
+
+ // Direct modal creation states
+ const [showAddProductModal, setShowAddProductModal] = useState(false);
+ const [showCustomerRegistryModal, setShowCustomerRegistryModal] = useState(false);
+
+ const handleSaveNewProduct = async (productData: any) => {
+   try {
+     const dataToSave = { ...productData };
+     if (!dataToSave.id) {
+       dataToSave.id = `PROD-${Date.now()}`;
+       dataToSave.nodeType = "Product";
+       dataToSave.isLeaf = true;
+     }
+     
+     const newProducts = [...products.filter(p => p.id !== dataToSave.id), dataToSave as Product];
+     await SheetsSyncEngine.saveProducts(newProducts);
+     SheetsSyncEngine.pushTransaction(SheetsSyncEngine.getConnectionSettings(), "upsertProduct", dataToSave).catch(console.error);
+     onShowNotification("Product saved successfully", "success");
+     setShowAddProductModal(false);
+     if (onInvoiceCreated) onInvoiceCreated();
+   } catch (e) {
+     console.error(e);
+     onShowNotification("Error saving product", "error");
+   }
+ };
 
  // Advanced Customer Details states
  const [showCustomerDetails, setShowCustomerDetails] = useState(false);
@@ -1152,10 +1179,7 @@ export default function PosBilling({
  {onNavigateToTab && (
  <button
  type="button"
- onClick={() => {
- saveDraftSilent();
- onNavigateToTab("products");
- }}
+ onClick={() => setShowAddProductModal(true)}
  className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 hover:text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded cursor-pointer border-none"
  >
  <Plus className="h-3 w-3" />
@@ -1401,10 +1425,7 @@ export default function PosBilling({
  {onNavigateToTab && (
  <button
  type="button"
- onClick={() => {
- saveDraftSilent();
- onNavigateToTab("customers");
- }}
+ onClick={() => setShowCustomerRegistryModal(true)}
  className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 hover:text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded cursor-pointer border-none"
  >
  <UserPlus className="h-3 w-3" />
@@ -2614,6 +2635,53 @@ export default function PosBilling({
   </div>
 </div>
 )}
+
+  {/* NEW PRODUCT CREATION MODAL */}
+  {showAddProductModal && (
+    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-sm overflow-y-auto animate-in fade-in duration-200">
+      <div className="w-full max-w-3xl rounded-xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+        <SimpleProductForm
+          initialProduct={null}
+          allProducts={products}
+          onSave={handleSaveNewProduct}
+          onCancel={() => setShowAddProductModal(false)}
+        />
+      </div>
+    </div>
+  )}
+
+  {/* CUSTOMER REGISTRY MODAL */}
+  {showCustomerRegistryModal && (
+    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-sm overflow-y-auto animate-in fade-in duration-200">
+      <div className="w-full max-w-6xl rounded-xl shadow-2xl overflow-hidden bg-card border border-default p-6 max-h-[90vh] flex flex-col relative animate-in zoom-in-95 duration-200">
+        <button 
+          onClick={() => setShowCustomerRegistryModal(false)}
+          className="absolute top-4 right-4 p-2 rounded-lg text-muted hover:bg-surface border-none bg-transparent cursor-pointer z-50"
+        >
+          <X className="w-5 h-5" />
+        </button>
+        <div className="flex-1 overflow-y-auto custom-scrollbar">
+          <CustomersTab
+            customers={customers}
+            invoices={SheetsSyncEngine.getInvoices()}
+            onRefresh={onInvoiceCreated}
+            onShowNotification={onShowNotification}
+            onSelectCustomer={(matched) => {
+              setCustomerSelectionMode("existing");
+              setExistingCustomerSearch(`${matched.id} - ${matched.name}`);
+              setCustomerName(matched.name);
+              setMobileNumber(String(matched.mobile || ""));
+              setAddress(matched.address || "");
+              setSecondaryPhone(matched.secondaryPhone || "");
+              setSecondaryContactName(matched.secondaryContactName || "");
+              setNotes(matched.notes || "");
+              setShowCustomerRegistryModal(false);
+            }}
+          />
+        </div>
+      </div>
+    </div>
+  )}
     </div>
   );
 }

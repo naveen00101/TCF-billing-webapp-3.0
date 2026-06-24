@@ -28,6 +28,7 @@ interface CustomersTabProps {
  initiallySelectedCustomerId?: string;
  onClearSelected?: () => void;
  onNavigateToTab?: (tab: string, filter?: string, extraState?: any) => void;
+ onSelectCustomer?: (customer: Customer) => void;
 }
 
 export default function CustomersTab({
@@ -37,7 +38,8 @@ export default function CustomersTab({
  onShowNotification,
  initiallySelectedCustomerId,
  onClearSelected,
- onNavigateToTab
+ onNavigateToTab,
+ onSelectCustomer
 }: CustomersTabProps) {
  const [search, setSearch] = useState("");
  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
@@ -825,7 +827,17 @@ export default function CustomersTab({
  {/* STATE C: ACTIVE CUSTOMER DRILL-DOWN DISPLAY PROFILE PAGE */}
  {!isAddingNew && !isEditing && activeCustomer && (
  <div className="space-y-5 animate-in slide-in-from-right duration-250">
- 
+ {onSelectCustomer && (
+ <button
+ type="button"
+ onClick={() => onSelectCustomer(activeCustomer)}
+ className="w-full rounded-xl bg-emerald-600 hover:bg-emerald-700 py-2.5 text-xs font-bold text-white transition active:scale-95 border-none cursor-pointer flex items-center justify-center gap-1.5 shadow-sm"
+ >
+ <Check className="h-4 w-4" />
+ <span>Link to Billing Invoice</span>
+ </button>
+ )}
+
  {/* Header profile title */}
  <div className="flex items-center justify-between border-b border-default pb-3">
  <div>
