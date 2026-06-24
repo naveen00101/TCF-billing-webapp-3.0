@@ -1,7 +1,8 @@
 import React, { useState } from "react";
-import { Trash2, RotateCcw, Package, FileText, Award } from "lucide-react";
+import { Trash2, RotateCcw, Package, FileText, Award, X, ShieldAlert, Lock, Key } from "lucide-react";
 import { SheetsSyncEngine } from "../utils/sheetsSync";
 import { Product, Invoice, Agent } from "../types";
+import MD5 from "crypto-js/md5";
 
 interface TrashTabProps {
   onRefresh: () => void;
@@ -12,6 +13,18 @@ type TrashType = "products" | "invoices" | "agents";
 
 export default function TrashTab({ onRefresh, onShowNotification }: TrashTabProps) {
   const [activeType, setActiveType] = useState<TrashType>("products");
+  
+  // State for single-item deletion
+  const [showSingleDeleteModal, setShowSingleDeleteModal] = useState(false);
+  const [singleItemToDelete, setSingleItemToDelete] = useState<{ id: string; name: string; type: TrashType } | null>(null);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+
+  // State for bulk clearing
+  const [showBulkClearModal, setShowBulkClearModal] = useState(false);
+  const [adminPassword, setAdminPassword] = useState("");
+
+  const currentUser = SheetsSyncEngine.getCurrentUser();
+  const isAdmin = currentUser?.role === "Admin";
 
   // Get deleted items from SheetsSyncEngine
   const deletedProducts = SheetsSyncEngine.getProducts().filter((p) => p.isSoftDeleted);
@@ -60,6 +73,84 @@ export default function TrashTab({ onRefresh, onShowNotification }: TrashTabProp
     }
   };
 
+  // Single Item Delete Confirmation Trigger
+  const triggerSingleDelete = (id: string, name: string, type: TrashType) => {
+    if (!isAdmin) {
+      onShowNotification("Access Denied: Only administrators can permanently delete records.", "error");
+      return;
+    }
+    setSingleItemToDelete({ id, name, type });
+    setDeleteConfirmText("");
+    setShowSingleDeleteModal(true);
+  };
+
+  // Perform Single Item Delete
+  const handleConfirmSingleDelete = async () => {
+    if (deleteConfirmText.toLowerCase() !== "delete" || !singleItemToDelete) return;
+    
+    try {
+      const { id, name, type } = singleItemToDelete;
+      if (type === "products") {
+        await SheetsSyncEngine.deleteProductPermanently(id);
+        onShowNotification(`✓ Product '${name}' permanently deleted.`, "success");
+      } else if (type === "agents") {
+        await SheetsSyncEngine.deleteAgentPermanently(id);
+        onShowNotification(`✓ Agent '${name}' permanently deleted.`, "success");
+      } else if (type === "invoices") {
+        await SheetsSyncEngine.deleteInvoicePermanently(id);
+        onShowNotification(`✓ Invoice '${name}' permanently deleted.`, "success");
+      }
+      
+      setShowSingleDeleteModal(false);
+      setSingleItemToDelete(null);
+      onRefresh();
+    } catch (e) {
+      onShowNotification("Error deleting item permanently", "error");
+    }
+  };
+
+  // Bulk Delete Trigger
+  const triggerBulkClear = () => {
+    if (!isAdmin) {
+      onShowNotification("Access Denied: Only administrators can clear the trash bin.", "error");
+      return;
+    }
+    setAdminPassword("");
+    setShowBulkClearModal(true);
+  };
+
+  // Perform Bulk Clear
+  const handleConfirmBulkClear = async () => {
+    const users = SheetsSyncEngine.getUsers();
+    const adminUser = users.find(u => u.role === "Admin");
+    if (!adminUser) {
+      onShowNotification("Error: No admin user registered.", "error");
+      return;
+    }
+
+    const hashedInput = MD5(adminPassword).toString();
+    if (adminUser.passwordHash !== hashedInput) {
+      onShowNotification("Access Denied: Invalid admin password.", "error");
+      return;
+    }
+
+    try {
+      await SheetsSyncEngine.clearAllTrashOfType(activeType);
+      onShowNotification(`✓ Successfully cleared all soft-deleted ${activeType}!`, "success");
+      setShowBulkClearModal(false);
+      onRefresh();
+    } catch (e) {
+      onShowNotification("Error clearing trash bin", "error");
+    }
+  };
+
+  // Check count of items in active tab
+  const getActiveTabCount = () => {
+    if (activeType === "products") return deletedProducts.length;
+    if (activeType === "invoices") return deletedInvoices.length;
+    return deletedAgents.length;
+  };
+
   return (
     <div className="flex flex-col h-[calc(100vh-4rem)] bg-surface/30">
       {/* Header */}
@@ -70,45 +161,61 @@ export default function TrashTab({ onRefresh, onShowNotification }: TrashTabProp
           </div>
           <div>
             <h1 className="text-base font-extrabold text-primary tracking-tight">System Trash Bin</h1>
-            <p className="text-xs text-muted mt-0.5">Restore soft-deleted records. Data remains permanently in Google Sheets.</p>
+            <p className="text-xs text-muted mt-0.5 flex items-center gap-1">
+              <span>Restore soft-deleted records. Permanent deletion is final and synced directly.</span>
+              {!isAdmin && <span className="text-[10px] text-amber-600 font-bold bg-amber-500/10 border border-amber-500/20 px-1 rounded flex items-center gap-0.5"><Lock className="h-2.5 w-2.5" /> Admin Only Deletion</span>}
+            </p>
           </div>
         </div>
 
-        {/* Tab Selector */}
-        <div className="flex bg-surface rounded-lg p-0.5 border border-default">
-          <button
-            onClick={() => setActiveType("products")}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-md transition-all cursor-pointer ${
-              activeType === "products"
-                ? "bg-rose-600 text-white shadow-sm"
-                : "text-muted hover:text-primary"
-            }`}
-          >
-            <Package className="h-3.5 w-3.5" />
-            <span>Products ({deletedProducts.length})</span>
-          </button>
-          <button
-            onClick={() => setActiveType("invoices")}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-md transition-all cursor-pointer ${
-              activeType === "invoices"
-                ? "bg-rose-600 text-white shadow-sm"
-                : "text-muted hover:text-primary"
-            }`}
-          >
-            <FileText className="h-3.5 w-3.5" />
-            <span>Invoices ({deletedInvoices.length})</span>
-          </button>
-          <button
-            onClick={() => setActiveType("agents")}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-md transition-all cursor-pointer ${
-              activeType === "agents"
-                ? "bg-rose-600 text-white shadow-sm"
-                : "text-muted hover:text-primary"
-            }`}
-          >
-            <Award className="h-3.5 w-3.5" />
-            <span>Agents ({deletedAgents.length})</span>
-          </button>
+        {/* Tab & Action Selector */}
+        <div className="flex items-center gap-3">
+          <div className="flex bg-surface rounded-lg p-0.5 border border-default">
+            <button
+              onClick={() => setActiveType("products")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-md transition-all cursor-pointer border-none ${
+                activeType === "products"
+                  ? "bg-rose-600 text-white shadow-sm"
+                  : "text-muted hover:text-primary bg-transparent"
+              }`}
+            >
+              <Package className="h-3.5 w-3.5" />
+              <span>Products ({deletedProducts.length})</span>
+            </button>
+            <button
+              onClick={() => setActiveType("invoices")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-md transition-all cursor-pointer border-none ${
+                activeType === "invoices"
+                  ? "bg-rose-600 text-white shadow-sm"
+                  : "text-muted hover:text-primary bg-transparent"
+              }`}
+            >
+              <FileText className="h-3.5 w-3.5" />
+              <span>Invoices ({deletedInvoices.length})</span>
+            </button>
+            <button
+              onClick={() => setActiveType("agents")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-md transition-all cursor-pointer border-none ${
+                activeType === "agents"
+                  ? "bg-rose-600 text-white shadow-sm"
+                  : "text-muted hover:text-primary bg-transparent"
+              }`}
+            >
+              <Award className="h-3.5 w-3.5" />
+              <span>Agents ({deletedAgents.length})</span>
+            </button>
+          </div>
+
+          {/* Bulk Clear Button (Only for Admins) */}
+          {isAdmin && getActiveTabCount() > 0 && (
+            <button
+              onClick={triggerBulkClear}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg bg-rose-600 hover:bg-rose-700 text-white cursor-pointer transition-colors shadow-sm border-none"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              <span>Clear All {activeType}</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -141,13 +248,24 @@ export default function TrashTab({ onRefresh, onShowNotification }: TrashTabProp
                       <td className="p-4">{p.category}</td>
                       <td className="p-4">₹{p.price.toFixed(2)}</td>
                       <td className="p-4 text-right">
-                        <button
-                          onClick={() => handleRestoreProduct(p)}
-                          className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-md transition-colors cursor-pointer border-none shadow-sm"
-                        >
-                          <RotateCcw className="h-3 w-3" />
-                          <span>Restore</span>
-                        </button>
+                        <div className="flex justify-end gap-2">
+                          <button
+                            onClick={() => handleRestoreProduct(p)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-md transition-colors cursor-pointer border-none shadow-sm"
+                          >
+                            <RotateCcw className="h-3 w-3" />
+                            <span>Restore</span>
+                          </button>
+                          {isAdmin && (
+                            <button
+                              onClick={() => triggerSingleDelete(p.id, p.name, "products")}
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white rounded-md transition-colors cursor-pointer border-none shadow-sm"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                              <span>Delete</span>
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -184,13 +302,24 @@ export default function TrashTab({ onRefresh, onShowNotification }: TrashTabProp
                       <td className="p-4">{new Date(inv.createdDate || inv.date).toLocaleDateString()}</td>
                       <td className="p-4 font-mono">₹{inv.grandTotal.toFixed(2)}</td>
                       <td className="p-4 text-right">
-                        <button
-                          onClick={() => handleRestoreInvoice(inv)}
-                          className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-md transition-colors cursor-pointer border-none shadow-sm"
-                        >
-                          <RotateCcw className="h-3 w-3" />
-                          <span>Restore</span>
-                        </button>
+                        <div className="flex justify-end gap-2">
+                          <button
+                            onClick={() => handleRestoreInvoice(inv)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-md transition-colors cursor-pointer border-none shadow-sm"
+                          >
+                            <RotateCcw className="h-3 w-3" />
+                            <span>Restore</span>
+                          </button>
+                          {isAdmin && (
+                            <button
+                              onClick={() => triggerSingleDelete(inv.invoiceId || inv.invoiceNo, inv.invoiceNo, "invoices")}
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white rounded-md transition-colors cursor-pointer border-none shadow-sm"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                              <span>Delete</span>
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -227,13 +356,24 @@ export default function TrashTab({ onRefresh, onShowNotification }: TrashTabProp
                       <td className="p-4">{agt.agentType}</td>
                       <td className="p-4">{agt.commissionPercentage}%</td>
                       <td className="p-4 text-right">
-                        <button
-                          onClick={() => handleRestoreAgent(agt)}
-                          className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-md transition-colors cursor-pointer border-none shadow-sm"
-                        >
-                          <RotateCcw className="h-3 w-3" />
-                          <span>Restore</span>
-                        </button>
+                        <div className="flex justify-end gap-2">
+                          <button
+                            onClick={() => handleRestoreAgent(agt)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-md transition-colors cursor-pointer border-none shadow-sm"
+                          >
+                            <RotateCcw className="h-3 w-3" />
+                            <span>Restore</span>
+                          </button>
+                          {isAdmin && (
+                            <button
+                              onClick={() => triggerSingleDelete(agt.id, agt.name, "agents")}
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white rounded-md transition-colors cursor-pointer border-none shadow-sm"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                              <span>Delete</span>
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -243,6 +383,120 @@ export default function TrashTab({ onRefresh, onShowNotification }: TrashTabProp
           </div>
         )}
       </div>
+
+      {/* SINGLE ITEM DELETE CONFIRMATION MODAL */}
+      {showSingleDeleteModal && singleItemToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-card/60 p-4 animate-in fade-in duration-200">
+          <div className="w-full max-w-sm rounded-xl border border-default bg-card p-5 shadow-lg space-y-4 animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between border-b border-default pb-2.5">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <ShieldAlert className="h-4.5 w-4.5 text-rose-600 animate-pulse" />
+                <h3 className="font-bold text-primary text-sm truncate">Confirm Permanent Delete</h3>
+              </div>
+              <button
+                onClick={() => setShowSingleDeleteModal(false)}
+                className="text-muted hover:text-primary cursor-pointer p-0.5 border-none bg-transparent"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <p className="text-xs text-secondary leading-relaxed font-sans text-left">
+                You are about to permanently delete the {singleItemToDelete.type.slice(0, -1)} <strong>{singleItemToDelete.name}</strong> ({singleItemToDelete.id}).
+                This action is irreversible and will delete it from Supabase.
+              </p>
+              
+              <div className="space-y-1 text-left">
+                <label className="text-[10px] uppercase font-bold text-muted">
+                  Type <span className="font-mono text-rose-500">delete</span> to confirm
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={deleteConfirmText}
+                  onChange={(e) => setDeleteConfirmText(e.target.value)}
+                  placeholder="Type 'delete'"
+                  className="w-full rounded-lg border border-default bg-surface px-3 py-1.5 text-xs text-primary focus:border-rose-500 outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-default">
+              <button
+                onClick={() => setShowSingleDeleteModal(false)}
+                className="px-3.5 py-1.5 text-xs font-semibold text-secondary hover:text-primary bg-transparent border-none cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmSingleDelete}
+                disabled={deleteConfirmText.toLowerCase() !== "delete"}
+                className="px-4 py-1.5 text-xs font-bold bg-rose-600 hover:bg-rose-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg transition-colors border-none cursor-pointer shadow"
+              >
+                Permanently Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* BULK CLEAR TRASH CONFIRMATION MODAL */}
+      {showBulkClearModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-card/60 p-4 animate-in fade-in duration-200">
+          <div className="w-full max-w-sm rounded-xl border border-default bg-card p-5 shadow-lg space-y-4 animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between border-b border-default pb-2.5">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <Lock className="h-4.5 w-4.5 text-rose-600" />
+                <h3 className="font-bold text-primary text-sm truncate">Authorize Clear Trash</h3>
+              </div>
+              <button
+                onClick={() => setShowBulkClearModal(false)}
+                className="text-muted hover:text-primary cursor-pointer p-0.5 border-none bg-transparent"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <p className="text-xs text-secondary leading-relaxed font-sans text-left">
+                This will permanently delete **all** soft-deleted {activeType} from the database.
+                To authorize this request, please enter your Administrator password.
+              </p>
+              
+              <div className="space-y-1 text-left">
+                <label className="text-[10px] uppercase font-bold text-muted flex items-center gap-1">
+                  <Key className="h-3 w-3" /> Admin Password
+                </label>
+                <input
+                  type="password"
+                  required
+                  value={adminPassword}
+                  onChange={(e) => setAdminPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full rounded-lg border border-default bg-surface px-3 py-1.5 text-xs text-primary focus:border-rose-500 outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-default">
+              <button
+                onClick={() => setShowBulkClearModal(false)}
+                className="px-3.5 py-1.5 text-xs font-semibold text-secondary hover:text-primary bg-transparent border-none cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmBulkClear}
+                disabled={!adminPassword}
+                className="px-4 py-1.5 text-xs font-bold bg-rose-600 hover:bg-rose-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg transition-colors border-none cursor-pointer shadow"
+              >
+                Clear All Permanently
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1747,6 +1747,63 @@ export class SheetsSyncEngine {
     }
   }
 
+  // Permanent Deletion Handlers
+  public static async deleteProductPermanently(productId: string): Promise<void> {
+    const list = this.getProducts().filter(p => p.id !== productId);
+    this.memoryCache["billing_products"] = list;
+    if (supabase) {
+      const { error } = await supabase.from("products").delete().eq("id", productId);
+      if (error) console.error("[SyncEngine] Error deleting product permanently:", error);
+    }
+  }
+
+  public static async deleteAgentPermanently(agentId: string): Promise<void> {
+    const list = this.getAgents().filter(a => a.id !== agentId);
+    this.memoryCache["billing_agents_registry"] = list;
+    if (supabase) {
+      const { error } = await supabase.from("agents").delete().eq("id", agentId);
+      if (error) console.error("[SyncEngine] Error deleting agent permanently:", error);
+    }
+  }
+
+  public static async deleteInvoicePermanently(invoiceId: string): Promise<void> {
+    const invoices = this.getInvoices().filter(inv => inv.invoiceId !== invoiceId && inv.invoiceNo !== invoiceId);
+    this.memoryCache["billing_invoices"] = invoices;
+
+    const items = this.getInvoiceItems().filter(item => item.invoiceId !== invoiceId && item.invoiceNo !== invoiceId);
+    this.memoryCache["billing_invoice_items"] = items;
+
+    const txns = this.getPaymentTransactions().filter(t => t.invoiceId !== invoiceId && t.invoiceNo !== invoiceId);
+    this.memoryCache["billing_payment_transactions"] = txns;
+
+    if (supabase) {
+      // 1. Delete transactions
+      await supabase.from("payment_transactions").delete().eq("invoice_id", invoiceId);
+      // 2. Delete invoice (cascades to invoice_items via DB schema)
+      const { error } = await supabase.from("invoices").delete().eq("invoice_id", invoiceId);
+      if (error) console.error("[SyncEngine] Error deleting invoice permanently:", error);
+    }
+  }
+
+  public static async clearAllTrashOfType(type: "products" | "invoices" | "agents"): Promise<void> {
+    if (type === "products") {
+      const deletedProds = this.getProducts().filter(p => p.isSoftDeleted);
+      for (const p of deletedProds) {
+        await this.deleteProductPermanently(p.id);
+      }
+    } else if (type === "agents") {
+      const deletedAgents = this.getAgents().filter(a => a.isSoftDeleted);
+      for (const a of deletedAgents) {
+        await this.deleteAgentPermanently(a.id);
+      }
+    } else if (type === "invoices") {
+      const deletedInvs = this.getInvoices().filter(i => i.isSoftDeleted);
+      for (const inv of deletedInvs) {
+        await this.deleteInvoicePermanently(inv.invoiceId || inv.invoiceNo);
+      }
+    }
+  }
+
   // Terminal ID helper
   public static getTerminalId(): string {
     if (typeof window !== "undefined") {
