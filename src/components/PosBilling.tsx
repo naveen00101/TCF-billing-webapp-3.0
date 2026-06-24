@@ -530,17 +530,32 @@ export default function PosBilling({
  }, [mobileNumber, lineItems, onHasUnsavedChanges]);
 
  const loadDraft = (draft: any) => {
- console.log("Loading draft:", draft);
- setDraftId(draft.id);
- setCustomerName(draft.customerName ||"");
- setMobileNumber(draft.mobileNumber ||"");
- setCustomerState(draft.customerState ||"");
- 
- // UI states
- setCustomerSelectionMode(draft.customerSelectionMode || (draft.isNewCustomer ?"new" :"existing"));
- if (!draft.isNewCustomer && draft.mobileNumber) {
- setExistingCustomerSearch(draft.mobileNumber);
- }
+    console.log("Loading draft:", draft);
+    setDraftId(draft.id);
+    setCustomerName(draft.customerName || "");
+    setMobileNumber(draft.mobileNumber || "");
+    setCustomerState(draft.customerState || "");
+    
+    // UI states
+    const isNew = draft.customerSelectionMode === "new" || draft.isNewCustomer || false;
+    setCustomerSelectionMode(isNew ? "new" : "existing");
+    
+    if (!isNew && draft.mobileNumber) {
+      const cleanedMobile = String(draft.mobileNumber).replace(/\D/g, "");
+      const customerList = customers.length > 0 ? customers : SheetsSyncEngine.getCustomers();
+      const matchedCust = customerList.find(c => String(c.mobile || "").replace(/\D/g, "") === cleanedMobile);
+      if (matchedCust) {
+        setExistingCustomerSearch(`${matchedCust.id} - ${matchedCust.name}`);
+        setCustomerName(draft.customerName || matchedCust.name || "");
+        setMobileNumber(draft.mobileNumber || String(matchedCust.mobile || ""));
+        setAddress(draft.address || matchedCust.address || "");
+        setSecondaryPhone(draft.secondaryPhone || matchedCust.secondaryPhone || "");
+        setSecondaryContactName(draft.secondaryContactName || matchedCust.secondaryContactName || "");
+        setNotes(draft.notes || matchedCust.notes || "");
+      } else {
+        setExistingCustomerSearch(draft.mobileNumber);
+      }
+    }
  
  // Restore line items
  if (draft.lineItems && draft.lineItems.length > 0) {

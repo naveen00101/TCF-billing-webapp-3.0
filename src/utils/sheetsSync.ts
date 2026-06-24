@@ -602,45 +602,92 @@ const mapEmployeeToDb = (emp: Employee) => ({
   status: emp.status ?? 'Active',
 });
 
-const mapDraftInvoiceFromDb = (row: any): any => ({
-  id: row.id,
-  createdDate: row.created_date,
-  customerName: row.customer_name,
-  mobileNumber: row.mobile_number,
-  customerState: row.customer_state,
-  lineItems: row.line_items || [],
-  gstType: row.gst_type,
-  gstEnabled: row.gst_enabled,
-  promoCodeInput: row.promo_code_input,
-  assignedEmployee: row.assigned_employee,
-  referralAgentId: row.referral_agent_id,
-  referralAgentName: row.referral_agent_name,
-  paymentType: row.payment_type,
-  amountReceivedInput: row.amount_received_input,
-  deliveryNotes: row.delivery_notes,
-  notes: row.notes,
-  draftAmount: Number(row.draft_amount),
-});
+const mapDraftInvoiceFromDb = (row: any): any => {
+  const rawLineItems = row.line_items || [];
+  const metaItem = rawLineItems.find((item: any) => item && item.isDraftMeta);
+  const cleanLineItems = rawLineItems.filter((item: any) => !item || !item.isDraftMeta);
 
-const mapDraftInvoiceToDb = (draft: any) => ({
-  id: draft.id,
-  created_date: draft.createdDate ?? null,
-  customer_name: draft.customerName ?? null,
-  mobile_number: draft.mobileNumber ?? null,
-  customer_state: draft.customerState ?? null,
-  line_items: draft.lineItems ?? [],
-  gst_type: draft.gstType ?? null,
-  gst_enabled: draft.gstEnabled ?? false,
-  promo_code_input: draft.promoCodeInput ?? null,
-  assigned_employee: draft.assignedEmployee ?? null,
-  referral_agent_id: draft.referralAgentId ?? null,
-  referral_agent_name: draft.referralAgentName ?? null,
-  payment_type: draft.paymentType ?? null,
-  amount_received_input: draft.amountReceivedInput ?? null,
-  delivery_notes: draft.deliveryNotes ?? null,
-  notes: draft.notes ?? null,
-  draft_amount: draft.draftAmount ?? 0,
-});
+  return {
+    id: row.id,
+    createdDate: row.created_date,
+    customerName: row.customer_name,
+    mobileNumber: row.mobile_number,
+    customerState: row.customer_state,
+    lineItems: cleanLineItems,
+    gstType: row.gst_type,
+    gstEnabled: row.gst_enabled,
+    promoCodeInput: row.promo_code_input,
+    assignedEmployee: row.assigned_employee,
+    referralAgentId: row.referral_agent_id,
+    referralAgentName: row.referral_agent_name,
+    paymentType: row.payment_type,
+    amountReceivedInput: row.amount_received_input,
+    deliveryNotes: row.delivery_notes,
+    notes: row.notes,
+    draftAmount: Number(row.draft_amount),
+    
+    // Unpack meta
+    discount: metaItem?.discount ?? 0,
+    discountType: metaItem?.discountType ?? 'value',
+    roAdjustment: metaItem?.roAdjustment ?? 0,
+    isNewCustomer: metaItem?.isNewCustomer ?? false,
+    address: metaItem?.address ?? '',
+    secondaryPhone: metaItem?.secondaryPhone ?? '',
+    secondaryContactName: metaItem?.secondaryContactName ?? '',
+    customerGstNo: metaItem?.customerGstNo ?? '',
+    customerBusinessName: metaItem?.customerBusinessName ?? '',
+    customerBusinessAddress: metaItem?.customerBusinessAddress ?? '',
+    customerStateCode: metaItem?.customerStateCode ?? '',
+    customerSelectionMode: metaItem?.customerSelectionMode ?? 'existing',
+    expectedDeliveryDate: metaItem?.expectedDeliveryDate ?? '',
+    autoNo: metaItem?.autoNo ?? '',
+    driverName: metaItem?.driverName ?? '',
+  };
+};
+
+const mapDraftInvoiceToDb = (draft: any) => {
+  const metaItem = {
+    isDraftMeta: true,
+    discount: draft.discount,
+    discountType: draft.discountType,
+    roAdjustment: draft.roAdjustment,
+    isNewCustomer: draft.isNewCustomer,
+    address: draft.address,
+    secondaryPhone: draft.secondaryPhone,
+    secondaryContactName: draft.secondaryContactName,
+    customerGstNo: draft.customerGstNo,
+    customerBusinessName: draft.customerBusinessName,
+    customerBusinessAddress: draft.customerBusinessAddress,
+    customerStateCode: draft.customerStateCode,
+    customerSelectionMode: draft.customerSelectionMode,
+    expectedDeliveryDate: draft.expectedDeliveryDate,
+    autoNo: draft.autoNo,
+    driverName: draft.driverName,
+  };
+
+  const lineItems = draft.lineItems ?? [];
+  const lineItemsWithMeta = [...lineItems, metaItem];
+
+  return {
+    id: draft.id,
+    created_date: draft.createdDate ?? null,
+    customer_name: draft.customerName ?? null,
+    mobile_number: draft.mobileNumber ?? null,
+    customer_state: draft.customerState ?? null,
+    line_items: lineItemsWithMeta,
+    gst_type: draft.gstType ?? null,
+    gst_enabled: draft.gstEnabled ?? false,
+    promo_code_input: draft.promoCodeInput ?? null,
+    assigned_employee: draft.assignedEmployee ?? null,
+    referral_agent_id: draft.referralAgentId ?? null,
+    referral_agent_name: draft.referralAgentName ?? null,
+    payment_type: draft.paymentType ?? null,
+    amount_received_input: draft.amountReceivedInput ?? null,
+    delivery_notes: draft.deliveryNotes ?? null,
+    notes: draft.notes ?? null,
+    draft_amount: draft.draftAmount ?? 0,
+  };
+};
 
 
 // ============================================
