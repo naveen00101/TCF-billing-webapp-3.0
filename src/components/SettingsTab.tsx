@@ -373,7 +373,6 @@ export default function SettingsTab({
    const [supabaseAnonKey, setSupabaseAnonKey] = useState(connSettings.supabaseAnonKey || "");
    const [spreadsheetName, setSpreadsheetName] = useState(connSettings.isConnected ? "Supabase Database" : "Not Connected");
    const [isConnected, setIsConnected] = useState(connSettings.isConnected);
-   const [backupInterval, setBackupInterval] = useState<"1_day" | "2_day" | "1_week" | "2_week" | "1_month">(connSettings.backupInterval || "1_day");
 
  // Company settings states
  const [companyName, setCompanyName] = useState(String(companySettings.companyName ||""));
@@ -401,73 +400,6 @@ export default function SettingsTab({
 
  // File Copy helpers
  const [copiedCode, setCopiedCode] = useState(false);
-
- // Cloud Backup and local safe-state backup states
- const [isCreatingCloudBackup, setIsCreatingCloudBackup] = useState(false);
- const [cloudBackupResult, setCloudBackupResult] = useState<{ success: boolean; backupName?: string; backupFileUrl?: string; error?: string } | null>(null);
- const [lastLocalBackupTime, setLastLocalBackupTime] = useState<string | null>(null);
-
- useEffect(() => {
-   const backup = SheetsSyncEngine.getLocalBackup();
-   if (backup && backup.timestamp) {
-     setLastLocalBackupTime(new Date(backup.timestamp).toLocaleString());
-   }
- }, []);
-
- const handleTriggerCloudBackup = async () => {
-   if (!isAdmin) return;
-   setIsCreatingCloudBackup(true);
-   setCloudBackupResult(null);
-   onShowNotification("Initiating Google Sheets cloud backup...", "info");
-   try {
-     const res = await SheetsSyncEngine.triggerCloudBackup();
-     if (res.success) {
-       setCloudBackupResult({
-         success: true,
-         backupName: res.backupName,
-         backupFileUrl: res.backupFileUrl
-       });
-       onShowNotification("✓ Google Sheets cloud backup created successfully!", "success");
-     } else {
-       setCloudBackupResult({
-         success: false,
-         error: res.message
-       });
-       onShowNotification(`Cloud Backup Failed: ${res.message}`, "error");
-     }
-   } catch (e: any) {
-     setCloudBackupResult({
-       success: false,
-       error: e.message || String(e)
-     });
-     onShowNotification(`Cloud Backup Error: ${e.message || e}`, "error");
-   } finally {
-     setIsCreatingCloudBackup(false);
-   }
- };
-
- const handleRestoreLocalBackup = () => {
-   if (!isAdmin) return;
-   const backup = SheetsSyncEngine.getLocalBackup();
-   if (!backup) {
-     onShowNotification("No local backup found.", "error");
-     return;
-   }
-   if (!confirm(`Are you sure you want to restore all data to the last known good local backup from ${new Date(backup.timestamp).toLocaleString()}? This will replace your current active local database.`)) {
-     return;
-   }
-   const success = SheetsSyncEngine.restoreLocalBackup();
-   if (success) {
-     onShowNotification("✓ Local safe-state backup restored successfully!", "success");
-     const backupObj = SheetsSyncEngine.getLocalBackup();
-     if (backupObj && backupObj.timestamp) {
-       setLastLocalBackupTime(new Date(backupObj.timestamp).toLocaleString());
-     }
-     onRefresh();
-   } else {
-     onShowNotification("Failed to restore local safe-state backup.", "error");
-   }
- };
 
  // Submit company info settings
  const handleSaveCompany = async (e: React.FormEvent) => {
@@ -1875,113 +1807,6 @@ export default function SettingsTab({
         </div>
       </div>
 
-  {/* DATABASE BACKUPS & CLOUD PROTECTION */}
-  <div className="border-t border-default pt-5 space-y-4">
-    <div className="flex items-center gap-1.5">
-      <Lock className="h-4 w-4 text-emerald-600" />
-      <h3 className="font-bold text-primary text-xs">Database Backups &amp; Cloud Protection</h3>
-    </div>
-    
-    <div className="bg-card/45 border border-default rounded-xl p-4 space-y-3">
-      <div className="flex items-start gap-2.5 text-[11px] text-muted text-left">
-        <Info className="h-4 w-4 shrink-0 text-blue-500 mt-0.5" />
-        <div className="space-y-1">
-          <p className="font-semibold text-primary">Automated Google Drive Backups</p>
-          <p className="leading-relaxed">
-            The system automatically creates a daily backup copy of your entire Google Sheet database on Google Drive when data is synchronized.
-            Backups are stored in a folder named <strong>{spreadsheetName} - Backups</strong> with a 30-day rolling retention policy.
-          </p>
-        </div>
-      </div>
-
-      <div className="flex flex-col gap-1 text-left pt-1">
-        <label className="text-[10px] font-bold text-secondary uppercase tracking-wider">
-          Automatic Backup Frequency
-        </label>
-        <select
-          value={backupInterval}
-          onChange={(e) => {
-            const val = e.target.value as any;
-            setBackupInterval(val);
-            const currentConn = SheetsSyncEngine.getConnectionSettings();
-            const updatedConn = { ...currentConn, backupInterval: val };
-            SheetsSyncEngine.saveConnectionSettings(updatedConn);
-            onShowNotification(`✓ Backup frequency updated to: ${e.target.options[e.target.selectedIndex].text}`, "success");
-          }}
-          disabled={!isAdmin}
-          className="w-full max-w-[200px] rounded-lg border border-default bg-card px-2.5 py-1.5 text-xs text-primary focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
-        >
-          <option value="1_day">Every 1 Day</option>
-          <option value="2_day">Every 2 Days</option>
-          <option value="1_week">Every 1 Week</option>
-          <option value="2_week">Every 2 Weeks</option>
-          <option value="1_month">Every 1 Month</option>
-        </select>
-      </div>
-
-      <div className="flex flex-wrap gap-2 pt-1.5">
-        <button
-          onClick={handleTriggerCloudBackup}
-          disabled={isCreatingCloudBackup || !isConnected}
-          className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-default bg-card hover:bg-surface px-3 py-2 text-xs font-semibold text-secondary hover:text-primary cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed transition"
-        >
-          {isCreatingCloudBackup ? (
-            <RefreshCw className="h-3.5 w-3.5 animate-spin text-emerald-500" />
-          ) : (
-            <Database className="h-3.5 w-3.5 text-emerald-500" />
-          )}
-          <span>{isCreatingCloudBackup ? "Backing up..." : "Trigger Cloud Backup Now"}</span>
-        </button>
-
-        {lastLocalBackupTime && (
-          <button
-            onClick={handleRestoreLocalBackup}
-            disabled={!lastLocalBackupTime}
-            className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-default bg-card hover:bg-surface px-3 py-2 text-xs font-semibold text-secondary hover:text-primary cursor-pointer transition"
-          >
-            <RefreshCw className="h-3.5 w-3.5 text-blue-500" />
-            <span>Restore Last Local Safe-State</span>
-          </button>
-        )}
-      </div>
-
-      {lastLocalBackupTime && (
-        <p className="text-[10px] text-muted">
-          Last Local Safe-State Backup: <span className="font-mono text-secondary">{lastLocalBackupTime}</span> (captured automatically on successful sync).
-        </p>
-      )}
-
-      {cloudBackupResult && (
-        <div className={`text-[11px] rounded-lg p-2.5 border text-left ${
-          cloudBackupResult.success 
-            ? "bg-emerald-50/50 border-emerald-200 text-emerald-800" 
-            : "bg-red-50/50 border-red-200 text-red-800"
-        }`}>
-          {cloudBackupResult.success ? (
-            <div className="space-y-1">
-              <p className="font-bold">✓ Cloud Backup Created Successfully!</p>
-              <p className="text-[10px] font-mono break-all">{cloudBackupResult.backupName}</p>
-              {cloudBackupResult.backupFileUrl && (
-                <a 
-                  href={cloudBackupResult.backupFileUrl} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="inline-block text-emerald-600 hover:text-emerald-700 font-bold underline mt-1"
-                >
-                  Open Backup File in Google Drive ↗
-                </a>
-              )}
-            </div>
-          ) : (
-            <div>
-              <p className="font-bold">⚠️ Backup Creation Failed</p>
-              <p className="text-[10px] break-all">{cloudBackupResult.error}</p>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  </div>
 
   {/* Performance & Scale Testing Section */}
   <div className="border-t border-default pt-4 mt-4 space-y-3">
