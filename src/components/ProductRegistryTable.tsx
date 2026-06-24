@@ -24,7 +24,7 @@ export function ProductRegistryTable({ products, onEdit, onDelete }: { products:
     const categoryPath = p.category || 'Uncategorized';
     const skuCount = safeArray(p.simpleVariants).length;
     return { product: p, categoryPath, configCount: 0, skuCount };
-  }).sort((a,b) => a.categoryPath.localeCompare(b.categoryPath) || a.product.name.localeCompare(b.product.name));
+  });
 
  return (
  <div className="bg-card rounded-xl border border-default shadow-sm overflow-hidden animate-in fade-in">
