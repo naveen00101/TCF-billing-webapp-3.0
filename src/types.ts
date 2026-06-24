@@ -256,6 +256,8 @@ export interface InvoiceItem {
 }
 
 export interface ConnectionSettings {
+  supabaseUrl?: string;
+  supabaseAnonKey?: string;
   spreadsheetId: string;
   spreadsheetName: string;
   appsScriptUrl: string;

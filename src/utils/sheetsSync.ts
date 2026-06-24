@@ -17,45 +17,19 @@ import {
 } from "../types";
 
 import { getTodayStr, isDateInCurrentWeek, getInvoiceDateStr, parseInvoiceDate, getCurrentTimeStr } from "./dateUtils";
-import { IndexedDBStorage } from "./indexedDBStorage";
+import { supabase, updateSupabaseClient, getSupabaseConfig } from "./supabaseClient";
+import { createClient } from "@supabase/supabase-js";
 
 const TODAY = getTodayStr();
 
 // Professional mock data for immediate out-of-the-box loading
 const DEFAULT_EMPLOYEES: Employee[] = [];
-
 const DEFAULT_AGENTS: Agent[] = [];
-
 const DEFAULT_PROMO_CODES: PromoCode[] = [];
-
 const DEFAULT_PRODUCTS: Product[] = [];
-
 const DEFAULT_CUSTOMERS: Customer[] = [];
-
 const DEFAULT_INVOICES: Invoice[] = [];
-
 const DEFAULT_INVOICE_ITEMS: InvoiceItem[] = [];
-
-export const HARDCODED_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwbE6busg-nHjZ_w5XX4euz4rVd0jX1d-gMJAdNiD0Z77xPpGfQsD6p8p5TDPzNwVvhuA/exec";
-export const HARDCODED_SPREADSHEET_ID = "1x3o0AobotsU6CN9AEhG9wM3D_TicnHApO_rvocKzaOc";
-
-const DEFAULT_CONNECTION_SETTINGS: ConnectionSettings = {
-  spreadsheetId: HARDCODED_SPREADSHEET_ID,
-  spreadsheetName: "Tenali Central Furniture Billing Database",
-  appsScriptUrl: HARDCODED_APPS_SCRIPT_URL,
-  apiKey: "",
-  isConnected: true, // Default to connected out-of-the-box
-  lastSyncTime: "",
-  productsSheetName: "Products",
-  customersSheetName: "Customers",
-  invoicesSheetName: "Invoices",
-  invoiceItemsSheetName: "InvoiceItems",
-  settingsSheetName: "Settings",
-  agentsSheetName: "Agents",
-  paymentTransactionsSheetName: "PaymentTransactions",
-  connectionMode: "auto",
-  backupInterval: "1_day",
-};
 
 const DEFAULT_COMPANY_SETTINGS: CompanySettings = {
   companyName: "Tenali Central Furniture",
@@ -67,7 +41,7 @@ const DEFAULT_COMPANY_SETTINGS: CompanySettings = {
   website: "www.tenalicentralfurniture.com",
   invoiceFooter: "Thank you for buying premium furniture from Tenali Central Furniture! We guarantee quality craftsmanship in every piece.",
   invoicePrefix: "YR",
-  nextInvoiceNumber: 1004,
+  nextInvoiceNumber: 1001,
   defaultPrintFormat: "Receipt",
   defaultDownloadFormat: "A4",
   useLogoWatermark: true,
@@ -100,53 +74,593 @@ const DEFAULT_USERS: User[] = [
     fullName: "System Admin",
     username: "admin",
     email: "admin@tcfshowroom.com",
-    mobile: "9999999990",
+    mobile: "8919546858",
     role: "Admin",
     status: "Active",
     dateCreated: "2026-06-01",
     lastLogin: TODAY + " 08:30 AM",
     passwordHash: "0192023a7bbd73250516f069df18b500" // MD5 of "admin123"
-  },
-  {
-    id: "USER-1002",
-    fullName: "Operations Manager",
-    username: "manager",
-    email: "manager@tcfshowroom.com",
-    mobile: "9999999991",
-    role: "Manager",
-    status: "Active",
-    dateCreated: "2026-06-02",
-    lastLogin: TODAY + " 09:00 AM",
-    passwordHash: "0ebedab8890bb86c3677b102b453aeb1" // MD5 of "manager123"
-  },
-  {
-    id: "USER-1003",
-    fullName: "Sales Desk Employee",
-    username: "employee",
-    email: "employee@tcfshowroom.com",
-    mobile: "9999999992",
-    role: "Employee",
-    status: "Active",
-    dateCreated: "2026-06-03",
-    lastLogin: TODAY + " 09:15 AM",
-    passwordHash: "9f57ebbf2138eb15d86b9fcb52994e63" // MD5 of "employee123"
   }
 ];
 
 const DEFAULT_AUDIT_LOGS: AuditLog[] = [];
-
 const DEFAULT_ACTIVITIES: UserActivity[] = [];
 
+// ============================================
+// DATABASE FIELD MAPPINGS (CAMEL <=> SNAKE)
+// ============================================
+
+const mapCompanySettingsFromDb = (row: any): CompanySettings => ({
+  companyName: row.company_name,
+  shortName: row.short_name,
+  address: row.address,
+  phone: row.phone,
+  email: row.email,
+  gstNumber: row.gst_number,
+  website: row.website,
+  invoiceFooter: row.invoice_footer,
+  invoicePrefix: row.invoice_prefix,
+  nextInvoiceNumber: Number(row.next_invoice_number) || 1001,
+  defaultPrintFormat: row.default_print_format,
+  defaultDownloadFormat: row.default_download_format,
+  useLogoWatermark: row.use_logo_watermark,
+  invoiceTerms: row.invoice_terms,
+  companyState: row.company_state,
+  companyStateCode: row.company_state_code,
+  cgstPercentage: Number(row.cgst_percentage),
+  sgstPercentage: Number(row.sgst_percentage),
+  igstPercentage: Number(row.igst_percentage),
+  gstEnabledByDefault: row.gst_enabled_by_default,
+});
+
+const mapCompanySettingsToDb = (s: CompanySettings) => ({
+  id: 'SETTINGS_ROW',
+  company_name: s.companyName,
+  short_name: s.shortName,
+  address: s.address,
+  phone: s.phone,
+  email: s.email,
+  gst_number: s.gstNumber,
+  website: s.website,
+  invoice_footer: s.invoiceFooter,
+  invoice_prefix: s.invoicePrefix,
+  next_invoice_number: s.nextInvoiceNumber,
+  default_print_format: s.defaultPrintFormat,
+  default_download_format: s.defaultDownloadFormat,
+  use_logo_watermark: s.useLogoWatermark,
+  invoice_terms: s.invoiceTerms,
+  company_state: s.companyState,
+  company_state_code: s.companyStateCode,
+  cgst_percentage: s.cgstPercentage,
+  sgst_percentage: s.sgstPercentage,
+  igst_percentage: s.igstPercentage,
+  gst_enabled_by_default: s.gstEnabledByDefault,
+});
+
+const mapUserFromDb = (row: any): User => ({
+  id: row.id,
+  fullName: row.full_name,
+  username: row.username,
+  email: row.email,
+  mobile: row.mobile,
+  role: row.role,
+  status: row.status,
+  dateCreated: row.date_created,
+  lastLogin: row.last_login,
+  passwordHash: row.password_hash,
+});
+
+const mapUserToDb = (u: User) => ({
+  id: u.id,
+  full_name: u.fullName,
+  username: u.username,
+  email: u.email,
+  mobile: u.mobile,
+  role: u.role,
+  status: u.status,
+  date_created: u.dateCreated,
+  last_login: u.lastLogin,
+  password_hash: u.passwordHash,
+});
+
+const mapProductFromDb = (row: any): Product => ({
+  id: row.id,
+  name: row.name,
+  category: row.category,
+  unit: row.unit,
+  price: Number(row.price),
+  basePrice: row.base_price !== null ? Number(row.base_price) : undefined,
+  inventoryType: row.inventory_type,
+  variants: row.variants,
+  optionGroups: row.option_groups,
+  inventoryMode: row.inventory_mode,
+  simpleVariants: row.simple_variants,
+  colors: row.colors,
+  sizes: row.sizes,
+  isCombo: row.is_combo,
+  comboItems: row.combo_items,
+  productOptions: row.product_options,
+  trackInventorySeparately: row.track_inventory_separately,
+  openingStock: row.opening_stock !== null ? Number(row.opening_stock) : undefined,
+  color: row.color,
+  material: row.material,
+  brand: row.brand,
+  vendor: row.vendor,
+  purchaseCost: row.purchase_cost !== null ? Number(row.purchase_cost) : undefined,
+  sellingPrice: row.selling_price !== null ? Number(row.selling_price) : undefined,
+  unitsSold: row.units_sold !== null ? Number(row.units_sold) : undefined,
+  revenueGenerated: row.revenue_generated !== null ? Number(row.revenue_generated) : undefined,
+  lastSoldDate: row.last_sold_date,
+  stockAvailable: row.stock_available !== null ? Number(row.stock_available) : undefined,
+  productionTime: row.production_time,
+  notes: row.notes,
+  sku: row.sku,
+  warranty: row.warranty,
+  size: row.size,
+  weight: row.weight,
+  imageUrl: row.image_url,
+  status: row.status,
+  isArchived: row.is_archived,
+  hsnCode: row.hsn_code,
+  isSoftDeleted: row.is_soft_deleted,
+});
+
+const mapProductToDb = (p: Product) => ({
+  id: p.id,
+  name: p.name,
+  category: p.category ?? null,
+  unit: p.unit ?? null,
+  price: p.price,
+  base_price: p.basePrice ?? null,
+  inventory_type: p.inventoryType ?? null,
+  variants: p.variants ?? [],
+  option_groups: p.optionGroups ?? [],
+  inventory_mode: p.inventoryMode ?? 'simple',
+  simple_variants: p.simpleVariants ?? [],
+  colors: p.colors ?? [],
+  sizes: p.sizes ?? [],
+  is_combo: p.isCombo ?? false,
+  combo_items: p.comboItems ?? [],
+  product_options: p.productOptions ?? [],
+  track_inventory_separately: p.trackInventorySeparately ?? false,
+  opening_stock: p.openingStock ?? 0,
+  color: p.color ?? null,
+  material: p.material ?? null,
+  brand: p.brand ?? null,
+  vendor: p.vendor ?? null,
+  purchase_cost: p.purchaseCost ?? null,
+  selling_price: p.sellingPrice ?? null,
+  units_sold: p.unitsSold ?? 0,
+  revenue_generated: p.revenueGenerated ?? 0,
+  last_sold_date: p.lastSoldDate ?? null,
+  stock_available: p.stockAvailable ?? 0,
+  production_time: p.productionTime ?? null,
+  notes: p.notes ?? null,
+  sku: p.sku ?? null,
+  warranty: p.warranty ?? null,
+  size: p.size ?? null,
+  weight: p.weight ?? null,
+  image_url: p.imageUrl ?? null,
+  status: p.status ?? 'Active',
+  is_archived: p.isArchived ?? false,
+  hsn_code: p.hsnCode ?? null,
+  is_soft_deleted: p.isSoftDeleted ?? false,
+});
+
+const mapCustomerFromDb = (row: any): Customer => ({
+  id: row.id,
+  name: row.name,
+  mobile: row.mobile,
+  address: row.address,
+  secondaryPhone: row.secondary_phone,
+  secondaryContactName: row.secondary_contact_name,
+  notes: row.notes,
+  currentAddress: row.current_address,
+  addressHistory: row.address_history,
+  isSoftDeleted: row.is_soft_deleted,
+});
+
+const mapCustomerToDb = (c: Customer) => ({
+  id: c.id,
+  name: c.name,
+  mobile: c.mobile,
+  address: c.address,
+  secondary_phone: c.secondaryPhone ?? null,
+  secondary_contact_name: c.secondaryContactName ?? null,
+  notes: c.notes ?? null,
+  current_address: c.currentAddress ?? null,
+  address_history: c.addressHistory ?? [],
+  is_soft_deleted: c.isSoftDeleted ?? false,
+});
+
+const mapInvoiceFromDb = (row: any): Invoice => ({
+  invoiceId: row.invoice_id,
+  invoiceNo: row.invoice_no,
+  invoiceCategory: row.invoice_category,
+  date: row.date,
+  invoiceDate: row.invoice_date,
+  invoiceTime: row.invoice_time,
+  createdTimestamp: row.created_timestamp,
+  customerName: row.customer_name,
+  mobile: row.mobile,
+  customerPrimaryPhone: row.customer_primary_phone,
+  itemCount: Number(row.item_count),
+  subtotal: Number(row.subtotal),
+  discount: Number(row.discount),
+  roAdjustment: row.ro_adjustment !== null ? Number(row.ro_adjustment) : undefined,
+  grandTotal: Number(row.grand_total),
+  status: row.status,
+  assignedEmployee: row.assigned_employee,
+  expectedDeliveryDate: row.expected_delivery_date,
+  deliveryDate: row.delivery_date,
+  deliveryNotes: row.delivery_notes,
+  autoNo: row.auto_no,
+  driverName: row.driver_name,
+  createdBy: row.created_by,
+  createdDate: row.created_date,
+  createdTime: row.created_time,
+  lastEditedBy: row.last_edited_by,
+  lastEditedDate: row.last_edited_date,
+  lastEditedTime: row.last_edited_time,
+  lastEditedTimestamp: row.last_edited_timestamp,
+  isSoftDeleted: row.is_soft_deleted,
+  agentId: row.agent_id,
+  agentName: row.agent_name,
+  referralAgentId: row.referral_agent_id,
+  referralAgentName: row.referral_agent_name,
+  referralAgentCategory: row.referral_agent_category,
+  referralAgentType: row.referral_agent_type,
+  grossAmount: row.gross_amount !== null ? Number(row.gross_amount) : undefined,
+  promoCode: row.promo_code,
+  promoDiscountAmount: row.promo_discount_amount !== null ? Number(row.promo_discount_amount) : undefined,
+  cancellationPercentage: row.cancellation_percentage !== null ? Number(row.cancellation_percentage) : undefined,
+  cancellationDeduction: row.cancellation_deduction !== null ? Number(row.cancellation_deduction) : undefined,
+  refundAmount: row.refund_amount !== null ? Number(row.refund_amount) : undefined,
+  companyRetainedAmount: row.company_retained_amount !== null ? Number(row.company_retained_amount) : undefined,
+  deletedBy: row.deleted_by,
+  deletedDate: row.deleted_date,
+  gstEnabled: row.gst_enabled,
+  gstType: row.gst_type,
+  customerGstNo: row.customer_gst_no,
+  customerBusinessName: row.customer_business_name,
+  customerBusinessAddress: row.customer_business_address,
+  customerState: row.customer_state,
+  customerStateCode: row.customer_state_code,
+  cgstPercentage: row.cgst_percentage !== null ? Number(row.cgst_percentage) : undefined,
+  sgstPercentage: row.sgst_percentage !== null ? Number(row.sgst_percentage) : undefined,
+  igstPercentage: row.igst_percentage !== null ? Number(row.igst_percentage) : undefined,
+  cgstAmount: row.cgst_amount !== null ? Number(row.cgst_amount) : undefined,
+  sgstAmount: row.sgst_amount !== null ? Number(row.sgst_amount) : undefined,
+  igstAmount: row.igst_amount !== null ? Number(row.igst_amount) : undefined,
+  taxAmount: row.tax_amount !== null ? Number(row.tax_amount) : undefined,
+  paymentType: row.payment_type,
+  paymentStatus: row.payment_status,
+  amountPaid: row.amount_paid !== null ? Number(row.amount_paid) : undefined,
+  balanceDue: row.balance_due !== null ? Number(row.balance_due) : undefined,
+  balanceCollectionStatus: row.balance_collection_status,
+  customerSecondaryPhone: row.customer_secondary_phone,
+  customerSecondaryContactName: row.customer_secondary_contact_name,
+  notes: row.notes,
+  clientNotes: row.client_notes,
+  orderNotes: row.order_notes,
+});
+
+const mapInvoiceToDb = (inv: Invoice) => ({
+  invoice_id: inv.invoiceId || inv.invoiceNo,
+  invoice_no: inv.invoiceNo,
+  invoice_category: inv.invoiceCategory ?? null,
+  date: inv.date,
+  invoice_date: inv.invoiceDate ?? null,
+  invoice_time: inv.invoiceTime ?? null,
+  customer_name: inv.customerName,
+  mobile: inv.mobile,
+  customer_primary_phone: inv.customerPrimaryPhone ?? null,
+  item_count: inv.itemCount,
+  subtotal: inv.subtotal,
+  discount: inv.discount,
+  ro_adjustment: inv.roAdjustment ?? 0,
+  grand_total: inv.grandTotal,
+  status: inv.status,
+  assigned_employee: inv.assignedEmployee ?? null,
+  expected_delivery_date: inv.expectedDeliveryDate ?? null,
+  delivery_date: inv.deliveryDate ?? null,
+  delivery_notes: inv.deliveryNotes ?? null,
+  auto_no: inv.autoNo ?? null,
+  driver_name: inv.driverName ?? null,
+  created_by: inv.createdBy,
+  created_date: inv.createdDate,
+  created_time: inv.createdTime,
+  last_edited_by: inv.lastEditedBy ?? null,
+  last_edited_date: inv.lastEditedDate ?? null,
+  last_edited_time: inv.lastEditedTime ?? null,
+  last_edited_timestamp: inv.lastEditedTimestamp ?? null,
+  is_soft_deleted: inv.isSoftDeleted ?? false,
+  agent_id: inv.agentId ?? null,
+  agent_name: inv.agentName ?? null,
+  referral_agent_id: inv.referralAgentId ?? null,
+  referral_agent_name: inv.referralAgentName ?? null,
+  referral_agent_category: inv.referralAgentCategory ?? null,
+  referral_agent_type: inv.referralAgentType ?? null,
+  gross_amount: inv.grossAmount ?? 0,
+  promo_code: inv.promoCode ?? null,
+  promo_discount_amount: inv.promoDiscountAmount ?? 0,
+  cancellation_percentage: inv.cancellationPercentage ?? 0,
+  cancellation_deduction: inv.cancellationDeduction ?? 0,
+  refund_amount: inv.refundAmount ?? 0,
+  company_retained_amount: inv.companyRetainedAmount ?? 0,
+  deleted_by: inv.deletedBy ?? null,
+  deleted_date: inv.deletedDate ?? null,
+  gst_enabled: inv.gstEnabled ?? false,
+  gst_type: inv.gstType ?? null,
+  customer_gst_no: inv.customerGstNo ?? null,
+  customer_business_name: inv.customerBusinessName ?? null,
+  customer_business_address: inv.customerBusinessAddress ?? null,
+  customer_state: inv.customerState ?? null,
+  customer_state_code: inv.customerStateCode ?? null,
+  cgst_percentage: inv.cgstPercentage ?? 0,
+  sgst_percentage: inv.sgstPercentage ?? 0,
+  igst_percentage: inv.igstPercentage ?? 0,
+  cgst_amount: inv.cgstAmount ?? 0,
+  sgst_amount: inv.sgstAmount ?? 0,
+  igst_amount: inv.igstAmount ?? 0,
+  tax_amount: inv.taxAmount ?? 0,
+  payment_type: inv.paymentType ?? null,
+  payment_status: inv.paymentStatus ?? null,
+  amount_paid: inv.amountPaid ?? 0,
+  balance_due: inv.balanceDue ?? 0,
+  balance_collection_status: inv.balanceCollectionStatus ?? null,
+  customer_secondary_phone: inv.customerSecondaryPhone ?? null,
+  customer_secondary_contact_name: inv.customerSecondaryContactName ?? null,
+  notes: inv.notes ?? null,
+  client_notes: inv.clientNotes ?? null,
+  order_notes: inv.orderNotes ?? null,
+});
+
+const mapInvoiceItemFromDb = (row: any): InvoiceItem => ({
+  invoiceId: row.invoice_id,
+  invoiceNo: row.invoice_no,
+  productId: row.product_id,
+  productName: row.product_name,
+  displayName: row.display_name,
+  storeName: row.store_name,
+  variant: row.variant,
+  quantity: Number(row.quantity),
+  unitPrice: Number(row.unit_price),
+  amount: Number(row.amount),
+  selectedColor: row.selected_color,
+  selectedSize: row.selected_size,
+  hsnCode: row.hsn_code,
+  hierarchyNodeId: row.hierarchy_node_id,
+  skuId: row.sku_id,
+  hierarchyPath: row.hierarchy_path,
+  skuCode: row.sku_code,
+  selectedOptions: row.selected_options,
+  isCombo: row.is_combo,
+  comboItems: row.combo_items,
+});
+
+const mapInvoiceItemToDb = (item: InvoiceItem) => ({
+  invoice_id: item.invoiceId || item.invoiceNo,
+  invoice_no: item.invoiceNo,
+  product_id: item.productId,
+  product_name: item.productName,
+  display_name: item.displayName ?? null,
+  store_name: item.storeName ?? null,
+  variant: item.variant ?? null,
+  quantity: item.quantity,
+  unit_price: item.unitPrice,
+  amount: item.amount,
+  selected_color: item.selectedColor ?? null,
+  selected_size: item.selectedSize ?? null,
+  hsn_code: item.hsnCode ?? null,
+  hierarchy_node_id: item.hierarchyNodeId ?? null,
+  sku_id: item.skuId ?? null,
+  hierarchy_path: item.hierarchyPath ?? null,
+  sku_code: item.skuCode ?? null,
+  selected_options: item.selectedOptions ?? {},
+  is_combo: item.isCombo ?? false,
+  combo_items: item.comboItems ?? [],
+});
+
+const mapPaymentTransactionFromDb = (row: any): PaymentTransaction => ({
+  id: row.id,
+  invoiceId: row.invoice_id,
+  invoiceNo: row.invoice_no,
+  date: row.date,
+  time: row.time,
+  amount: Number(row.amount),
+  collectedBy: row.collected_by,
+  notes: row.notes,
+});
+
+const mapPaymentTransactionToDb = (t: PaymentTransaction) => ({
+  id: t.id,
+  invoice_id: t.invoiceId ?? null,
+  invoice_no: t.invoiceNo,
+  date: t.date,
+  time: t.time,
+  amount: t.amount,
+  collected_by: t.collectedBy,
+  notes: t.notes ?? null,
+});
+
+const mapAgentFromDb = (row: any): Agent => ({
+  id: row.id,
+  name: row.name,
+  mobile: row.mobile,
+  email: row.email,
+  agentType: row.agent_type,
+  commissionPercentage: Number(row.commission_percentage),
+  status: row.status,
+  notes: row.notes,
+  createdDate: row.created_date,
+  isSoftDeleted: row.is_soft_deleted,
+});
+
+const mapAgentToDb = (a: Agent) => ({
+  id: a.id,
+  name: a.name,
+  mobile: a.mobile,
+  email: a.email ?? null,
+  agent_type: a.agentType,
+  commission_percentage: a.commissionPercentage,
+  status: a.status,
+  notes: a.notes ?? null,
+  created_date: a.createdDate ?? null,
+  is_soft_deleted: a.isSoftDeleted ?? false,
+});
+
+const mapPromoCodeFromDb = (row: any): PromoCode => ({
+  promoCode: row.promo_code,
+  description: row.description,
+  discountType: row.discount_type,
+  percentageDiscount: row.percentage_discount !== null ? Number(row.percentage_discount) : undefined,
+  fixedDiscount: row.fixed_discount !== null ? Number(row.fixed_discount) : undefined,
+  startDate: row.start_date,
+  endDate: row.end_date,
+  maximumUsage: Number(row.maximum_usage),
+  usageCount: Number(row.usage_count),
+  activeStatus: row.active_status,
+  isSoftDeleted: row.is_soft_deleted,
+});
+
+const mapPromoCodeToDb = (p: PromoCode) => ({
+  promo_code: p.promoCode,
+  description: p.description ?? null,
+  discount_type: p.discountType,
+  percentage_discount: p.percentageDiscount ?? null,
+  fixed_discount: p.fixedDiscount ?? null,
+  start_date: p.startDate ?? null,
+  end_date: p.endDate ?? null,
+  maximum_usage: p.maximumUsage ?? 0,
+  usage_count: p.usageCount ?? 0,
+  active_status: p.activeStatus ?? 'Active',
+  is_soft_deleted: p.isSoftDeleted ?? false,
+});
+
+const mapUserActivityFromDb = (row: any): UserActivity => ({
+  id: row.id,
+  username: row.username,
+  loginDate: row.login_date,
+  loginTime: row.login_time,
+  logoutTime: row.logout_time,
+  sessionDuration: row.session_duration,
+  deviceType: row.device_type,
+  browser: row.browser,
+  ipAddress: row.ip_address,
+  activeSeconds: Number(row.active_seconds),
+});
+
+const mapUserActivityToDb = (ua: UserActivity) => ({
+  id: ua.id,
+  username: ua.username,
+  login_date: ua.loginDate ?? null,
+  login_time: ua.loginTime ?? null,
+  logout_time: ua.logoutTime ?? null,
+  session_duration: ua.sessionDuration ?? null,
+  device_type: ua.deviceType ?? null,
+  browser: ua.browser ?? null,
+  ip_address: ua.ipAddress ?? null,
+  active_seconds: ua.activeSeconds ?? 0,
+});
+
+const mapAuditLogFromDb = (row: any): AuditLog => ({
+  id: row.id,
+  actionType: row.action_type,
+  userName: row.user_name,
+  date: row.date,
+  time: row.time,
+  previousValue: row.previous_value,
+  newValue: row.newValue,
+});
+
+const mapAuditLogToDb = (al: AuditLog) => ({
+  id: al.id,
+  action_type: al.actionType,
+  user_name: al.userName,
+  date: al.date ?? null,
+  time: al.time ?? null,
+  previous_value: al.previousValue ?? null,
+  newValue: al.newValue ?? null,
+});
+
+const mapEmployeeFromDb = (row: any): Employee => ({
+  id: row.id,
+  fullName: row.full_name,
+  role: row.role,
+  email: row.email,
+  mobile: row.mobile,
+  status: row.status,
+});
+
+const mapEmployeeToDb = (emp: Employee) => ({
+  id: emp.id,
+  full_name: emp.fullName,
+  role: emp.role ?? null,
+  email: emp.email ?? null,
+  mobile: emp.mobile ?? null,
+  status: emp.status ?? 'Active',
+});
+
+const mapDraftInvoiceFromDb = (row: any): any => ({
+  id: row.id,
+  createdDate: row.created_date,
+  customerName: row.customer_name,
+  mobileNumber: row.mobile_number,
+  customerState: row.customer_state,
+  lineItems: row.line_items || [],
+  gstType: row.gst_type,
+  gstEnabled: row.gst_enabled,
+  promoCodeInput: row.promo_code_input,
+  assignedEmployee: row.assigned_employee,
+  referralAgentId: row.referral_agent_id,
+  referralAgentName: row.referral_agent_name,
+  paymentType: row.payment_type,
+  amountReceivedInput: row.amount_received_input,
+  deliveryNotes: row.delivery_notes,
+  notes: row.notes,
+  draftAmount: Number(row.draft_amount),
+});
+
+const mapDraftInvoiceToDb = (draft: any) => ({
+  id: draft.id,
+  created_date: draft.createdDate ?? null,
+  customer_name: draft.customerName ?? null,
+  mobile_number: draft.mobileNumber ?? null,
+  customer_state: draft.customerState ?? null,
+  line_items: draft.lineItems ?? [],
+  gst_type: draft.gstType ?? null,
+  gst_enabled: draft.gstEnabled ?? false,
+  promo_code_input: draft.promoCodeInput ?? null,
+  assigned_employee: draft.assignedEmployee ?? null,
+  referral_agent_id: draft.referralAgentId ?? null,
+  referral_agent_name: draft.referralAgentName ?? null,
+  payment_type: draft.paymentType ?? null,
+  amount_received_input: draft.amountReceivedInput ?? null,
+  delivery_notes: draft.deliveryNotes ?? null,
+  notes: draft.notes ?? null,
+  draft_amount: draft.draftAmount ?? 0,
+});
+
+
+// ============================================
+// ENGINE IMPLEMENTATION
+// ============================================
+
 export class SheetsSyncEngine {
-  private static isSyncingDown = false;
-  private static isSyncingInProgress = false;
-  private static hasPendingSyncRequest = false;
-  private static backgroundSyncTimeout: any = null;
-  private static hasSyncedDownThisSession = false;
+  public static isSyncingDown = false;
+  public static isSyncingInProgress = false;
+  public static hasPendingSyncRequest = false;
+  public static backgroundSyncTimeout: any = null;
+  public static hasSyncedDownThisSession = false;
 
   private static syncStatus: "idle" | "syncing" | "success" | "error" = "idle";
   private static lastSyncError: string | null = null;
   private static syncStatusListeners: ((status: "idle" | "syncing" | "success" | "error", error: string | null) => void)[] = [];
+  public static realtimeListeners: (() => void)[] = [];
+  
+  private static memoryCache: { [key: string]: any } = {};
+  private static activeSubscription: any = null;
 
   public static registerSyncStatusListener(cb: (status: "idle" | "syncing" | "success" | "error", error: string | null) => void) {
     this.syncStatusListeners.push(cb);
@@ -164,78 +678,223 @@ export class SheetsSyncEngine {
     });
   }
 
-  // Local changes registry (dirty tracking)
-  public static getLocalChanges(): { [type: string]: { [id: string]: boolean } } {
-    return this.getStorageItem<{ [type: string]: { [id: string]: boolean } }>("billing_local_changes", {});
+  public static registerRealtimeListener(cb: () => void) {
+    this.realtimeListeners.push(cb);
+    return () => {
+      this.realtimeListeners = this.realtimeListeners.filter(l => l !== cb);
+    };
   }
 
-  private static saveLocalChanges(changes: { [type: string]: { [id: string]: boolean } }): void {
-    this.setStorageItem("billing_local_changes", changes);
-  }
-
-  public static trackLocalChange(type: string, id: string): void {
-    const changes = this.getLocalChanges();
-    if (!changes[type]) {
-      changes[type] = {};
-    }
-    changes[type][id] = true;
-    this.saveLocalChanges(changes);
-  }
-
-  public static isLocalChangeDirty(type: string, id: string): boolean {
-    const changes = this.getLocalChanges();
-    return !!(changes[type] && changes[type][id]);
-  }
-
-  public static clearLocalChanges(): void {
-    this.saveLocalChanges({});
-  }
-
-  private static queueAutomaticSync(): void {
-    if (this.isSyncingDown) return;
-    const conn = this.getConnectionSettings();
-    if (!conn.isConnected || !conn.appsScriptUrl) return;
-
-    if (this.backgroundSyncTimeout) {
-      clearTimeout(this.backgroundSyncTimeout);
-    }
-
-    this.backgroundSyncTimeout = setTimeout(() => {
-      this.triggerBackgroundSync();
-    }, 50);
-  }
-  private static memoryCache: { [key: string]: any } = {};
-
+  // Preload cache from Supabase
   public static async preloadCache(): Promise<void> {
-    const keys = [
-      "billing_products",
-      "billing_customers",
-      "billing_invoices",
-      "billing_invoice_items",
-      "billing_agents_registry",
-      "billing_conn_settings",
-      "billing_company_settings",
-      "billing_current_user",
-      "billing_payment_transactions",
-      "billing_users",
-      "billing_promo_codes",
-      "billing_user_activities",
-      "billing_audit_logs",
-      "billing_local_changes",
-      "POS_FURNITURE_OPTION_GROUPS_V3",
-      "billing_terminal_id"
-    ];
-
-    for (const key of keys) {
-      const val = await IndexedDBStorage.getItem<any | null>(key, null);
-      if (val !== null) {
-        this.memoryCache[key] = val;
+    this.updateSyncStatus("syncing");
+    
+    // Check if Supabase client is initialized
+    if (!supabase) {
+      // Load local credentials config if saved
+      const config = this.getConnectionSettings();
+      if (config.supabaseUrl && config.supabaseAnonKey) {
+        updateSupabaseClient(config.supabaseUrl, config.supabaseAnonKey);
       }
     }
+
+    if (!supabase) {
+      console.warn("[SyncEngine] Supabase is not configured yet. Using default mock datasets.");
+      this.loadDefaultsIntoCache();
+      this.updateSyncStatus("idle");
+      return;
+    }
+
+    console.log("[SyncEngine] Preloading cache from Supabase...");
+    try {
+      await Promise.all([
+        this.reloadTable("company_settings"),
+        this.reloadTable("users"),
+        this.reloadTable("products"),
+        this.reloadTable("customers"),
+        this.reloadTable("invoices"),
+        this.reloadTable("invoice_items"),
+        this.reloadTable("payment_transactions"),
+        this.reloadTable("agents"),
+        this.reloadTable("promo_codes"),
+        this.reloadTable("user_activities"),
+        this.reloadTable("audit_logs"),
+        this.reloadTable("employees"),
+        this.reloadTable("draft_invoices")
+      ]);
+
+      // Seed admin user locally if no users exist in database
+      const usersList = this.memoryCache["billing_user_registry"] || [];
+      if (usersList.length === 0) {
+        this.memoryCache["billing_user_registry"] = DEFAULT_USERS;
+        await supabase.from("users").insert(DEFAULT_USERS.map(mapUserToDb));
+      }
+
+      this.hasSyncedDownThisSession = true;
+      this.updateSyncStatus("success");
+      this.subscribeToRealtime();
+    } catch (e: any) {
+      console.error("[SyncEngine] Failed to preload cache:", e);
+      this.updateSyncStatus("error", e.message || "Failed to fetch from Supabase");
+      this.loadDefaultsIntoCache();
+    }
+  }
+
+  private static loadDefaultsIntoCache(): void {
+    this.memoryCache["billing_products"] = DEFAULT_PRODUCTS;
+    this.memoryCache["billing_customers"] = DEFAULT_CUSTOMERS;
+    this.memoryCache["billing_invoices"] = DEFAULT_INVOICES;
+    this.memoryCache["billing_invoice_items"] = DEFAULT_INVOICE_ITEMS;
+    this.memoryCache["billing_agents_registry"] = DEFAULT_AGENTS;
+    this.memoryCache["billing_company_settings"] = DEFAULT_COMPANY_SETTINGS;
+    this.memoryCache["billing_user_registry"] = DEFAULT_USERS;
+    this.memoryCache["billing_payment_transactions"] = [];
+    this.memoryCache["billing_promo_codes"] = DEFAULT_PROMO_CODES;
+    this.memoryCache["billing_user_activities"] = DEFAULT_ACTIVITIES;
+    this.memoryCache["billing_audit_logs"] = DEFAULT_AUDIT_LOGS;
+    this.memoryCache["billing_employees_registry"] = DEFAULT_EMPLOYEES;
+    this.memoryCache["billing_drafts"] = [];
+    this.memoryCache["billing_cancellation_rules"] = {
+      "Draft": 100,
+      "Work In Progress": 80,
+      "Ready for Delivery": 60,
+      "Ready For Delivery": 60,
+      "Delivered": 0,
+      "Completed": 0
+    };
+  }
+
+  // Reload single table into cache
+  public static async reloadTable(table: string): Promise<void> {
+    if (!supabase) return;
     
-    // Ensure terminal ID is generated if not exists
-    this.getTerminalId();
-    console.log("[SyncEngine] Cache preloaded successfully.");
+    switch (table) {
+      case "company_settings": {
+        const { data, error } = await supabase.from("company_settings").select("*");
+        if (error) throw error;
+        if (data && data.length > 0) {
+          this.memoryCache["billing_company_settings"] = mapCompanySettingsFromDb(data[0]);
+          if (data[0].cancellation_rules) {
+            this.memoryCache["billing_cancellation_rules"] = data[0].cancellation_rules;
+          }
+        } else {
+          this.memoryCache["billing_company_settings"] = DEFAULT_COMPANY_SETTINGS;
+        }
+        break;
+      }
+      case "users": {
+        const { data, error } = await supabase.from("users").select("*");
+        if (error) throw error;
+        this.memoryCache["billing_user_registry"] = data ? data.map(mapUserFromDb) : [];
+        break;
+      }
+      case "products": {
+        const { data, error } = await supabase.from("products").select("*");
+        if (error) throw error;
+        this.memoryCache["billing_products"] = data ? data.map(mapProductFromDb) : [];
+        break;
+      }
+      case "customers": {
+        const { data, error } = await supabase.from("customers").select("*");
+        if (error) throw error;
+        this.memoryCache["billing_customers"] = data ? data.map(mapCustomerFromDb) : [];
+        break;
+      }
+      case "invoices": {
+        const { data, error } = await supabase.from("invoices").select("*");
+        if (error) throw error;
+        this.memoryCache["billing_invoices"] = data ? data.map(mapInvoiceFromDb) : [];
+        break;
+      }
+      case "invoice_items": {
+        const { data, error } = await supabase.from("invoice_items").select("*");
+        if (error) throw error;
+        this.memoryCache["billing_invoice_items"] = data ? data.map(mapInvoiceItemFromDb) : [];
+        break;
+      }
+      case "payment_transactions": {
+        const { data, error } = await supabase.from("payment_transactions").select("*");
+        if (error) throw error;
+        this.memoryCache["billing_payment_transactions"] = data ? data.map(mapPaymentTransactionFromDb) : [];
+        break;
+      }
+      case "agents": {
+        const { data, error } = await supabase.from("agents").select("*");
+        if (error) throw error;
+        this.memoryCache["billing_agents_registry"] = data ? data.map(mapAgentFromDb) : [];
+        break;
+      }
+      case "promo_codes": {
+        const { data, error } = await supabase.from("promo_codes").select("*");
+        if (error) throw error;
+        this.memoryCache["billing_promo_codes"] = data ? data.map(mapPromoCodeFromDb) : [];
+        break;
+      }
+      case "user_activities": {
+        const { data, error } = await supabase.from("user_activities").select("*");
+        if (error) throw error;
+        this.memoryCache["billing_user_activities"] = data ? data.map(mapUserActivityFromDb) : [];
+        break;
+      }
+      case "audit_logs": {
+        const { data, error } = await supabase.from("audit_logs").select("*");
+        if (error) throw error;
+        this.memoryCache["billing_audit_logs"] = data ? data.map(mapAuditLogFromDb) : [];
+        break;
+      }
+      case "employees": {
+        const { data, error } = await supabase.from("employees").select("*");
+        if (error) throw error;
+        this.memoryCache["billing_employees_registry"] = data ? data.map(mapEmployeeFromDb) : [];
+        break;
+      }
+      case "draft_invoices": {
+        const { data, error } = await supabase.from("draft_invoices").select("*");
+        if (error) throw error;
+        this.memoryCache["billing_drafts"] = data ? data.map(mapDraftInvoiceFromDb) : [];
+        break;
+      }
+    }
+  }
+
+  // Subscribe to Postgres database realtime updates
+  public static subscribeToRealtime(): void {
+    if (this.activeSubscription) {
+      this.activeSubscription.unsubscribe();
+      this.activeSubscription = null;
+    }
+    
+    if (!supabase) return;
+    
+    const handleRealtimeChange = async (payload: any) => {
+      const { table } = payload;
+      console.log(`[Realtime Sync] Table "${table}" changed on database. Refreshing cache...`);
+      try {
+        await this.reloadTable(table);
+        // Dispatch UI update trigger
+        this.realtimeListeners.forEach(cb => {
+          try { cb(); } catch (e) {}
+        });
+      } catch (err) {
+        console.warn(`[Realtime Sync] Failed to hot-reload table "${table}":`, err);
+      }
+    };
+
+    this.activeSubscription = supabase
+      .channel("supabase-realtime-sync")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public"
+        },
+        (payload) => {
+          handleRealtimeChange(payload);
+        }
+      )
+      .subscribe((status) => {
+        console.log(`[Realtime Sync] WebSockets subscription connection status: ${status}`);
+      });
   }
 
   private static getStorageItem<T>(key: string, defaultValue: T): T {
@@ -247,23 +906,30 @@ export class SheetsSyncEngine {
 
   private static setStorageItem<T>(key: string, value: T): void {
     this.memoryCache[key] = value;
-    IndexedDBStorage.setItem(key, value).catch(e => {
-      console.warn(`[SyncEngine] Background write failed for key "${key}":`, e);
-    });
   }
 
   // Active Session User tracking
   public static getCurrentUser(): User | null {
-    return this.getStorageItem<User | null>("billing_current_user", null);
+    if (typeof window !== "undefined") {
+      const userStr = localStorage.getItem("billing_current_user");
+      if (userStr) {
+        try {
+          return JSON.parse(userStr);
+        } catch (e) {}
+      }
+    }
+    return null;
   }
 
   public static setCurrentUser(user: User | null): void {
-    this.setStorageItem("billing_current_user", user);
-    if (user) {
-      // Update last active time as well
-      localStorage.setItem("billing_session_last_active", Date.now().toString());
-    } else {
-      localStorage.removeItem("billing_session_last_active");
+    if (typeof window !== "undefined") {
+      if (user) {
+        localStorage.setItem("billing_current_user", JSON.stringify(user));
+        localStorage.setItem("billing_session_last_active", Date.now().toString());
+      } else {
+        localStorage.removeItem("billing_current_user");
+        localStorage.removeItem("billing_session_last_active");
+      }
     }
   }
 
@@ -274,26 +940,18 @@ export class SheetsSyncEngine {
   }
 
   public static saveProducts(products: Product[], isSyncPull = false): void {
-    let merged = products;
-    if (!isSyncPull) {
-      const existingSoftDeleted = this.getProducts().filter(p => p.isSoftDeleted);
-      const activeIds = new Set(products.filter(p => !p.isSoftDeleted).map(p => p.id));
-      merged = [
-        ...products,
-        ...existingSoftDeleted.filter(p => !activeIds.has(p.id))
-      ];
-    }
-    const validated = this.validateAndRepairProductTree(merged);
+    const validated = this.validateAndRepairProductTree(products);
     this.setStorageItem("billing_products", validated);
-    if (!isSyncPull) {
-      validated.forEach(p => {
-        if (p.id) this.trackLocalChange("products", p.id);
+    
+    if (supabase && !isSyncPull) {
+      const dbRows = validated.map(mapProductToDb);
+      supabase.from("products").upsert(dbRows).then(({ error }) => {
+        if (error) console.error("Error upserting products to Supabase:", error);
       });
     }
-    this.queueAutomaticSync();
   }
 
-  // Option Groups persistency helpers
+  // Option Groups persistence
   public static getOptionGroups(): any[] {
     const defaultGroups = [
       { id: "og1", name: "Size", values: ["King", "Queen", "Double", "Single"] },
@@ -311,13 +969,9 @@ export class SheetsSyncEngine {
     this.setStorageItem("POS_FURNITURE_OPTION_GROUPS_V3", groups);
   }
 
-  /**
-   * Ensure uniqueness by ID and return flat products.
-   */
   public static validateAndRepairProductTree(products: Product[]): Product[] {
     if (!products || !Array.isArray(products)) return [];
 
-    // Helper: safely parse a value that may be a JSON-stringified array, defaulting to []
     const parseArrayField = <T>(val: any): T[] => {
       if (!val) return [];
       if (Array.isArray(val)) return val as T[];
@@ -344,7 +998,6 @@ export class SheetsSyncEngine {
         p.inventoryType = "Stock Item";
       }
 
-      // Repair JSON-stringified array fields that come back as strings from Google Sheets
       p.colors = parseArrayField<string>(p.colors);
       p.sizes = parseArrayField<any>(p.sizes);
       p.simpleVariants = parseArrayField<any>(p.simpleVariants);
@@ -360,80 +1013,20 @@ export class SheetsSyncEngine {
     return Array.from(idMap.values());
   }
 
-
-  // Customers registry
+  // Customers Registry
   public static getCustomers(): Customer[] {
-    const custs = this.getStorageItem<Customer[]>("billing_customers", DEFAULT_CUSTOMERS);
-    let modified = false;
-
-    // Parse invoices ONCE at the top to prevent repeated localStorage parsing
-    const allInvs = this.getStorageItem<Invoice[]>("billing_invoices", []);
-    const invalidAddresses = ["Registered POS Transaction", "Unknown", "Default Address", "N/A"];
-
-    // Build a map of mobile -> latest valid invoice address
-    const mobileToAddressMap = new Map<string, string>();
-    allInvs.forEach(inv => {
-      if (inv.mobile) {
-        const cleanMobile = String(inv.mobile).replace(/\D/g, "");
-        const invAddr = inv.customerBusinessAddress || (inv as any).customerAddress || "";
-        if (invAddr && !invalidAddresses.includes(invAddr.trim())) {
-          mobileToAddressMap.set(cleanMobile, invAddr.trim());
-        }
-      }
-    });
-
-    const sanitized = custs.map((c) => {
-      let isChanged = false;
-      const currentAddr = c.address ? c.address.trim() : "";
-
-      if (!currentAddr || invalidAddresses.includes(currentAddr)) {
-        let bestAddress = "Address Not Available";
-
-        // 1. Try address history
-        if (c.addressHistory && c.addressHistory.length > 0) {
-          bestAddress = c.addressHistory[0].address;
-        } else {
-          // 2. Try latest invoice address from the precomputed map (O(1) lookup)
-          const cleanMobile = String(c.mobile).replace(/\D/g, "");
-          const matchedAddr = mobileToAddressMap.get(cleanMobile);
-          if (matchedAddr) {
-            bestAddress = matchedAddr;
-          }
-        }
-
-        c.address = bestAddress;
-        c.currentAddress = bestAddress;
-        isChanged = true;
-      }
-      if (isChanged) modified = true;
-      return c;
-    });
-
-    if (modified) {
-      this.saveCustomers(sanitized);
-
-      // Attempt background push for repaired customers
-      setTimeout(() => {
-        const conn = this.getConnectionSettings();
-        if (conn?.appsScriptUrl) {
-          sanitized.forEach((c) => {
-            this.pushTransaction(conn, "upsertCustomer", c).catch(() => { });
-          });
-        }
-      }, 500);
-    }
-
-    return sanitized;
+    return this.getStorageItem<Customer[]>("billing_customers", DEFAULT_CUSTOMERS);
   }
 
   public static saveCustomers(customers: Customer[], isSyncPull = false): void {
     this.setStorageItem("billing_customers", customers);
-    if (!isSyncPull) {
-      customers.forEach(c => {
-        if (c.id) this.trackLocalChange("customers", c.id);
+    
+    if (supabase && !isSyncPull) {
+      const dbRows = customers.map(mapCustomerToDb);
+      supabase.from("customers").upsert(dbRows).then(({ error }) => {
+        if (error) console.error("Error upserting customers to Supabase:", error);
       });
     }
-    this.queueAutomaticSync();
   }
 
   // Invoice Lookup Handlers
@@ -447,164 +1040,20 @@ export class SheetsSyncEngine {
     return invoices.find((inv) => inv.invoiceNo === invoiceNo);
   }
 
-  // Invoices & Invoice Items (enforce status safety)
+  // Invoices & Invoice Items
   public static getInvoices(): Invoice[] {
-    const invs = this.getStorageItem<Invoice[]>("billing_invoices", DEFAULT_INVOICES);
-    // Backwards compatibility safety wrapper
-    let modified = false;
-    const sanitized = invs.map((inv) => {
-      let isChanged = false;
-      const cleanRaw = inv.status ? String(inv.status).trim() : "";
-      if (!cleanRaw || cleanRaw === "null" || cleanRaw === "undefined" || cleanRaw.toUpperCase() === "N/A" || cleanRaw === "") {
-        inv.status = "Work In Progress";
-        isChanged = true;
-      }
-      if (!inv.createdBy) {
-        inv.createdBy = "admin";
-        inv.createdDate = inv.date || TODAY;
-        inv.createdTime = "12:00 PM";
-        isChanged = true;
-      }
-
-      // CRITICAL GST CLASSIFICATION BUG REPAIR
-      if (inv.invoiceNo && inv.invoiceNo.startsWith("TCF-G-")) {
-        if (inv.invoiceCategory !== "GST") {
-          inv.invoiceCategory = "GST";
-          isChanged = true;
-        }
-        if (inv.gstEnabled !== true) {
-          inv.gstEnabled = true;
-          isChanged = true;
-        }
-        // Fallback for valid GST type
-        if (!inv.gstType || inv.gstType === "No GST" || inv.gstType === "Non-GST") {
-          inv.gstType = "Within State GST";
-          isChanged = true;
-        }
-      } else if (inv.invoiceNo && inv.invoiceNo.startsWith("TCF-") && !inv.invoiceNo.startsWith("TCF-G-")) {
-        if (inv.invoiceCategory !== "NON_GST") {
-          inv.invoiceCategory = "NON_GST";
-          isChanged = true;
-        }
-        if (inv.gstEnabled !== false) {
-          inv.gstEnabled = false;
-          isChanged = true;
-        }
-      } else {
-        // If category is "GST" but gstEnabled is incorrectly absent
-        if (inv.invoiceCategory === "GST") {
-          if (inv.gstEnabled !== true) {
-            inv.gstEnabled = true;
-            isChanged = true;
-          }
-          if (!inv.gstType || inv.gstType === "No GST" || inv.gstType === "Non-GST") {
-            inv.gstType = "Within State GST";
-            isChanged = true;
-          }
-        }
-        if (inv.invoiceCategory === "NON_GST") {
-          if (inv.gstEnabled !== false) {
-            inv.gstEnabled = false;
-            isChanged = true;
-          }
-        }
-      }
-
-      if (isChanged) modified = true;
-      return inv;
-    });
-
-    if (modified) {
-      this.saveInvoices(sanitized, false);
-    }
-    return sanitized;
+    return this.getStorageItem<Invoice[]>("billing_invoices", DEFAULT_INVOICES);
   }
 
-  public static saveInvoices(invoices: Invoice[], isUserAction: boolean = false, isSyncPull: boolean = false): void {
-    const oldInvoices = this.getStorageItem<Invoice[]>("billing_invoices", DEFAULT_INVOICES);
-    const currentUser = this.getCurrentUser();
-    const userDisplayName = currentUser ? `${currentUser.fullName} (@${currentUser.username})` : "System/Sync Engine";
+  public static saveInvoices(invoices: Invoice[], isUserAction: boolean = false, isSyncPull = false): void {
+    this.setStorageItem("billing_invoices", invoices);
 
-    const progressStatuses = [
-      "Work In Progress",
-      "Ready for Delivery",
-      "Ready For Delivery",
-      "Delivered",
-      "Cancelled"
-    ];
-
-    const sanitized = invoices.map((inv) => {
-      // 0. Normalize date fields — Google Sheets may return Date objects or numbers
-      // Convert to YYYY-MM-DD string so all downstream code can call .match() safely
-      const toDateStr = (val: any): string | undefined => {
-        if (!val) return undefined;
-        if (typeof val === 'string') {
-          const s = val.trim();
-          return (s && s !== 'null' && s !== 'undefined') ? s : undefined;
-        }
-        if (val instanceof Date) {
-          const y = val.getFullYear();
-          const m = String(val.getMonth() + 1).padStart(2, '0');
-          const d = String(val.getDate()).padStart(2, '0');
-          return `${y}-${m}-${d}`;
-        }
-        if (typeof val === 'number') {
-          // Excel serial date: days since 1899-12-30
-          const excelEpoch = new Date(1899, 11, 30);
-          const d = new Date(excelEpoch.getTime() + val * 86400000);
-          const y = d.getFullYear();
-          const mo = String(d.getMonth() + 1).padStart(2, '0');
-          const dy = String(d.getDate()).padStart(2, '0');
-          return `${y}-${mo}-${dy}`;
-        }
-        return String(val);
-      };
-      if ((inv as any).date !== undefined) inv.date = toDateStr((inv as any).date) as any;
-      if ((inv as any).createdDate !== undefined) inv.createdDate = toDateStr((inv as any).createdDate) as any;
-
-      // 1. Google Sheets Validation & Status Recovery
-      const cleanRaw = inv.status ? String(inv.status).trim() : "";
-      if (!cleanRaw || cleanRaw === "null" || cleanRaw === "undefined" || cleanRaw.toUpperCase() === "N/A" || cleanRaw === "") {
-        inv.status = "Work In Progress";
-      }
-
-
-      // 2. Auto-completion Protection & Status Transition Validation
-      const oldInv = oldInvoices.find((old) => (inv.invoiceId && old.invoiceId === inv.invoiceId) || old.invoiceNo === inv.invoiceNo);
-      if (oldInv) {
-        const oldStatus = oldInv.status || "Work In Progress";
-        const newStatus = inv.status;
-
-        if (oldStatus !== newStatus) {
-          const isProgressOld = progressStatuses.some(
-            (s) => s.toLowerCase() === String(oldStatus).toLowerCase()
-          );
-
-          // Prevent background process from auto-completing
-          if (isProgressOld && newStatus === "Completed" && !isUserAction) {
-            inv.status = oldStatus;
-          } else {
-            // Record Old Status, New Status, User, Date, Time (automatically handled by addAuditLog)
-            this.addAuditLog(
-              "Invoice Status Changed",
-              userDisplayName,
-              `Invoice ${inv.invoiceNo} | Old status: ${oldStatus}`,
-              `New status: ${inv.status}`
-            );
-          }
-        }
-      }
-      return inv;
-    });
-
-    this.setStorageItem("billing_invoices", sanitized);
-    if (!isSyncPull) {
-      sanitized.forEach(inv => {
-        const key = inv.invoiceNo || inv.invoiceId;
-        if (key) this.trackLocalChange("invoices", key);
+    if (supabase && !isSyncPull) {
+      const dbRows = invoices.map(mapInvoiceToDb);
+      supabase.from("invoices").upsert(dbRows).then(({ error }) => {
+        if (error) console.error("Error upserting invoices to Supabase:", error);
       });
     }
-    this.queueAutomaticSync();
   }
 
   public static getInvoiceItems(): InvoiceItem[] {
@@ -613,13 +1062,13 @@ export class SheetsSyncEngine {
 
   public static saveInvoiceItems(items: InvoiceItem[], isSyncPull = false): void {
     this.setStorageItem("billing_invoice_items", items);
-    if (!isSyncPull) {
-      items.forEach(item => {
-        const key = `${item.invoiceId}|${item.productId}|${item.variant}`;
-        this.trackLocalChange("invoiceItems", key);
+
+    if (supabase && !isSyncPull) {
+      const dbRows = items.map(mapInvoiceItemToDb);
+      supabase.from("invoice_items").upsert(dbRows).then(({ error }) => {
+        if (error) console.error("Error upserting invoice items to Supabase:", error);
       });
     }
-    this.queueAutomaticSync();
   }
 
   public static getPaymentTransactions(): PaymentTransaction[] {
@@ -628,69 +1077,88 @@ export class SheetsSyncEngine {
 
   public static savePaymentTransactions(txns: PaymentTransaction[], isSyncPull = false): void {
     this.setStorageItem("billing_payment_transactions", txns);
-    if (!isSyncPull) {
-      txns.forEach(t => {
-        if (t.id) this.trackLocalChange("paymentTransactions", t.id);
+
+    if (supabase && !isSyncPull) {
+      const dbRows = txns.map(mapPaymentTransactionToDb);
+      supabase.from("payment_transactions").upsert(dbRows).then(({ error }) => {
+        if (error) console.error("Error upserting payment transactions to Supabase:", error);
       });
     }
-    this.queueAutomaticSync();
   }
 
-  // Connections and configuration
+  // Connections and Configuration
   public static getConnectionSettings(): ConnectionSettings {
-    const settings = this.getStorageItem<ConnectionSettings>("billing_conn_settings", DEFAULT_CONNECTION_SETTINGS);
+    const defaultSettings: ConnectionSettings = {
+      supabaseUrl: "",
+      supabaseAnonKey: "",
+      isConnected: false,
+      lastSyncTime: "",
+      // Keep legacy properties matching interface to prevent compile errors
+      spreadsheetId: "",
+      spreadsheetName: "",
+      appsScriptUrl: "",
+      apiKey: "",
+      productsSheetName: "",
+      customersSheetName: "",
+      invoicesSheetName: "",
+      invoiceItemsSheetName: "",
+      settingsSheetName: "",
+      agentsSheetName: ""
+    };
     
-    // FORCE global hardcoded values if in auto mode to overwrite any stale cached data across devices
-    if (!settings.connectionMode || settings.connectionMode === "auto") {
-      settings.appsScriptUrl = HARDCODED_APPS_SCRIPT_URL;
-      settings.spreadsheetId = HARDCODED_SPREADSHEET_ID;
+    if (typeof window !== "undefined") {
+      const url = localStorage.getItem("VITE_SUPABASE_URL") || "";
+      const key = localStorage.getItem("VITE_SUPABASE_ANON_KEY") || "";
+      const isConnected = !!(url && key);
+      return {
+        supabaseUrl: url,
+        supabaseAnonKey: key,
+        isConnected,
+        lastSyncTime: localStorage.getItem("billing_last_sync_time") || "",
+        // Legacy stubs
+        spreadsheetId: "",
+        spreadsheetName: isConnected ? "Supabase Database" : "Not Connected",
+        appsScriptUrl: "",
+        apiKey: "",
+        productsSheetName: "products",
+        customersSheetName: "customers",
+        invoicesSheetName: "invoices",
+        invoiceItemsSheetName: "invoice_items",
+        settingsSheetName: "company_settings",
+        agentsSheetName: "agents"
+      };
     }
-
-    if (!settings.productsSheetName) settings.productsSheetName = "Products";
-    if (!settings.customersSheetName) settings.customersSheetName = "Customers";
-    if (!settings.invoicesSheetName) settings.invoicesSheetName = "Invoices";
-    if (!settings.invoiceItemsSheetName) settings.invoiceItemsSheetName = "InvoiceItems";
-    if (!settings.settingsSheetName) settings.settingsSheetName = "Settings";
-    if (!settings.agentsSheetName) settings.agentsSheetName = "Agents";
-    if (!settings.paymentTransactionsSheetName) settings.paymentTransactionsSheetName = "PaymentTransactions";
-    return settings;
+    return defaultSettings;
   }
 
   public static saveConnectionSettings(settings: ConnectionSettings): void {
-    this.setStorageItem("billing_conn_settings", settings);
-    this.syncGlobalDbConfig(settings);
-  }
-
-  private static syncGlobalDbConfig(settings: ConnectionSettings): void {
-    fetch("/api/config/db", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(settings)
-    }).catch(err => {
-      console.warn("Failed to sync global DB config to server", err);
-    });
+    if (typeof window !== "undefined") {
+      localStorage.setItem("VITE_SUPABASE_URL", settings.supabaseUrl);
+      localStorage.setItem("VITE_SUPABASE_ANON_KEY", settings.supabaseAnonKey);
+      localStorage.setItem("billing_last_sync_time", new Date().toLocaleTimeString());
+      
+      const newClient = updateSupabaseClient(settings.supabaseUrl, settings.supabaseAnonKey);
+      if (newClient) {
+        this.preloadCache();
+      }
+    }
   }
 
   public static getCompanySettings(): CompanySettings {
-    const settings = this.getStorageItem<CompanySettings>("billing_company_settings", DEFAULT_COMPANY_SETTINGS);
-    if (!settings.defaultPrintFormat) settings.defaultPrintFormat = "Receipt";
-    if (!settings.defaultDownloadFormat) settings.defaultDownloadFormat = "A4";
-    if (settings.useLogoWatermark === undefined) settings.useLogoWatermark = true;
-    if (settings.companyState === undefined) settings.companyState = "Andhra Pradesh";
-    if (settings.companyStateCode === undefined) settings.companyStateCode = "37";
-    if (settings.cgstPercentage === undefined) settings.cgstPercentage = 9;
-    if (settings.sgstPercentage === undefined) settings.sgstPercentage = 9;
-    if (settings.igstPercentage === undefined) settings.igstPercentage = 18;
-    if (settings.gstEnabledByDefault === undefined) settings.gstEnabledByDefault = false;
-    return settings;
+    return this.getStorageItem<CompanySettings>("billing_company_settings", DEFAULT_COMPANY_SETTINGS);
   }
 
-  public static saveCompanySettings(settings: CompanySettings, isSyncPull: boolean = false): void {
+  public static saveCompanySettings(settings: CompanySettings, isSyncPull = false): void {
     this.setStorageItem("billing_company_settings", settings);
-    if (!isSyncPull) {
-      this.trackLocalChange("settings", "SETTINGS_ROW");
+
+    if (supabase && !isSyncPull) {
+      const dbRow = mapCompanySettingsToDb(settings);
+      // Attach cancellation rules
+      (dbRow as any).cancellation_rules = this.getCancellationRules();
+      supabase.from("company_settings").upsert(dbRow).then(({ error }) => {
+        if (error) console.error("Error upserting company settings to Supabase:", error);
+      });
     }
-    this.queueAutomaticSync();
   }
 
   // Draft Invoices
@@ -711,79 +1179,92 @@ export class SheetsSyncEngine {
       drafts.push(draft);
     }
     this.saveDrafts(drafts);
+
+    if (supabase) {
+      const dbRow = mapDraftInvoiceToDb(draft);
+      supabase.from("draft_invoices").upsert(dbRow).then(({ error }) => {
+        if (error) console.error("Error upserting draft invoice to Supabase:", error);
+      });
+    }
   }
 
   public static deleteDraft(id: string): void {
     let drafts = this.getDrafts();
     drafts = drafts.filter(d => d.id !== id);
     this.saveDrafts(drafts);
+
+    if (supabase) {
+      supabase.from("draft_invoices").delete().eq("id", id).then(({ error }) => {
+        if (error) console.error("Error deleting draft invoice from Supabase:", error);
+      });
+    }
   }
 
-  // RBAC User Management Table
+  // Users registry
   public static getUsers(): User[] {
-    const users = this.getStorageItem<User[]>("billing_user_registry", DEFAULT_USERS);
-    // Migration check: If an old plaintext password exists, reset to the new MD5 defaults
-    if (users.some(u => u.passwordHash === "admin123" || u.passwordHash === "manager123")) {
-      this.setStorageItem("billing_user_registry", DEFAULT_USERS);
-      return DEFAULT_USERS;
-    }
-    return users;
+    return this.getStorageItem<User[]>("billing_user_registry", DEFAULT_USERS);
   }
 
   public static saveUsers(users: User[]): void {
     this.setStorageItem("billing_user_registry", users);
-    this.queueAutomaticSync();
+    
+    if (supabase) {
+      const dbRows = users.map(mapUserToDb);
+      supabase.from("users").upsert(dbRows).then(({ error }) => {
+        if (error) console.error("Error upserting users to Supabase:", error);
+      });
+    }
   }
 
-  // Dedicated Employees Registry
+  // Employees registry
   public static getEmployees(): Employee[] {
     return this.getStorageItem<Employee[]>("billing_employees_registry", DEFAULT_EMPLOYEES);
   }
 
   public static saveEmployees(employees: Employee[]): void {
     this.setStorageItem("billing_employees_registry", employees);
-    this.queueAutomaticSync();
+
+    if (supabase) {
+      const dbRows = employees.map(mapEmployeeToDb);
+      supabase.from("employees").upsert(dbRows).then(({ error }) => {
+        if (error) console.error("Error upserting employees to Supabase:", error);
+      });
+    }
   }
 
-  // Dedicated Referral & Internal Agents Registry
+  // Agents registry
   public static getAgents(): Agent[] {
     return this.getStorageItem<Agent[]>("billing_agents_registry", DEFAULT_AGENTS);
   }
 
   public static saveAgents(agents: Agent[], isSyncPull = false): void {
-    let merged = agents;
-    if (!isSyncPull) {
-      const existingSoftDeleted = this.getAgents().filter(a => a.isSoftDeleted);
-      const activeIds = new Set(agents.filter(a => !a.isSoftDeleted).map(a => a.id));
-      merged = [
-        ...agents,
-        ...existingSoftDeleted.filter(a => !activeIds.has(a.id))
-      ];
+    this.setStorageItem("billing_agents_registry", agents);
+
+    if (supabase && !isSyncPull) {
+      const dbRows = agents.map(mapAgentToDb);
+      supabase.from("agents").upsert(dbRows).then(({ error }) => {
+        if (error) console.error("Error upserting agents to Supabase:", error);
+      });
     }
-    this.setStorageItem("billing_agents_registry", merged);
-    this.queueAutomaticSync();
   }
 
-  // Promo Codes Module
+  // Promo Codes module
   public static getPromoCodes(): PromoCode[] {
     return this.getStorageItem<PromoCode[]>("billing_promo_codes", DEFAULT_PROMO_CODES);
   }
 
   public static savePromoCodes(promos: PromoCode[], isSyncPull = false): void {
-    let merged = promos;
-    if (!isSyncPull) {
-      const existingSoftDeleted = this.getPromoCodes().filter(p => p.isSoftDeleted);
-      const activeCodes = new Set(promos.filter(p => !p.isSoftDeleted).map(p => p.promoCode));
-      merged = [
-        ...promos,
-        ...existingSoftDeleted.filter(p => !activeCodes.has(p.promoCode))
-      ];
+    this.setStorageItem("billing_promo_codes", promos);
+
+    if (supabase && !isSyncPull) {
+      const dbRows = promos.map(mapPromoCodeToDb);
+      supabase.from("promo_codes").upsert(dbRows).then(({ error }) => {
+        if (error) console.error("Error upserting promo codes to Supabase:", error);
+      });
     }
-    this.setStorageItem("billing_promo_codes", merged);
-    this.queueAutomaticSync();
   }
 
-  // Cancellation Rules/Settings
+  // Cancellation Rules
   public static getCancellationRules(): { [status: string]: number } {
     const defaultRules = {
       "Draft": 100,
@@ -798,17 +1279,20 @@ export class SheetsSyncEngine {
 
   public static saveCancellationRules(rules: { [status: string]: number }): void {
     this.setStorageItem("billing_cancellation_rules", rules);
-    this.queueAutomaticSync();
+    if (supabase) {
+      supabase.from("company_settings").update({ cancellation_rules: rules }).eq("id", "SETTINGS_ROW").then(({ error }) => {
+        if (error) console.error("Error updating cancellation rules in Supabase:", error);
+      });
+    }
   }
 
-  // Audit Logs (Internal activity trails)
+  // Audit Logs
   public static getAuditLogs(): AuditLog[] {
     return this.getStorageItem<AuditLog[]>("billing_audit_logs", DEFAULT_AUDIT_LOGS);
   }
 
   public static saveAuditLogs(logs: AuditLog[]): void {
     this.setStorageItem("billing_audit_logs", logs);
-    this.queueAutomaticSync();
   }
 
   public static addAuditLog(actionType: string, userName: string, previousValue: string, newValue: string): void {
@@ -823,28 +1307,31 @@ export class SheetsSyncEngine {
       previousValue,
       newValue
     };
-    logs.unshift(newLog); // Push to top
-    this.saveAuditLogs(logs);
+    logs.unshift(newLog);
+    this.memoryCache["billing_audit_logs"] = logs;
+    
+    if (supabase) {
+      supabase.from("audit_logs").insert(mapAuditLogToDb(newLog)).then(({ error }) => {
+        if (error) console.error("Error inserting audit log to Supabase:", error);
+      });
+    }
   }
 
-  // User Sessions Activity logs
+  // User Sessions Activity
   public static getUserActivities(): UserActivity[] {
     return this.getStorageItem<UserActivity[]>("billing_user_activities", DEFAULT_ACTIVITIES);
   }
 
   public static saveUserActivities(activities: UserActivity[]): void {
     this.setStorageItem("billing_user_activities", activities);
-    this.queueAutomaticSync();
   }
 
-  // Log a new activity start
   public static recordLoginActivity(username: string): string {
     const list = this.getUserActivities();
     const actId = `ACT-${Date.now()}`;
     const now = new Date();
     const loginTime = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-    // Parse device/browser
     const userAgent = navigator.userAgent;
     let browser = "Web Browser";
     if (userAgent.indexOf("Chrome") > -1) browser = "Chrome";
@@ -869,11 +1356,17 @@ export class SheetsSyncEngine {
     };
 
     list.unshift(newActivity);
-    this.saveUserActivities(list);
+    this.memoryCache["billing_user_activities"] = list;
+    
+    if (supabase) {
+      supabase.from("user_activities").insert(mapUserActivityToDb(newActivity)).then(({ error }) => {
+        if (error) console.error("Error inserting login activity to Supabase:", error);
+      });
+    }
+    
     return actId;
   }
 
-  // Complete/Update a login activity on logout
   public static recordLogoutActivity(activityId: string): void {
     const list = this.getUserActivities();
     const idx = list.findIndex(a => a.id === activityId);
@@ -883,20 +1376,24 @@ export class SheetsSyncEngine {
       const logoutTime = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       act.logoutTime = logoutTime;
 
-      // Calculate simple duration from start time or elapsed sessions
       const loginDateToken = new Date(`${act.loginDate} ${act.loginTime}`);
       const secondsDiff = Math.max(60, Math.floor((now.getTime() - loginDateToken.getTime()) / 1000));
       act.activeSeconds = secondsDiff;
 
       const hrs = Math.floor(secondsDiff / 3600);
       const mins = Math.floor((secondsDiff % 3600) / 60);
-      act.sessionDuration = `${hrs.toString().padStart(2, '0')}h ${mins.toString().padStart(2, '0')}m`;
+      act.sessionDuration = `${act.activeSeconds >= 3600 ? hrs + 'h ' : ''}${mins}m`;
       list[idx] = act;
-      this.saveUserActivities(list);
+      this.memoryCache["billing_user_activities"] = list;
+
+      if (supabase) {
+        supabase.from("user_activities").update(mapUserActivityToDb(act)).eq("id", activityId).then(({ error }) => {
+          if (error) console.error("Error updating logout activity in Supabase:", error);
+        });
+      }
     }
   }
 
-  // Gracefully log session exit, marking session logs complete
   public static logSessionExit(username: string): void {
     const list = this.getUserActivities();
     const activeAct = list.find(a => a.username === username && !a.logoutTime);
@@ -906,17 +1403,15 @@ export class SheetsSyncEngine {
     this.setCurrentUser(null);
   }
 
-  // Calculate stats, with new status parameters
+  // Dashboard Stats
   public static calculateStats(): DashboardStats {
     const currentUser = this.getCurrentUser();
     const userRole = currentUser?.role || "Employee";
     const userFullName = currentUser?.fullName || "";
     const username = currentUser?.username || "";
 
-    // Standard getters (excludes soft deleted invoices)
     let invoices = this.getInvoices().filter(inv => !inv.isSoftDeleted && inv.status !== "Deleted");
 
-    // Employee-level data separation inside backend/data layer
     if (userRole === "Employee") {
       invoices = invoices.filter(
         inv =>
@@ -934,34 +1429,24 @@ export class SheetsSyncEngine {
     }
 
     const products = this.getProducts();
-
     const todayStr = getTodayStr();
 
-    // Today's Sales (Only count non-cancelled, non-draft, non-deleted invoices)
     const validInvoices = invoices.filter(inv => inv.status !== "Cancelled" && inv.status !== "Draft");
     const todayInvoices = validInvoices.filter((inv) => getInvoiceDateStr(inv.date) === todayStr);
-
-    // Weekly Sales
     const weeklyInvoices = validInvoices.filter((inv) => isDateInCurrentWeek(inv.date));
 
     let weeklySales = 0;
-
-    // Restrict financial data to Admins
     let todaySales = 0;
     if (userRole === "Admin") {
       todaySales = todayInvoices.reduce((sum, inv) => sum + inv.grandTotal, 0);
       weeklySales = weeklyInvoices.reduce((sum, inv) => sum + inv.grandTotal, 0);
     }
 
-    // Filter statuses for indicators
     const wipBillsCount = invoices.filter(i => i.status === "Work In Progress").length;
     const readyBillsCount = invoices.filter(i => i.status === "Ready for Delivery").length;
     const completedBillsCount = invoices.filter(i => i.status === "Completed").length;
-
-    // Deliveries pending: Status is "Delivered" or "Ready for Delivery" that is not closed/complete
     const pendingDeliveriesCount = invoices.filter(i => i.status === "Ready for Delivery" || i.status === "Delivered").length;
 
-    // Top Selling products calculation
     const prodSalesMap: { [name: string]: { qty: number; revenue: number } } = {};
     const invoiceStatusMap = new Map<string, string>();
     invoices.forEach(inv => {
@@ -990,13 +1475,14 @@ export class SheetsSyncEngine {
       .sort((a, b) => b.revenue - a.revenue)
       .slice(0, 5);
 
-    // Monthly summary calculation
     let monthlySales: { month: string; sales: number }[] = [];
     if (userRole === "Admin") {
       const monthlyMap: { [m: string]: number } = {};
       validInvoices.forEach((inv) => {
-        const month = inv.date.substring(0, 7);
-        monthlyMap[month] = (monthlyMap[month] || 0) + inv.grandTotal;
+        if (inv.date) {
+          const month = inv.date.substring(0, 7);
+          monthlyMap[month] = (monthlyMap[month] || 0) + inv.grandTotal;
+        }
       });
 
       const monthsSorted = Object.keys(monthlyMap).sort();
@@ -1024,7 +1510,7 @@ export class SheetsSyncEngine {
     }
 
     return {
-      todaySales: todaySales,
+      todaySales,
       todayInvoicesCount: todayInvoices.length,
       weeklySales,
       weeklyInvoicesCount: weeklyInvoices.length,
@@ -1033,8 +1519,6 @@ export class SheetsSyncEngine {
       recentInvoices: invoices.slice(0, 5),
       topProducts: topProducts.length > 0 ? topProducts : [{ name: "No products sold", salesCount: 0, revenue: 0 }],
       monthlySales: monthlySales.length > 0 ? monthlySales : [{ month: "Jun 26", sales: 0 }],
-
-      // New counts
       wipBillsCount,
       readyBillsCount,
       completedBillsCount,
@@ -1045,900 +1529,241 @@ export class SheetsSyncEngine {
     };
   }
 
-  // Restore defaults
+  // Reset to Demo Defaults
   public static resetToDemoDefaults(): void {
-    this.isSyncingDown = true;
-    try {
-      this.saveProducts(DEFAULT_PRODUCTS);
-      this.saveCustomers(DEFAULT_CUSTOMERS);
-      this.saveInvoices(DEFAULT_INVOICES);
-      this.saveInvoiceItems(DEFAULT_INVOICE_ITEMS);
-      this.saveCompanySettings(DEFAULT_COMPANY_SETTINGS);
-      this.saveUsers(DEFAULT_USERS);
-      this.saveEmployees(DEFAULT_EMPLOYEES);
-      this.saveAgents(DEFAULT_AGENTS);
-      this.savePromoCodes(DEFAULT_PROMO_CODES);
-      this.saveCancellationRules({
-        "Draft": 100,
-        "Work In Progress": 80,
-        "Ready for Delivery": 60,
-        "Ready For Delivery": 60,
-        "Delivered": 0,
-        "Completed": 0
-      });
-      this.saveAuditLogs(DEFAULT_AUDIT_LOGS);
-      this.saveUserActivities(DEFAULT_ACTIVITIES);
-
-      const conn = this.getConnectionSettings();
-      conn.isConnected = false;
-      this.saveConnectionSettings(conn);
-      this.hasSyncedDownThisSession = false;
-    } finally {
-      this.isSyncingDown = false;
-    }
+    if (!supabase) return;
+    this.updateSyncStatus("syncing");
+    
+    // Perform deletions of everything in Supabase
+    Promise.all([
+      supabase.from("products").delete().neq("id", "root"),
+      supabase.from("customers").delete().neq("id", "root"),
+      supabase.from("invoices").delete().neq("invoice_id", "root"),
+      supabase.from("payment_transactions").delete().neq("id", "root"),
+      supabase.from("agents").delete().neq("id", "root"),
+      supabase.from("promo_codes").delete().neq("promo_code", "root"),
+      supabase.from("audit_logs").delete().neq("id", "root"),
+      supabase.from("user_activities").delete().neq("id", "root"),
+      supabase.from("draft_invoices").delete().neq("id", "root"),
+      supabase.from("employees").delete().neq("id", "root")
+    ]).then(() => {
+      this.loadDefaultsIntoCache();
+      this.updateSyncStatus("success");
+    }).catch(err => {
+      console.error("[SyncEngine] Failed to reset data:", err);
+      this.updateSyncStatus("error", err.message || "Failed to reset");
+    });
   }
 
-  // Clear all local database records (leaves settings intact)
+  // Clear all database records
   public static clearLocalData(): void {
-    this.isSyncingDown = true;
-    try {
-      this.saveProducts([]);
-      this.saveCustomers([]);
-      this.saveInvoices([]);
-      this.saveInvoiceItems([]);
-      this.saveAgents([]);
-      this.savePaymentTransactions([]);
-      this.savePromoCodes([]);
-      this.saveAuditLogs([]);
-      this.saveUserActivities([]);
-      this.hasSyncedDownThisSession = false;
-    } finally {
-      this.isSyncingDown = false;
-    }
+    this.resetToDemoDefaults();
   }
 
-  private static isRateLimitError(e: any): boolean {
-    if (!e) return false;
-    const errString = typeof e === "string" ? e : (e.message || JSON.stringify(e)).toLowerCase();
-    return (
-      errString.includes("rate") ||
-      errString.includes("exceeded") ||
-      errString.includes("limit") ||
-      errString.includes("quota") ||
-      errString.includes("429") ||
-      errString.includes("too many requests")
-    );
-  }
-
-  // ============================================
-  // GOOGLE APPS SCRIPT WEB APP API CALLS
-  // ============================================
-
+  // Test Supabase credentials connection (re-uses Apps Script function name to prevent compile errors in SettingsTab)
   public static async testAppsScriptConnection(
     url: string,
-    spreadsheetId: string,
-    customMapping: Partial<ConnectionSettings>
+    key: string,
+    customMapping?: any
   ): Promise<{ success: boolean; message: string; sheetsFound?: { [key: string]: boolean }; spreadsheetName?: string }> {
     try {
-      const payload = {
-        action: "SYNC_DOWN",
-        spreadsheetId: spreadsheetId
-      };
-
-      const response = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify(payload)
-      });
-
-      if (!response.ok) return { success: false, message: "HTTP " + response.status };
-      const resText = await response.text();
-      const result = JSON.parse(resText);
-
-      if (result.success) {
-        return { success: true, message: "Connected successfully!", spreadsheetName: "Google Sheet Database" };
-      } else {
-        return { success: false, message: result.error || "Unknown Apps Script Error" };
-      }
-    } catch (e: any) {
-      return { success: false, message: e.message || "Failed to reach Apps Script URL." };
-    }
-  }
-
-  public static async initializeDatabaseViaAppsScript(
-    url: string,
-    companyName: string,
-    spreadsheetId?: string
-  ): Promise<{ success: boolean; spreadsheetId?: string; spreadsheetName?: string; message: string }> {
-    try {
-      const payload = {
-        action: "initializeDatabase",
-        companyName,
-        spreadsheetId,
-      };
-
-      const response = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify(payload),
-        redirect: "follow",
-      });
-
-      if (!response.ok) {
-        throw new Error(`Server status: ${response.status}`);
-      }
-
-      const result = await response.json();
-      return result;
-    } catch (e: any) {
-      console.error("Spreadsheet Auto-Generation Error:", e);
-      const isRate = this.isRateLimitError(e);
-      const friendlyMsg = isRate
-        ? "⚠️ Google Sheets API capacity limit hit. System has cached configuration. All operations will succeed offline."
-        : `Failed to automate sheet creation. Details: ${e.message || e}`;
-      return {
-        success: false,
-        message: friendlyMsg,
-      };
-    }
-  }
-
-  public static async updateDatabaseSchemaViaAppsScript(
-    url: string,
-    spreadsheetId: string
-  ): Promise<{ success: boolean; message: string }> {
-    try {
-      const payload = {
-        action: "updateDatabaseSchema",
-        spreadsheetId,
-      };
-
-      const response = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify(payload),
-        redirect: "follow",
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const result = await response.json();
-      return result;
-    } catch (e: any) {
-      console.error("Update schema error:", e);
-      return {
-        success: false,
-        message: `Network Connection Failed. Ensure Apps Script is running correctly. Error: ${e.message || e}`,
-      };
-    }
-  }
-
-  public static async syncDownFromSheets(conn?: ConnectionSettings): Promise<{ success: boolean; message: string }> {
-    this.isSyncingDown = true;
-    this.updateSyncStatus("syncing");
-    try {
-      const activeConn = conn || this.getConnectionSettings();
-      if (!activeConn.appsScriptUrl) {
-        return { success: false, message: "No Apps Script URL configured." };
-      }
-
-      const payload = {
-        action: "SYNC_DOWN",
-        spreadsheetId: activeConn.spreadsheetId,
-        sheetsMapping: {
-          products: activeConn.productsSheetName,
-          customers: activeConn.customersSheetName,
-          invoices: activeConn.invoicesSheetName,
-          invoiceItems: activeConn.invoiceItemsSheetName,
-          settings: activeConn.settingsSheetName,
-          agents: activeConn.agentsSheetName,
-          paymentTransactions: activeConn.paymentTransactionsSheetName || "PaymentTransactions",
-        }
-      };
-
-      const response = await fetch(activeConn.appsScriptUrl, {
-        method: "POST",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Sync pull failure: ${response.status}`);
-      }
-
-      const resText = await response.text();
-      const result = JSON.parse(resText);
+      const tempClient = createClient(url.trim(), key.trim());
+      // Test select setting table count
+      const { error } = await tempClient.from("company_settings").select("id").limit(1);
       
-      if (result.success) {
-        // Resolve keys based on mapped sheet names (with lowercase fallback)
-        const payloadData = result.payload || result;
-        const prodKey = activeConn.productsSheetName || "Products";
-        const custKey = activeConn.customersSheetName || "Customers";
-        const invKey = activeConn.invoicesSheetName || "Invoices";
-        const invItemsKey = activeConn.invoiceItemsSheetName || "InvoiceItems";
-        const agentKey = activeConn.agentsSheetName || "Agents";
-        const settingsKey = activeConn.settingsSheetName || "Settings";
-
-        const productsList = payloadData[prodKey] || payloadData["products"];
-        const customersList = payloadData[custKey] || payloadData["customers"];
-        const invoicesList = payloadData[invKey] || payloadData["invoices"];
-        const invoiceItemsList = payloadData[invItemsKey] || payloadData["invoiceItems"];
-        const agentsList = payloadData[agentKey] || payloadData["agents"];
-        const settingsList = payloadData[settingsKey] || payloadData["settings"];
-        const paymentTransactionsList = payloadData["PaymentTransactions"] || payloadData["paymentTransactions"];
-        const usersList = payloadData["Users"] || payloadData["users"];
-        const promoCodesList = payloadData["PromoCodes"] || payloadData["promoCodes"];
-        const userActivityList = payloadData["UserActivity"] || payloadData["userActivity"] || payloadData["userActivities"];
-        const auditLogList = payloadData["AuditLog"] || payloadData["auditLog"] || payloadData["auditLogs"];
-
-        // 1. Merge Products
-        if (productsList) {
-          const localProducts = this.getProducts();
-          const dbProductsList = Array.isArray(productsList) ? productsList : [];
-          
-          const mergedProducts = dbProductsList.map((p: Product) => {
-            if (this.isLocalChangeDirty("products", p.id)) {
-              const matchedLocal = localProducts.find(lp => lp.id === p.id);
-              return matchedLocal ? matchedLocal : p;
-            }
-            return p;
-          });
-
-          const mergedIds = new Set<string>(mergedProducts.map((p: any) => p.id));
-          localProducts.forEach(lp => {
-            if (!mergedIds.has(lp.id)) {
-              mergedProducts.push(lp);
-            }
-          });
-          this.saveProducts(mergedProducts, true);
+      if (error) {
+        if (error.code === "P0001" || error.message.includes("relation") || error.code === "42P01") {
+          // Relational error means credential is correct but tables are not created/initialized yet
+          return {
+            success: true,
+            message: "Credentials valid! Please run the SQL schema creation script.",
+            spreadsheetName: "Supabase Database (Schema Needed)"
+          };
         }
-
-        // 2. Merge Customers
-        if (customersList) {
-          const localCustomers = this.getCustomers();
-          const dbCustomersList = Array.isArray(customersList) ? customersList : [];
-
-          const mergedCustomers = dbCustomersList.map((c: Customer) => {
-            if (this.isLocalChangeDirty("customers", c.id)) {
-              const matchedLocal = localCustomers.find(lc => lc.id === c.id);
-              return matchedLocal ? matchedLocal : c;
-            }
-            return c;
-          });
-
-          const mergedIds = new Set<string>(mergedCustomers.map((c: any) => c.id));
-          localCustomers.forEach(lc => {
-            if (!mergedIds.has(lc.id)) {
-              mergedCustomers.push(lc);
-            }
-          });
-          this.saveCustomers(mergedCustomers, true);
-        }
-
-        // 3. Merge Invoices
-        if (invoicesList) {
-          const localInvoices = this.getInvoices();
-          const dbInvoicesList = Array.isArray(invoicesList) ? invoicesList : [];
-
-          const mergedInvoices = dbInvoicesList.map((inv: Invoice) => {
-            const invKey = inv.invoiceNo || inv.invoiceId;
-            if (invKey && this.isLocalChangeDirty("invoices", invKey)) {
-              const matchedLocal = localInvoices.find(li => (li.invoiceNo === inv.invoiceNo) || (li.invoiceId === inv.invoiceId));
-              return matchedLocal ? matchedLocal : inv;
-            }
-            return inv;
-          });
-
-          const mergedKeys = new Set<string>();
-          mergedInvoices.forEach((inv: any) => {
-            if (inv.invoiceNo) mergedKeys.add(inv.invoiceNo);
-            if (inv.invoiceId) mergedKeys.add(inv.invoiceId);
-          });
-
-          localInvoices.forEach(li => {
-            const hasNo = li.invoiceNo && mergedKeys.has(li.invoiceNo);
-            const hasId = li.invoiceId && mergedKeys.has(li.invoiceId);
-            if (!hasNo && !hasId) {
-              mergedInvoices.push(li);
-            }
-          });
-          this.saveInvoices(mergedInvoices, false, true);
-        }
-
-        // 4. Merge Invoice Items
-        if (invoiceItemsList) {
-          const localItems = this.getInvoiceItems();
-          const dbItemsList = Array.isArray(invoiceItemsList) ? invoiceItemsList : [];
-
-          const getCompoundKey = (item: InvoiceItem) => `${item.invoiceId}|${item.productId}|${item.variant}`;
-
-          const mergedItems = dbItemsList.map((item: InvoiceItem) => {
-            const key = getCompoundKey(item);
-            if (this.isLocalChangeDirty("invoiceItems", key)) {
-              const matchedLocal = localItems.find(li => getCompoundKey(li) === key);
-              return matchedLocal ? matchedLocal : item;
-            }
-            return item;
-          });
-
-          const mergedKeys = new Set<string>(mergedItems.map(getCompoundKey));
-          localItems.forEach(li => {
-            const key = getCompoundKey(li);
-            if (!mergedKeys.has(key)) {
-              mergedItems.push(li);
-            }
-          });
-          this.saveInvoiceItems(mergedItems, true);
-        }
-
-        // 5. Merge Agents
-        if (agentsList) {
-          const localAgents = this.getAgents();
-          const dbAgentsList = Array.isArray(agentsList) ? agentsList : [];
-
-          const mergedAgents = dbAgentsList.map((a: Agent) => {
-            if (this.isLocalChangeDirty("agents", a.id)) {
-              const matchedLocal = localAgents.find(la => la.id === a.id);
-              return matchedLocal ? matchedLocal : a;
-            }
-            return a;
-          });
-
-          const mergedIds = new Set<string>(mergedAgents.map((a: any) => a.id));
-          localAgents.forEach(la => {
-            if (!mergedIds.has(la.id)) {
-              mergedAgents.push(la);
-            }
-          });
-          this.saveAgents(mergedAgents, true);
-        }
-
-        // 6. Merge Payment Transactions
-        if (paymentTransactionsList) {
-          const localTxns = this.getPaymentTransactions();
-          const dbTxnsList = Array.isArray(paymentTransactionsList) ? paymentTransactionsList : [];
-
-          const mergedTxns = dbTxnsList.map((t: PaymentTransaction) => {
-            if (this.isLocalChangeDirty("paymentTransactions", t.id)) {
-              const matchedLocal = localTxns.find(lt => lt.id === t.id);
-              return matchedLocal ? matchedLocal : t;
-            }
-            return t;
-          });
-
-          const mergedIds = new Set<string>(mergedTxns.map((t: any) => t.id));
-          localTxns.forEach(lt => {
-            if (!mergedIds.has(lt.id)) {
-              mergedTxns.push(lt);
-            }
-          });
-          this.savePaymentTransactions(mergedTxns, true);
-        }
-
-        if (usersList && Array.isArray(usersList) && usersList.length > 0) this.saveUsers(usersList);
-        if (promoCodesList && Array.isArray(promoCodesList)) this.savePromoCodes(promoCodesList, true);
-        if (userActivityList && Array.isArray(userActivityList)) this.saveUserActivities(userActivityList);
-        if (auditLogList && Array.isArray(auditLogList)) this.saveAuditLogs(auditLogList);
-
-        // Calculate the highest remote sequence number from downloaded invoices
-        let maxRemoteSequence = 0;
-        if (invoicesList && Array.isArray(invoicesList)) {
-          invoicesList.forEach((inv: any) => {
-            if (inv.invoiceNo) {
-              const match = String(inv.invoiceNo).match(/(\d+)(?:-[A-Za-z][A-Za-z0-9]*)?$/);
-              if (match) {
-                const seq = parseInt(match[1]);
-                if (seq > maxRemoteSequence) {
-                  maxRemoteSequence = seq;
-                }
-              }
-            }
-          });
-        }
-
-        if (settingsList) {
-          const companySettings = this.getCompanySettings();
-          let name = companySettings.companyName;
-          let shortName = companySettings.shortName;
-          let addr = companySettings.address;
-          let phone = companySettings.phone;
-          let email = companySettings.email;
-          let gst = companySettings.gstNumber;
-          let website = companySettings.website;
-          let invoiceFooter = companySettings.invoiceFooter;
-          let prefix = companySettings.invoicePrefix;
-          let nextInvNum = companySettings.nextInvoiceNumber;
-          let defaultPrintFormat = companySettings.defaultPrintFormat;
-          let defaultDownloadFormat = companySettings.defaultDownloadFormat;
-          let useLogoWatermark = companySettings.useLogoWatermark;
-          let invoiceTerms = companySettings.invoiceTerms;
-          let companyState = companySettings.companyState;
-          let companyStateCode = companySettings.companyStateCode;
-          let cgstPercentage = companySettings.cgstPercentage;
-          let sgstPercentage = companySettings.sgstPercentage;
-          let igstPercentage = companySettings.igstPercentage;
-          let gstEnabledByDefault = companySettings.gstEnabledByDefault;
-
-          const firstRow = settingsList[0];
-          if (firstRow && (firstRow.nextInvoiceNumber !== undefined || firstRow.nextInvoiceNumber === null)) {
-            // Flat format
-            if (firstRow.companyName !== undefined && firstRow.companyName !== null) name = String(firstRow.companyName);
-            if (firstRow.shortName !== undefined && firstRow.shortName !== null) shortName = String(firstRow.shortName);
-            if (firstRow.address !== undefined && firstRow.address !== null) addr = String(firstRow.address);
-            if (firstRow.phone !== undefined && firstRow.phone !== null) phone = String(firstRow.phone);
-            if (firstRow.email !== undefined && firstRow.email !== null) email = String(firstRow.email);
-            if (firstRow.gstNumber !== undefined && firstRow.gstNumber !== null) gst = String(firstRow.gstNumber);
-            if (firstRow.website !== undefined && firstRow.website !== null) website = String(firstRow.website);
-            if (firstRow.invoiceFooter !== undefined && firstRow.invoiceFooter !== null) invoiceFooter = String(firstRow.invoiceFooter);
-            if (firstRow.invoicePrefix !== undefined && firstRow.invoicePrefix !== null) prefix = String(firstRow.invoicePrefix);
-            
-            const parsedNextInv = parseInt(firstRow.nextInvoiceNumber);
-            if (!isNaN(parsedNextInv)) nextInvNum = parsedNextInv;
-            
-            if (firstRow.defaultPrintFormat !== undefined && firstRow.defaultPrintFormat !== null) defaultPrintFormat = String(firstRow.defaultPrintFormat) as any;
-            if (firstRow.defaultDownloadFormat !== undefined && firstRow.defaultDownloadFormat !== null) defaultDownloadFormat = String(firstRow.defaultDownloadFormat) as any;
-            
-            if (firstRow.useLogoWatermark !== undefined && firstRow.useLogoWatermark !== null && firstRow.useLogoWatermark !== "") {
-              useLogoWatermark = String(firstRow.useLogoWatermark) === "true" || firstRow.useLogoWatermark === true;
-            } else if (firstRow.useLogoWatermark === "") {
-              useLogoWatermark = true;
-            }
-            if (firstRow.invoiceTerms !== undefined && firstRow.invoiceTerms !== null) invoiceTerms = String(firstRow.invoiceTerms);
-            if (firstRow.companyState !== undefined && firstRow.companyState !== null) companyState = String(firstRow.companyState);
-            if (firstRow.companyStateCode !== undefined && firstRow.companyStateCode !== null) companyStateCode = String(firstRow.companyStateCode);
-            
-            const parsedCgst = parseFloat(firstRow.cgstPercentage);
-            if (!isNaN(parsedCgst)) cgstPercentage = parsedCgst;
-            const parsedSgst = parseFloat(firstRow.sgstPercentage);
-            if (!isNaN(parsedSgst)) sgstPercentage = parsedSgst;
-            const parsedIgst = parseFloat(firstRow.igstPercentage);
-            if (!isNaN(parsedIgst)) igstPercentage = parsedIgst;
-            
-            if (firstRow.gstEnabledByDefault !== undefined && firstRow.gstEnabledByDefault !== null) {
-              gstEnabledByDefault = String(firstRow.gstEnabledByDefault) === "true" || firstRow.gstEnabledByDefault === true;
-            }
-          } else {
-            // Key-Value format
-            settingsList.forEach((s: any) => {
-              const key = s.key || s.Key;
-              const val = s.value !== undefined ? s.value : s.Value;
-              if (val === undefined || val === null) return;
-              
-              if (key === "companyName") name = String(val);
-              if (key === "shortName") shortName = String(val);
-              if (key === "address") addr = String(val);
-              if (key === "phone") phone = String(val);
-              if (key === "email") email = String(val);
-              if (key === "gstNumber") gst = String(val);
-              if (key === "website") website = String(val);
-              if (key === "invoiceFooter") invoiceFooter = String(val);
-              if (key === "invoicePrefix") prefix = String(val);
-              
-              if (key === "nextInvoiceNumber") {
-                const parsed = parseInt(val);
-                if (!isNaN(parsed)) nextInvNum = parsed;
-              }
-              
-              if (key === "defaultPrintFormat") defaultPrintFormat = String(val) as any;
-              if (key === "defaultDownloadFormat") defaultDownloadFormat = String(val) as any;
-              
-              if (key === "useLogoWatermark") {
-                useLogoWatermark = val === "" ? true : (String(val) === "true" || val === true);
-              }
-              if (key === "invoiceTerms") invoiceTerms = String(val);
-              if (key === "companyState") companyState = String(val);
-              if (key === "companyStateCode") companyStateCode = String(val);
-              
-              if (key === "cgstPercentage") {
-                const parsed = parseFloat(val);
-                if (!isNaN(parsed)) cgstPercentage = parsed;
-              }
-              if (key === "sgstPercentage") {
-                const parsed = parseFloat(val);
-                if (!isNaN(parsed)) sgstPercentage = parsed;
-              }
-              if (key === "igstPercentage") {
-                const parsed = parseFloat(val);
-                if (!isNaN(parsed)) igstPercentage = parsed;
-              }
-              
-              if (key === "gstEnabledByDefault") {
-                gstEnabledByDefault = String(val) === "true" || val === true;
-              }
-            });
-          }
-
-          // Force auto-advance settings if remote invoices have a higher sequence
-          if (maxRemoteSequence > 0 && maxRemoteSequence >= nextInvNum) {
-            nextInvNum = maxRemoteSequence + 1;
-          }
-
-          // Only overwrite settings from sheet if they are not locally modified
-          if (this.isLocalChangeDirty("settings", "SETTINGS_ROW")) {
-            this.saveCompanySettings({
-              ...companySettings,
-              nextInvoiceNumber: Math.max(companySettings.nextInvoiceNumber, nextInvNum)
-            }, true);
-          } else {
-            this.saveCompanySettings({
-              ...companySettings,
-              companyName: name,
-              shortName,
-              address: addr,
-              phone,
-              email,
-              gstNumber: gst,
-              website,
-              invoiceFooter,
-              invoicePrefix: prefix,
-              nextInvoiceNumber: nextInvNum,
-              defaultPrintFormat,
-              defaultDownloadFormat,
-              useLogoWatermark,
-              invoiceTerms,
-              companyState,
-              companyStateCode,
-              cgstPercentage,
-              sgstPercentage,
-              igstPercentage,
-              gstEnabledByDefault,
-            }, true);
-          }
-        } else if (maxRemoteSequence > 0) {
-          const companySettings = this.getCompanySettings();
-          if (maxRemoteSequence >= companySettings.nextInvoiceNumber) {
-            this.saveCompanySettings({
-              ...companySettings,
-              nextInvoiceNumber: maxRemoteSequence + 1,
-            }, true);
-          }
-        }
-
-        // Update lastSyncTime to current time
-        const updatedConn = {
-          ...activeConn,
-          lastSyncTime: new Date().toLocaleTimeString(),
-        };
-        this.saveConnectionSettings(updatedConn);
-        this.hasSyncedDownThisSession = true;
-        this.updateSyncStatus("success");
-        this.saveLocalBackup();
-
-        return { success: true, message: "Database synchronized successfully with Google Sheets." };
-      } else {
-        const isRate = this.isRateLimitError(result.message);
-        const friendlyMsg = isRate
-          ? "⚠️ Rate limit exceeded."
-          : (result.message || "Database returned sync error.");
-        this.updateSyncStatus("error", friendlyMsg);
-        return { success: false, message: friendlyMsg };
+        return { success: false, message: error.message || "Query failed" };
       }
+      
+      return {
+        success: true,
+        message: "Connected to Supabase successfully!",
+        spreadsheetName: "Supabase Database"
+      };
     } catch (e: any) {
-      console.error("Sync pull error:", e);
-      const isRate = this.isRateLimitError(e);
-      const friendlyMsg = isRate
-        ? "⚠️ Google Sheets API quota/rate limit exceeded. All billing data is safely preserved offline. Active features are 100% operational!"
-        : `Sync pulling failed: ${e.message || e}`;
-      this.updateSyncStatus("error", friendlyMsg);
-      return { success: false, message: friendlyMsg };
-    } finally {
-      this.isSyncingDown = false;
+      return { success: false, message: e.message || "Network error. Double check project URL." };
     }
   }
 
-  // Sync queue management
-  public static getSyncQueue(): any[] {
-    return this.getStorageItem<any[]>("billing_sync_queue", []);
+  // Legacy Apps Script stubs
+  public static async initializeDatabaseViaAppsScript(url: string, companyName: string): Promise<any> {
+    return { success: false, message: "Initialize database is handled via copyable SQL scripts in Supabase version." };
   }
-
-  public static saveSyncQueue(queue: any[]): void {
-    this.setStorageItem("billing_sync_queue", queue);
+  public static async updateDatabaseSchemaViaAppsScript(url: string, spreadsheetId: string): Promise<any> {
+    return { success: false, message: "Database schema is updated via the SQL Editor inside the Supabase dashboard." };
   }
-
-  public static async processSyncQueue(): Promise<{ success: boolean; attempted: number; succeeded: number }> {
-    const queue = this.getSyncQueue();
-    if (queue.length === 0) return { success: true, attempted: 0, succeeded: 0 };
-
-    const conn = this.getConnectionSettings();
-    if (!conn.isConnected || !conn.appsScriptUrl) {
-      return { success: false, attempted: 0, succeeded: 0 };
-    }
-
-    console.log(`[SYNC ENGINE] Syncing full database state to Google Sheets...`);
-    try {
-      const payload = {
-        action: "SYNC_UP",
-        spreadsheetId: conn.spreadsheetId,
-        backupInterval: conn.backupInterval || "1_day",
-        payload: {
-          [conn.productsSheetName || "Products"]: this.getProducts().map(({ inventoryType, ...p }) => p),
-          [conn.customersSheetName || "Customers"]: this.getCustomers(),
-          [conn.invoicesSheetName || "Invoices"]: this.getInvoices(),
-          [conn.invoiceItemsSheetName || "InvoiceItems"]: this.getInvoiceItems(),
-          [conn.settingsSheetName || "Settings"]: [this.getCompanySettings()],
-          [conn.agentsSheetName || "Agents"]: this.getAgents(),
-          "PaymentTransactions": this.getPaymentTransactions(),
-          "Users": this.getUsers(),
-          "PromoCodes": this.getPromoCodes(),
-          "UserActivity": this.getUserActivities(),
-          "AuditLog": this.getAuditLogs()
-        }
-      };
-
-      const response = await fetch(conn.appsScriptUrl, {
-        method: "POST",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify(payload),
-      });
-
-      if (response.ok) {
-        const resText = await response.text();
-        const result = JSON.parse(resText);
-        if (result.success) {
-          const syncedIds = new Set<string>(queue.map(x => x.id));
-          const currentQueue = this.getSyncQueue();
-          const updatedQueue = currentQueue.filter(item => !syncedIds.has(item.id));
-          this.saveSyncQueue(updatedQueue);
-          return { success: true, attempted: queue.length, succeeded: queue.length };
-        }
-      }
-      return { success: false, attempted: queue.length, succeeded: 0 };
-    } catch (e) {
-      console.error("[SYNC ENGINE] Background sync failed:", e);
-      return { success: false, attempted: queue.length, succeeded: 0 };
-    }
+  public static async syncDownFromSheets(conn?: ConnectionSettings): Promise<{ success: boolean; message: string }> {
+    await this.preloadCache();
+    return { success: true, message: "Synced with Supabase successfully." };
   }
-
-  public static async forceUploadAllToSheets(): Promise<{ success: boolean; message: string }> {
-    const queue = this.getSyncQueue();
-    const conn = this.getConnectionSettings();
-    if (!conn.isConnected || !conn.appsScriptUrl) {
-      return { success: false, message: "No active Google Sheets connection." };
-    }
-
-    console.log(`[SYNC ENGINE] Force uploading all cache to Google Sheets...`);
-    try {
-      const payload = {
-        action: "SYNC_UP",
-        spreadsheetId: conn.spreadsheetId,
-        backupInterval: conn.backupInterval || "1_day",
-        settingsExplicitUpdate: true,
-        payload: {
-          [conn.productsSheetName || "Products"]: this.getProducts().map(({ inventoryType, ...p }) => p),
-          [conn.customersSheetName || "Customers"]: this.getCustomers(),
-          [conn.invoicesSheetName || "Invoices"]: this.getInvoices(),
-          [conn.invoiceItemsSheetName || "InvoiceItems"]: this.getInvoiceItems(),
-          [conn.settingsSheetName || "Settings"]: [this.getCompanySettings()],
-          [conn.agentsSheetName || "Agents"]: this.getAgents(),
-          "PaymentTransactions": this.getPaymentTransactions(),
-          "Users": this.getUsers(),
-          "PromoCodes": this.getPromoCodes(),
-          "UserActivity": this.getUserActivities(),
-          "AuditLog": this.getAuditLogs()
-        }
-      };
-
-      const response = await fetch(conn.appsScriptUrl, {
-        method: "POST",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify(payload),
-      });
-
-      if (response.ok) {
-        const resText = await response.text();
-        const result = JSON.parse(resText);
-        if (result.success) {
-          const syncedIds = new Set<string>(queue.map(x => x.id));
-          const currentQueue = this.getSyncQueue();
-          const updatedQueue = currentQueue.filter(item => !syncedIds.has(item.id));
-          this.saveSyncQueue(updatedQueue);
-          this.clearLocalChanges();
-          return { success: true, message: "Successfully uploaded local cache to Google Sheets." };
-        } else {
-          return { success: false, message: result.error || "Google Sheets returned sync failure." };
-        }
-      }
-      return { success: false, message: `Server error: HTTP ${response.status}` };
-    } catch (e: any) {
-      console.error("[SYNC ENGINE] Force upload failed:", e);
-      return { success: false, message: e.message || "Failed to contact Google Apps Script." };
-    }
+  public static async triggerCloudBackup(): Promise<any> {
+    return { success: false, message: "Cloud backup is managed automatically by Supabase." };
   }
+  public static getLocalBackup(): any | null { return null; }
+  public static restoreLocalBackup(): boolean { return false; }
 
-  public static async triggerBackgroundSync(): Promise<void> {
-    const conn = this.getConnectionSettings();
-    if (!conn.isConnected || !conn.appsScriptUrl) return;
-
-    if (!this.hasSyncedDownThisSession) {
-      console.warn("[SYNC ENGINE] Skipping automatic background sync up because initial sync down has not completed successfully in this session. This prevents overwriting remote database with empty/stale local state.");
-      return;
-    }
-
-    if (this.isSyncingInProgress) {
-      this.hasPendingSyncRequest = true;
-      return;
-    }
-
-    this.isSyncingInProgress = true;
-    this.hasPendingSyncRequest = false;
-
-    console.log(`[SYNC ENGINE] Triggering automatic background sync to Google Sheets...`);
-    this.updateSyncStatus("syncing");
-    try {
-      const syncUpPayload: any = {
-        [conn.productsSheetName || "Products"]: this.getProducts().map(({ inventoryType, ...p }) => p),
-        [conn.customersSheetName || "Customers"]: this.getCustomers(),
-        [conn.invoicesSheetName || "Invoices"]: this.getInvoices(),
-        [conn.invoiceItemsSheetName || "InvoiceItems"]: this.getInvoiceItems(),
-        [conn.agentsSheetName || "Agents"]: this.getAgents(),
-        "PaymentTransactions": this.getPaymentTransactions(),
-        "Users": this.getUsers(),
-        "PromoCodes": this.getPromoCodes(),
-        "UserActivity": this.getUserActivities(),
-        "AuditLog": this.getAuditLogs()
-      };
-
-      if (this.isLocalChangeDirty("settings", "SETTINGS_ROW")) {
-        syncUpPayload[conn.settingsSheetName || "Settings"] = [this.getCompanySettings()];
-      }
-
-      const payload = {
-        action: "SYNC_UP",
-        spreadsheetId: conn.spreadsheetId,
-        backupInterval: conn.backupInterval || "1_day",
-        settingsExplicitUpdate: this.isLocalChangeDirty("settings", "SETTINGS_ROW"),
-        payload: syncUpPayload
-      };
-
-      const response = await fetch(conn.appsScriptUrl, {
-        method: "POST",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify(payload),
-      });
-
-      if (response.ok) {
-        const resText = await response.text();
-        const result = JSON.parse(resText);
-        if (result.success) {
-          console.log(`[SYNC ENGINE] Automatic background sync completed successfully.`);
-          this.updateSyncStatus("success");
-          this.saveLocalBackup();
-          this.clearLocalChanges();
-        } else {
-          console.warn("[SYNC ENGINE] Background sync failed:", result.error);
-          this.updateSyncStatus("error", result.error || "Google Sheets sync returned failure.");
-        }
-      } else {
-        throw new Error(`Server returned HTTP ${response.status}`);
-      }
-    } catch (e: any) {
-      console.warn("[SYNC ENGINE] Automatic background sync failed:", e);
-      this.updateSyncStatus("error", e.message || String(e));
-    } finally {
-      this.isSyncingInProgress = false;
-      if (this.hasPendingSyncRequest) {
-        setTimeout(() => {
-          this.triggerBackgroundSync();
-        }, 50);
-      }
-    }
-  }
-
-  // Terminal ID configuration
-  public static getTerminalId(): string {
-    const tid = this.getStorageItem<string | null>("billing_terminal_id", null);
-    if (!tid) {
-      const generated = `T${Math.floor(10 + Math.random() * 90)}`;
-      this.setStorageItem("billing_terminal_id", generated);
-      return generated;
-    }
-    return tid;
-  }
-
-  public static saveTerminalId(id: string): void {
-    const sanitized = String(id || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
-    this.setStorageItem("billing_terminal_id", sanitized);
-  }
-
+  // Direct sync write operations via pushTransaction
   public static async pushTransaction(
     conn: ConnectionSettings,
     actionType: string,
     payloadData: any
   ): Promise<{ success: boolean; message: string }> {
-    try {
-      if (this.backgroundSyncTimeout) {
-        clearTimeout(this.backgroundSyncTimeout);
-      }
+    if (!supabase) {
+      return { success: false, message: "Supabase client is not initialized. Please connect via Settings tab." };
+    }
 
-      this.backgroundSyncTimeout = setTimeout(() => {
-        this.triggerBackgroundSync();
-      }, 50);
-      
-      return { success: true, message: "Transaction queued for background sync." };
+    try {
+      switch (actionType) {
+        case "createInvoice": {
+          const { invoice, items } = payloadData;
+          // 1. Upsert invoice
+          const dbInvoice = mapInvoiceToDb(invoice);
+          const { error: invErr } = await supabase.from("invoices").upsert(dbInvoice);
+          if (invErr) throw invErr;
+          
+          // 2. Delete and insert items (cleans old items in case of edit)
+          const { error: delErr } = await supabase.from("invoice_items").delete().eq("invoice_id", invoice.invoiceId || invoice.invoiceNo);
+          if (delErr) throw delErr;
+          
+          const dbItems = items.map(mapInvoiceItemToDb);
+          const { error: itemsErr } = await supabase.from("invoice_items").insert(dbItems);
+          if (itemsErr) throw itemsErr;
+          
+          break;
+        }
+        case "updateInvoiceStatus": {
+          const { invoiceId, status } = payloadData;
+          const isSoftDeleted = status === "Deleted";
+          const { error } = await supabase
+            .from("invoices")
+            .update({ status, is_soft_deleted: isSoftDeleted })
+            .eq("invoice_id", invoiceId);
+          if (error) throw error;
+          break;
+        }
+        case "recordPaymentTransaction": {
+          const {
+            transactionId,
+            invoiceId,
+            invoiceNo,
+            date,
+            time,
+            amount,
+            collectedBy,
+            notes,
+            newAmountPaid,
+            newBalanceDue,
+            newPaymentStatus,
+            newPaymentType
+          } = payloadData;
+
+          // 1. Update invoice paid state
+          const { error: invErr } = await supabase
+            .from("invoices")
+            .update({
+              amount_paid: newAmountPaid,
+              balance_due: newBalanceDue,
+              payment_status: newPaymentStatus,
+              payment_type: newPaymentType
+            })
+            .eq("invoice_id", invoiceId);
+          if (invErr) throw invErr;
+
+          // 2. Insert transaction entry
+          const txnRow = {
+            id: transactionId,
+            invoice_id: invoiceId,
+            invoice_no: invoiceNo,
+            date,
+            time,
+            amount,
+            collected_by: collectedBy,
+            notes
+          };
+          const { error: txnErr } = await supabase.from("payment_transactions").insert(txnRow);
+          if (txnErr) throw txnErr;
+          
+          break;
+        }
+        case "updateCustomerAddress": {
+          const { customerId, address, updatedHistoryJson } = payloadData;
+          const { error } = await supabase
+            .from("customers")
+            .update({
+              address,
+              current_address: address,
+              address_history: JSON.parse(updatedHistoryJson)
+            })
+            .eq("id", customerId);
+          if (error) throw error;
+          break;
+        }
+        case "upsertProduct": {
+          const dbRow = mapProductToDb(payloadData);
+          const { error } = await supabase.from("products").upsert(dbRow);
+          if (error) throw error;
+          break;
+        }
+        case "upsertAgent": {
+          const dbRow = mapAgentToDb(payloadData);
+          const { error } = await supabase.from("agents").upsert(dbRow);
+          if (error) throw error;
+          break;
+        }
+        case "upsertCustomer": {
+          const dbRow = mapCustomerToDb(payloadData);
+          const { error } = await supabase.from("customers").upsert(dbRow);
+          if (error) throw error;
+          break;
+        }
+        case "saveSettings": {
+          if (payloadData.cancellationRules) {
+            const rules = JSON.parse(payloadData.cancellationRules);
+            const { error } = await supabase.from("company_settings").update({ cancellation_rules: rules }).eq("id", "SETTINGS_ROW");
+            if (error) throw error;
+          } else {
+            const dbRow = mapCompanySettingsToDb(payloadData);
+            (dbRow as any).cancellation_rules = this.getCancellationRules();
+            const { error } = await supabase.from("company_settings").upsert(dbRow);
+            if (error) throw error;
+          }
+          break;
+        }
+        default:
+          console.warn(`[SyncEngine] Unhandled pushTransaction action: ${actionType}`);
+      }
+      return { success: true, message: "Database synchronized successfully with Supabase." };
     } catch (e: any) {
-      return { success: false, message: e.message || "Failed to queue sync." };
+      console.error(`[SyncEngine] Transaction sync failed for action: ${actionType}:`, e);
+      return { success: false, message: e.message || String(e) };
     }
   }
 
-  public static async triggerCloudBackup(): Promise<{ success: boolean; message: string; backupName?: string; backupFileUrl?: string }> {
-    try {
-      const conn = this.getConnectionSettings();
-      if (!conn.appsScriptUrl) {
-        return { success: false, message: "No Apps Script URL configured." };
+  // Terminal ID helper
+  public static getTerminalId(): string {
+    if (typeof window !== "undefined") {
+      let tid = localStorage.getItem("billing_terminal_id");
+      if (!tid) {
+        tid = `T${Math.floor(10 + Math.random() * 90)}`;
+        localStorage.setItem("billing_terminal_id", tid);
       }
-
-      const payload = {
-        action: "CREATE_BACKUP",
-        spreadsheetId: conn.spreadsheetId
-      };
-
-      const response = await fetch(conn.appsScriptUrl, {
-        method: "POST",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-
-      const resText = await response.text();
-      const result = JSON.parse(resText);
-      
-      if (result.success) {
-        return {
-          success: true,
-          message: "Cloud backup completed successfully.",
-          backupName: result.backupName,
-          backupFileUrl: result.backupFileUrl
-        };
-      } else {
-        return {
-          success: false,
-          message: result.error || "Failed to create cloud backup."
-        };
-      }
-    } catch (e: any) {
-      console.error("[SYNC ENGINE] Cloud backup failed:", e);
-      return { success: false, message: e.message || "Failed to contact Google Apps Script." };
+      return tid;
     }
+    return "T01";
   }
 
-  public static saveLocalBackup(): void {
-    try {
-      const backup = {
-        products: this.getProducts(),
-        customers: this.getCustomers(),
-        invoices: this.getInvoices(),
-        invoiceItems: this.getInvoiceItems(),
-        company: this.getCompanySettings(),
-        timestamp: new Date().toISOString()
-      };
-      this.setStorageItem("billing_db_backup_last_known_good", backup);
-    } catch (e) {
-      console.warn("[SYNC ENGINE] Failed to save local backup:", e);
-    }
-  }
-
-  public static getLocalBackup(): any | null {
-    return this.getStorageItem<any | null>("billing_db_backup_last_known_good", null);
-  }
-
-  public static restoreLocalBackup(): boolean {
-    const backup = this.getLocalBackup();
-    if (!backup) return false;
-    try {
-      if (backup.products) this.saveProducts(backup.products, true);
-      if (backup.customers) this.saveCustomers(backup.customers);
-      if (backup.invoices) this.saveInvoices(backup.invoices);
-      if (backup.invoiceItems) this.saveInvoiceItems(backup.invoiceItems);
-      if (backup.company) this.saveCompanySettings(backup.company);
-      return true;
-    } catch (e) {
-      console.error("[SYNC ENGINE] Failed to restore local backup:", e);
-      return false;
+  public static saveTerminalId(id: string): void {
+    const sanitized = String(id || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+    if (typeof window !== "undefined") {
+      localStorage.setItem("billing_terminal_id", sanitized);
     }
   }
 }

@@ -1,9 +1,342 @@
 import React, { useState, useEffect } from "react";
 import { Info, Settings, Database, Server, RefreshCw, Copy, Check, ShieldAlert, Download, Upload, AlertCircle, Sparkles, Lock, ShieldCheck, Sun, Moon, Laptop, User, Trash2 } from"lucide-react";
 import { ConnectionSettings, CompanySettings, Invoice, InvoiceItem, InvoiceStatus, Product, Customer, Agent, PaymentTransaction } from "../types";
-import { SheetsSyncEngine, HARDCODED_APPS_SCRIPT_URL, HARDCODED_SPREADSHEET_ID } from"../utils/sheetsSync";
+import { SheetsSyncEngine } from"../utils/sheetsSync";
 import { SYSTEM_LOGO } from"../constants/branding";
-import codeGsStr from "../../backend/Code.gs?raw";
+const SQL_SCHEMA = `-- 1. Create company_settings table
+CREATE TABLE company_settings (
+  id TEXT PRIMARY KEY DEFAULT 'SETTINGS_ROW',
+  company_name TEXT NOT NULL,
+  short_name TEXT,
+  address TEXT,
+  phone TEXT,
+  email TEXT,
+  gst_number TEXT,
+  website TEXT,
+  invoice_footer TEXT,
+  invoice_prefix TEXT DEFAULT 'YR',
+  next_invoice_number INTEGER DEFAULT 1001,
+  default_print_format TEXT DEFAULT 'Receipt',
+  default_download_format TEXT DEFAULT 'A4',
+  use_logo_watermark BOOLEAN DEFAULT TRUE,
+  invoice_terms TEXT,
+  company_state TEXT DEFAULT 'Andhra Pradesh',
+  company_state_code TEXT DEFAULT '37',
+  cgst_percentage NUMERIC DEFAULT 9,
+  sgst_percentage NUMERIC DEFAULT 9,
+  igst_percentage NUMERIC DEFAULT 18,
+  gst_enabled_by_default BOOLEAN DEFAULT FALSE,
+  cancellation_rules JSONB DEFAULT '{}'::jsonb
+);
+
+-- Seed initial company settings
+INSERT INTO company_settings (
+  company_name, short_name, address, phone, email, gst_number, website, invoice_footer, invoice_terms, cancellation_rules
+) VALUES (
+  'Tenali Central Furniture',
+  'TCF Smart Billing',
+  'Opp R.C.M Church, Amaravathi Yards, Chenchupet, Tenali, Andhra Pradesh 522202',
+  '8919546858',
+  'tenalicentralfurnitures@gmail.com',
+  'GSTIN-37AIIPM1793Q1ZE',
+  'www.tenalicentralfurniture.com',
+  'Thank you for buying premium furniture from Tenali Central Furniture! We guarantee quality craftsmanship in every piece.',
+  E'1. Cancellation Policy: A 10% deduction will be applied to the advance payment in the event of an order cancellation.\\n\\n2. Colour Variance (Online Orders): Please note that the actual color of the furniture may vary slightly from the images displayed on your screen due to lighting and monitor settings.\\n\\n3. Payment Terms: The full outstanding balance must be cleared prior to the delivery of the goods.\\n\\n4. Warranty Coverage: Major internal wood breakage or deep structural cracks occurring during the warranty period are eligible for replacement.\\n\\n5. Wear and Tear Exclusions: The warranty does not cover natural wear and tear, including fading polish, minor paint damage, superficial surface cracks, or naturally loosened joints.\\n\\n6. Customer Damage: Products will not be eligible for replacement if physical damage has been caused by mishandling or misuse by the customer.\\n\\n7. Transportation Costs: All transport charges related to warranty claims, repairs, or replacements will be borne by the customer.\\n\\n8. As disputes or subject to tenali jurisdiction only. Terms and conditions are mentioned in our website',
+  '{"Draft": 100, "Work In Progress": 80, "Ready for Delivery": 60, "Ready For Delivery": 60, "Delivered": 0, "Completed": 0}'::jsonb
+) ON CONFLICT DO NOTHING;
+
+-- 2. Create users table
+CREATE TABLE users (
+  id TEXT PRIMARY KEY,
+  full_name TEXT NOT NULL,
+  username TEXT UNIQUE NOT NULL,
+  email TEXT,
+  mobile TEXT,
+  role TEXT DEFAULT 'Employee',
+  status TEXT DEFAULT 'Active',
+  date_created TEXT,
+  last_login TEXT,
+  password_hash TEXT NOT NULL
+);
+
+-- Seed default admin user (password: admin123)
+INSERT INTO users (id, full_name, username, role, status, password_hash)
+VALUES ('USER-1001', 'System Admin', 'admin', 'Admin', 'Active', '0192023a7bbd73250516f069df18b500')
+ON CONFLICT DO NOTHING;
+
+-- 3. Create products table
+CREATE TABLE products (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  category TEXT,
+  unit TEXT,
+  price NUMERIC NOT NULL,
+  base_price NUMERIC,
+  inventory_type TEXT,
+  variants JSONB DEFAULT '[]'::jsonb,
+  option_groups JSONB DEFAULT '[]'::jsonb,
+  inventory_mode TEXT DEFAULT 'simple',
+  simple_variants JSONB DEFAULT '[]'::jsonb,
+  colors JSONB DEFAULT '[]'::jsonb,
+  sizes JSONB DEFAULT '[]'::jsonb,
+  is_combo BOOLEAN DEFAULT FALSE,
+  combo_items JSONB DEFAULT '[]'::jsonb,
+  product_options JSONB DEFAULT '[]'::jsonb,
+  track_inventory_separately BOOLEAN DEFAULT FALSE,
+  opening_stock NUMERIC DEFAULT 0,
+  color TEXT,
+  material TEXT,
+  brand TEXT,
+  vendor TEXT,
+  purchase_cost NUMERIC,
+  selling_price NUMERIC,
+  units_sold INTEGER DEFAULT 0,
+  revenue_generated NUMERIC DEFAULT 0,
+  last_sold_date TEXT,
+  stock_available NUMERIC DEFAULT 0,
+  production_time TEXT,
+  notes TEXT,
+  sku TEXT,
+  warranty TEXT,
+  size TEXT,
+  weight TEXT,
+  image_url TEXT,
+  status TEXT DEFAULT 'Active',
+  is_archived BOOLEAN DEFAULT FALSE,
+  hsn_code TEXT,
+  is_soft_deleted BOOLEAN DEFAULT FALSE
+);
+
+-- 4. Create customers table
+CREATE TABLE customers (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  mobile TEXT NOT NULL,
+  address TEXT,
+  secondary_phone TEXT,
+  secondary_contact_name TEXT,
+  notes TEXT,
+  current_address TEXT,
+  address_history JSONB DEFAULT '[]'::jsonb,
+  is_soft_deleted BOOLEAN DEFAULT FALSE
+);
+
+-- 5. Create invoices table
+CREATE TABLE invoices (
+  invoice_id TEXT PRIMARY KEY,
+  invoice_no TEXT UNIQUE NOT NULL,
+  invoice_category TEXT,
+  date TEXT,
+  invoice_date TEXT,
+  invoice_time TEXT,
+  created_timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  customer_name TEXT NOT NULL,
+  mobile TEXT NOT NULL,
+  customer_primary_phone TEXT,
+  item_count INTEGER DEFAULT 0,
+  subtotal NUMERIC DEFAULT 0,
+  discount NUMERIC DEFAULT 0,
+  ro_adjustment NUMERIC DEFAULT 0,
+  grand_total NUMERIC DEFAULT 0,
+  status TEXT DEFAULT 'Draft',
+  assigned_employee TEXT,
+  expected_delivery_date TEXT,
+  delivery_date TEXT,
+  delivery_notes TEXT,
+  auto_no TEXT,
+  driver_name TEXT,
+  created_by TEXT,
+  created_date TEXT,
+  created_time TEXT,
+  last_edited_by TEXT,
+  last_edited_date TEXT,
+  last_edited_time TEXT,
+  last_edited_timestamp TEXT,
+  is_soft_deleted BOOLEAN DEFAULT FALSE,
+  agent_id TEXT,
+  agent_name TEXT,
+  referral_agent_id TEXT,
+  referral_agent_name TEXT,
+  referral_agent_category TEXT,
+  referral_agent_type TEXT,
+  gross_amount NUMERIC DEFAULT 0,
+  promo_code TEXT,
+  promo_discount_amount NUMERIC DEFAULT 0,
+  cancellation_percentage NUMERIC DEFAULT 0,
+  cancellation_deduction NUMERIC DEFAULT 0,
+  refund_amount NUMERIC DEFAULT 0,
+  company_retained_amount NUMERIC DEFAULT 0,
+  deleted_by TEXT,
+  deleted_date TEXT,
+  gst_enabled BOOLEAN DEFAULT FALSE,
+  gst_type TEXT,
+  customer_gst_no TEXT,
+  customer_business_name TEXT,
+  customer_business_address TEXT,
+  customer_state TEXT,
+  customer_state_code TEXT,
+  cgst_percentage NUMERIC DEFAULT 9,
+  sgst_percentage NUMERIC DEFAULT 9,
+  igst_percentage NUMERIC DEFAULT 18,
+  cgst_amount NUMERIC DEFAULT 0,
+  sgst_amount NUMERIC DEFAULT 0,
+  igst_amount NUMERIC DEFAULT 0,
+  tax_amount NUMERIC DEFAULT 0,
+  payment_type TEXT,
+  payment_status TEXT,
+  amount_paid NUMERIC DEFAULT 0,
+  balance_due NUMERIC DEFAULT 0,
+  balance_collection_status TEXT,
+  customer_secondary_phone TEXT,
+  customer_secondary_contact_name TEXT,
+  notes TEXT,
+  client_notes TEXT,
+  order_notes TEXT
+);
+
+-- 6. Create invoice_items table
+CREATE TABLE invoice_items (
+  id SERIAL PRIMARY KEY,
+  invoice_id TEXT REFERENCES invoices(invoice_id) ON DELETE CASCADE,
+  invoice_no TEXT,
+  product_id TEXT,
+  product_name TEXT,
+  display_name TEXT,
+  store_name TEXT,
+  variant TEXT,
+  quantity NUMERIC DEFAULT 1,
+  unit_price NUMERIC DEFAULT 0,
+  amount NUMERIC DEFAULT 0,
+  selected_color TEXT,
+  selected_size TEXT,
+  hsn_code TEXT,
+  hierarchy_node_id TEXT,
+  sku_id TEXT,
+  hierarchy_path TEXT,
+  sku_code TEXT,
+  selected_options JSONB DEFAULT '{}'::jsonb,
+  is_combo BOOLEAN DEFAULT FALSE,
+  combo_items JSONB DEFAULT '[]'::jsonb
+);
+
+-- 7. Create payment_transactions table
+CREATE TABLE payment_transactions (
+  id TEXT PRIMARY KEY,
+  invoice_id TEXT,
+  invoice_no TEXT NOT NULL,
+  date TEXT NOT NULL,
+  time TEXT NOT NULL,
+  amount NUMERIC NOT NULL,
+  collected_by TEXT NOT NULL,
+  notes TEXT
+);
+
+-- 8. Create agents table
+CREATE TABLE agents (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  mobile TEXT NOT NULL,
+  email TEXT,
+  agent_type TEXT,
+  commission_percentage NUMERIC DEFAULT 0,
+  status TEXT DEFAULT 'Active',
+  notes TEXT,
+  created_date TEXT,
+  is_soft_deleted BOOLEAN DEFAULT FALSE
+);
+
+-- 9. Create promo_codes table
+CREATE TABLE promo_codes (
+  promo_code TEXT PRIMARY KEY,
+  description TEXT,
+  discount_type TEXT NOT NULL,
+  percentage_discount NUMERIC,
+  fixed_discount NUMERIC,
+  start_date TEXT,
+  end_date TEXT,
+  maximum_usage INTEGER DEFAULT 0,
+  usage_count INTEGER DEFAULT 0,
+  active_status TEXT DEFAULT 'Active',
+  is_soft_deleted BOOLEAN DEFAULT FALSE
+);
+
+-- 10. Create user_activities table
+CREATE TABLE user_activities (
+  id TEXT PRIMARY KEY,
+  username TEXT NOT NULL,
+  login_date TEXT,
+  login_time TEXT,
+  logout_time TEXT,
+  session_duration TEXT,
+  device_type TEXT,
+  browser TEXT,
+  ip_address TEXT,
+  active_seconds INTEGER DEFAULT 0
+);
+
+-- 11. Create audit_logs table
+CREATE TABLE audit_logs (
+  id TEXT PRIMARY KEY,
+  action_type TEXT NOT NULL,
+  user_name TEXT NOT NULL,
+  date TEXT,
+  time TEXT,
+  previous_value TEXT,
+  newValue TEXT
+);
+
+-- 12. Create employees table
+CREATE TABLE employees (
+  id TEXT PRIMARY KEY,
+  full_name TEXT NOT NULL,
+  role TEXT,
+  email TEXT,
+  mobile TEXT,
+  status TEXT DEFAULT 'Active'
+);
+
+INSERT INTO employees (id, full_name, role, status) VALUES 
+('EMP-1001', 'Rajesh Kumar', 'Senior Carpentry', 'Active'),
+('EMP-1002', 'Suresh Naidu', 'Delivery Driver', 'Active')
+ON CONFLICT DO NOTHING;
+
+-- 13. Create draft_invoices table
+CREATE TABLE draft_invoices (
+  id TEXT PRIMARY KEY,
+  created_date TEXT,
+  customer_name TEXT,
+  mobile_number TEXT,
+  customer_state TEXT,
+  line_items JSONB DEFAULT '[]'::jsonb,
+  gst_type TEXT,
+  gst_enabled BOOLEAN,
+  promo_code_input TEXT,
+  assigned_employee TEXT,
+  referral_agent_id TEXT,
+  referral_agent_name TEXT,
+  payment_type TEXT,
+  amount_received_input TEXT,
+  delivery_notes TEXT,
+  notes TEXT,
+  draft_amount NUMERIC
+);
+
+-- 14. Enable Realtime Replication
+ALTER PUBLICATION supabase_realtime ADD TABLE 
+  company_settings, 
+  users, 
+  products, 
+  customers, 
+  invoices, 
+  invoice_items, 
+  payment_transactions, 
+  agents, 
+  promo_codes, 
+  user_activities, 
+  audit_logs, 
+  employees, 
+  draft_invoices;
+`;
 
 interface SettingsTabProps {
  connSettings: ConnectionSettings;
@@ -35,30 +368,12 @@ export default function SettingsTab({
  SheetsSyncEngine.getCancellationRules()
  );
 
- // Connection settings states
- const [connectionMode, setConnectionMode] = useState<"auto" | "manual">(
-  connSettings.connectionMode || "auto"
- );
- const [appsScriptUrl, setAppsScriptUrl] = useState(
-  connSettings.connectionMode === "auto" ? HARDCODED_APPS_SCRIPT_URL : (connSettings.appsScriptUrl || "")
- );
- const [spreadsheetId, setSpreadsheetId] = useState(
-  connSettings.spreadsheetId || ""
- );
- const [apiKey, setApiKey] = useState(connSettings.apiKey ||"");
- const [spreadsheetName, setSpreadsheetName] = useState(connSettings.spreadsheetName ||"Not Connected");
- const [isConnected, setIsConnected] = useState(connSettings.isConnected);
- const [backupInterval, setBackupInterval] = useState<"1_day" | "2_day" | "1_week" | "2_week" | "1_month">(
-   connSettings.backupInterval || "1_day"
- );
-
- // Customize mapping sheet states
- const [productsSheet, setProductsSheet] = useState(connSettings.productsSheetName ||"Products");
- const [customersSheet, setCustomersSheet] = useState(connSettings.customersSheetName ||"Customers");
- const [invoicesSheet, setInvoicesSheet] = useState(connSettings.invoicesSheetName ||"Invoices");
- const [invoiceItemsSheet, setInvoiceItemsSheet] = useState(connSettings.invoiceItemsSheetName ||"InvoiceItems");
- const [settingsSheet, setSettingsSheet] = useState(connSettings.settingsSheetName ||"Settings");
- const [agentsSheet, setAgentsSheet] = useState(connSettings.agentsSheetName ||"Agents");
+  // Connection settings states
+   const [supabaseUrl, setSupabaseUrl] = useState(connSettings.supabaseUrl || "");
+   const [supabaseAnonKey, setSupabaseAnonKey] = useState(connSettings.supabaseAnonKey || "");
+   const [spreadsheetName, setSpreadsheetName] = useState(connSettings.isConnected ? "Supabase Database" : "Not Connected");
+   const [isConnected, setIsConnected] = useState(connSettings.isConnected);
+   const [backupInterval, setBackupInterval] = useState<"1_day" | "2_day" | "1_week" | "2_week" | "1_month">(connSettings.backupInterval || "1_day");
 
  // Company settings states
  const [companyName, setCompanyName] = useState(String(companySettings.companyName ||""));
@@ -152,18 +467,6 @@ export default function SettingsTab({
    } else {
      onShowNotification("Failed to restore local safe-state backup.", "error");
    }
- };
-
- // Copy script code utility
- const copyScriptCode = async () => {
- try {
- await navigator.clipboard.writeText(codeGsStr);
- setCopiedCode(true);
- onShowNotification("Google Apps Script code copy completed! Paste into extensions.","success");
- setTimeout(() => setCopiedCode(false), 2000);
- } catch {
- onShowNotification("Copy failed.","error");
- }
  };
 
  // Submit company info settings
@@ -291,221 +594,122 @@ export default function SettingsTab({
  onRefresh();
  };
 
- // Validate current sheet connection parameters
- const handleTestConnection = async () => {
- if (!isAdmin) return;
- if (!appsScriptUrl.trim()) {
- onShowNotification("A valid Google Apps Script Web App URL is required.","error");
- return;
- }
- if (!spreadsheetId.trim()) {
- onShowNotification("A valid Google Spreadsheet ID is required.","error");
- return;
- }
-
- setIsSyncing(true);
- onShowNotification("Pinging Google Spreadsheet...","info");
-
- const activeMapping = {
- productsSheetName: productsSheet,
- customersSheetName: customersSheet,
- invoicesSheetName: invoicesSheet,
- invoiceItemsSheetName: invoiceItemsSheet,
- settingsSheetName: settingsSheet,
- agentsSheetName: agentsSheet,
- };
-
- const result = await SheetsSyncEngine.testAppsScriptConnection(
- appsScriptUrl.trim(),
- spreadsheetId.trim(),
- activeMapping
- );
-
- setIsSyncing(false);
-
- if (result.success) {
- const dbName = result.spreadsheetName ||"Connected Sheet";
- setSpreadsheetName(dbName);
- setIsConnected(true);
-
- const updatedConn: ConnectionSettings = {
- spreadsheetId: spreadsheetId.trim(),
- spreadsheetName: dbName,
- appsScriptUrl: appsScriptUrl.trim(),
- apiKey: apiKey,
- isConnected: true,
- lastSyncTime: new Date().toLocaleTimeString(),
- ...activeMapping,
- connectionMode: connectionMode,
- backupInterval: backupInterval,
- };
-
- SheetsSyncEngine.saveConnectionSettings(updatedConn);
- 
- SheetsSyncEngine.addAuditLog(
-"Database Linked",
- currentUser?.fullName ||"System Admin",
-"Offline Static DB",
- `Linked active spreadsheet: ${dbName}`
- );
-
- onShowNotification("✓ Connection test benefited! Spreadsheet is verified.","success");
- onRefresh();
- } else {
- setIsConnected(false);
- setSpreadsheetName("Not Connected");
- onShowNotification(`Test Failed: ${result.message}`,"error");
- }
- };
-
- // Initialize Database in drive via script
- const handleInitializeDatabase = async () => {
- if (!isAdmin || !appsScriptUrl.trim()) return;
-
- setIsSyncing(true);
- onShowNotification("Requesting database initialization via script...","info");
-
- const result = await SheetsSyncEngine.initializeDatabaseViaAppsScript(
- appsScriptUrl.trim(),
- companyName ||"My Smart Billing",
- spreadsheetId.trim() || undefined
- );
-
- setIsSyncing(false);
-
- if (result.success && result.spreadsheetId) {
- setSpreadsheetId(result.spreadsheetId);
- setSpreadsheetName(result.spreadsheetName ||"Smart Billing Database");
- setIsConnected(true);
-
- const activeMapping = {
- productsSheetName:"Products",
- customersSheetName:"Customers",
- invoicesSheetName:"Invoices",
- invoiceItemsSheetName:"InvoiceItems",
- settingsSheetName:"Settings",
- agentsSheetName:"Agents",
- };
-
- const updatedConn: ConnectionSettings = {
- spreadsheetId: result.spreadsheetId,
- spreadsheetName: result.spreadsheetName ||"Smart Billing Database",
- appsScriptUrl: appsScriptUrl.trim(),
- apiKey: apiKey,
- isConnected: true,
- lastSyncTime: new Date().toLocaleTimeString(),
- ...activeMapping,
- connectionMode: connectionMode,
- backupInterval: backupInterval,
- };
-
- SheetsSyncEngine.saveConnectionSettings(updatedConn);
- onShowNotification("✓ Sheets Database initialized successfully! Code mapped.","success");
- 
- await SheetsSyncEngine.syncDownFromSheets(updatedConn);
- onRefresh();
- } else {
- onShowNotification(`Database Initialization Failed: ${result.message}`,"error");
- }
- };
-
- const handleUpdateSchema = async () => {
- if (!isAdmin || !appsScriptUrl.trim() || !spreadsheetId.trim()) return;
-
- setIsSyncing(true);
- onShowNotification("Checking for database schema updates...","info");
-
- const result = await SheetsSyncEngine.updateDatabaseSchemaViaAppsScript(
- appsScriptUrl.trim(),
- spreadsheetId.trim()
- );
-
- setIsSyncing(true);
-
- if (result.success) {
- onShowNotification(`✓ ${result.message}`,"success");
- onRefresh();
- } else {
- onShowNotification(`Schema Validation Failed: ${result.message}`,"error");
- }
- };
-
- // Manual Synchronization
- const handleSyncPull = async () => {
+  // Validate current Supabase connection parameters
+  const handleTestConnection = async () => {
     if (!isAdmin) return;
-    const conn = SheetsSyncEngine.getConnectionSettings();
-    if (!conn.appsScriptUrl) {
-      onShowNotification("Database is offline. Configure Google Apps Script Web App URL first.", "error");
+    if (!supabaseUrl.trim()) {
+      onShowNotification("A valid Supabase Project URL is required.", "error");
       return;
     }
-    
+    if (!supabaseAnonKey.trim()) {
+      onShowNotification("A valid Supabase Anon Key is required.", "error");
+      return;
+    }
+
     setIsSyncing(true);
-    onShowNotification("Refreshing local data cache from Google Sheets...","info");
-    
-    const result = await SheetsSyncEngine.syncDownFromSheets(conn);
+    onShowNotification("Pinging Supabase database...", "info");
+
+    const result = await SheetsSyncEngine.testAppsScriptConnection(
+      supabaseUrl.trim(),
+      supabaseAnonKey.trim()
+    );
+
     setIsSyncing(false);
 
     if (result.success) {
-      onShowNotification("✓ Local cache refreshed successfully from Google Sheets.","success");
+      const dbName = result.spreadsheetName || "Supabase Database";
+      setSpreadsheetName(dbName);
+      setIsConnected(true);
+
+      const updatedConn: ConnectionSettings = {
+        supabaseUrl: supabaseUrl.trim(),
+        supabaseAnonKey: supabaseAnonKey.trim(),
+        isConnected: true,
+        lastSyncTime: new Date().toLocaleTimeString(),
+        spreadsheetId: "",
+        spreadsheetName: dbName,
+        appsScriptUrl: "",
+        apiKey: "",
+        productsSheetName: "products",
+        customersSheetName: "customers",
+        invoicesSheetName: "invoices",
+        invoiceItemsSheetName: "invoice_items",
+        settingsSheetName: "company_settings",
+        agentsSheetName: "agents"
+      };
+
+      SheetsSyncEngine.saveConnectionSettings(updatedConn);
+      
+      SheetsSyncEngine.addAuditLog(
+        "Database Linked",
+        currentUser?.fullName || "System Admin",
+        "Disconnected",
+        `Linked active Supabase project: ${supabaseUrl.trim()}`
+      );
+
+      onShowNotification("✓ Supabase connection verified and saved!", "success");
       onRefresh();
     } else {
-      onShowNotification(`Sync Error: ${result.message}`,"error");
+      setIsConnected(false);
+      setSpreadsheetName("Not Connected");
+      onShowNotification(`Test Failed: ${result.message}`, "error");
     }
   };
 
-  const handleSyncPush = async () => {
+  const copySqlSchema = async () => {
+    try {
+      await navigator.clipboard.writeText(SQL_SCHEMA);
+      setCopiedCode(true);
+      onShowNotification("PostgreSQL schema copied to clipboard! Paste it in your Supabase SQL Editor.", "success");
+      setTimeout(() => setCopiedCode(false), 2000);
+    } catch {
+      onShowNotification("Copy failed.", "error");
+    }
+  };
+
+  const handleSyncPull = async () => {
     if (!isAdmin) return;
-    const conn = SheetsSyncEngine.getConnectionSettings();
-    if (!conn.appsScriptUrl || !conn.spreadsheetId) {
-      onShowNotification("Google Sheets credentials are not configured.", "error");
-      return;
-    }
-    if (!window.confirm("⚠️ WARNING: This will overwrite Google Sheets with your local browser cache! Are you sure you want to proceed?")) {
-      return;
-    }
     setIsSyncing(true);
-    onShowNotification("Uploading local cache to Google Sheets...", "info");
-    const result = await SheetsSyncEngine.forceUploadAllToSheets();
+    onShowNotification("Refreshing local cache from Supabase...", "info");
+    
+    await SheetsSyncEngine.preloadCache();
     setIsSyncing(false);
-    if (result.success) {
-      onShowNotification("✓ Google Sheets database successfully updated from local cache!", "success");
-    } else {
-      onShowNotification(`Upload Error: ${result.message}`, "error");
-    }
+    onShowNotification("✓ Cache refreshed successfully from Supabase.", "success");
+    onRefresh();
   };
 
- const handleResetDefaults = () => {
- if (!isAdmin) return;
- const confirmReset = window.confirm(
-"Restore Default Demo Logs? This cleans local databases and fills standard Products, Customers, and Invoices."
- );
- if (!confirmReset) return;
+  const handleResetDefaults = () => {
+    if (!isAdmin) return;
+    const confirmReset = window.confirm(
+      "Restore Default Demo Logs? This cleans Supabase database tables and fills standard Products, Customers, and Invoices."
+    );
+    if (!confirmReset) return;
 
- SheetsSyncEngine.resetToDemoDefaults();
- setAppsScriptUrl("");
- setSpreadsheetId("");
- setSpreadsheetName("Not Connected");
- setIsConnected(false);
+    SheetsSyncEngine.resetToDemoDefaults();
+    setSupabaseUrl("");
+    setSupabaseAnonKey("");
+    setSpreadsheetName("Not Connected");
+    setIsConnected(false);
 
- onShowNotification("✓ Application restarted with demo files. All sync logs disconnected.","success");
- onRefresh();
- };
+    onShowNotification("✓ Application restarted with demo files. All sync logs disconnected.", "success");
+    onRefresh();
+  };
 
   const handleClearLocalData = () => {
     if (!isAdmin) return;
     const confirmClear = window.confirm(
-      "⚠️ WARNING: This will permanently delete all local products, customers, invoices, and transaction logs from this browser's cache! (Your Google Sheets database will NOT be affected). Are you sure you want to clear all local data?"
+      "⚠️ WARNING: This will permanently delete all products, customers, invoices, and transaction logs from your Supabase database! Are you sure you want to clear all data?"
     );
     if (!confirmClear) return;
 
     SheetsSyncEngine.clearLocalData();
-    onShowNotification("✓ All local billing data cleared successfully.", "success");
+    onShowNotification("✓ All database data cleared successfully.", "success");
     onRefresh();
   };
 
   const handleGenerateMockData = () => {
     if (!isAdmin) return;
-    
+
     // 1. Generate 8 Mock Products
     const mockCategories = ["Chair", "Table", "Sofa", "Bed"];
     const mockProductNames = [
@@ -518,7 +722,7 @@ export default function SettingsTab({
       { name: "Recliner Single Seater", category: "Sofa", price: 18000 },
       { name: "Orthopedic Mattress", category: "Bed", price: 15000 }
     ];
-    
+
     const mockProducts: Product[] = mockProductNames.map((p, idx) => ({
       id: `PROD-TEMP-${1001 + idx}`,
       name: `[Mock] ${p.name}`,
@@ -530,7 +734,7 @@ export default function SettingsTab({
       revenueGenerated: 0,
       status: "Active"
     }));
-    
+
     // 2. Generate 20 Mock Customers
     const mockCustomers: Customer[] = [];
     for (let i = 1; i <= 20; i++) {
@@ -542,7 +746,7 @@ export default function SettingsTab({
         notes: "Regular retail test customer."
       });
     }
-    
+
     // 3. Generate 4 Mock Agents
     const mockAgents: Agent[] = [];
     const agentTypes = ["Referral Partner", "Freelancer", "Channel Partner"];
@@ -559,20 +763,20 @@ export default function SettingsTab({
         createdDate: "2025-06-01"
       });
     }
-    
+
     // 4. Generate 1000 Mock Invoices distributed over 12 months (June 2025 - June 2026)
     const newInvoices: Invoice[] = [];
     const newItems: InvoiceItem[] = [];
     const newTxns: PaymentTransaction[] = [];
-    
+
     const operators = [
       { username: "admin", name: "System Admin" },
       { username: "manager_suresh", name: "Suresh (Manager)" },
       { username: "operator_ramesh", name: "Ramesh (Employee)" }
     ];
-    
+
     const statuses: InvoiceStatus[] = ["Completed", "Work In Progress", "Ready for Delivery", "Cancelled"];
-    
+
     const now = new Date();
     const months = [];
     for (let m = 0; m < 12; m++) {
@@ -580,41 +784,41 @@ export default function SettingsTab({
       const y = d.getFullYear();
       const monthIdx = d.getMonth() + 1;
       const days = new Date(y, monthIdx, 0).getDate();
-      
+
       let weight = 1.0;
       if (monthIdx === 10 || monthIdx === 11 || monthIdx === 12) weight = 1.6;
       else if (monthIdx === 1 || monthIdx === 2) weight = 0.7;
-      
+
       months.push({ year: y, month: monthIdx, days, weight });
     }
-    
+
     const totalWeight = months.reduce((sum, m) => sum + m.weight, 0);
     let invoiceCounter = 1;
-    
+
     months.forEach((m) => {
       const monthInvoicesCount = Math.floor((m.weight / totalWeight) * 1000);
-      
+
       for (let i = 0; i < monthInvoicesCount; i++) {
         const invId = `INV-TEMP-${m.year}-${String(m.month).padStart(2, '0')}-${10000 + invoiceCounter}`;
         const invNo = `YR-TEMP-${10000 + invoiceCounter}`;
         invoiceCounter++;
-        
+
         const cust = mockCustomers[Math.floor(Math.random() * mockCustomers.length)];
         const op = operators[Math.floor(Math.random() * operators.length)];
-        
+
         const day = Math.floor(1 + Math.random() * m.days);
         const dateStr = `${m.year}-${String(m.month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-        
+
         const itemsCount = Math.floor(1 + Math.random() * 3);
         let subtotal = 0;
-        
+
         for (let k = 0; k < itemsCount; k++) {
           const p = mockProducts[Math.floor(Math.random() * mockProducts.length)];
           const qty = Math.floor(1 + Math.random() * 2);
           const itemPrice = p.price;
           const amt = qty * itemPrice;
           subtotal += amt;
-          
+
           newItems.push({
             invoiceId: invId,
             invoiceNo: invNo,
@@ -625,20 +829,20 @@ export default function SettingsTab({
             amount: amt
           });
         }
-        
+
         let discount = 0;
         if (Math.random() > 0.6) {
           discount = Math.random() > 0.5 ? Math.floor(subtotal * 0.05) : 500;
         }
-        
+
         const grandTotal = subtotal - discount;
         const randomStatus = statuses[Math.floor(Math.random() * statuses.length)];
-        
+
         let paymentType = "Full Payment";
         let amtPaid = grandTotal;
         let balDue = 0;
         let payStatus = "Paid";
-        
+
         if (randomStatus === "Cancelled") {
           amtPaid = 0;
           balDue = 0;
@@ -649,7 +853,7 @@ export default function SettingsTab({
             amtPaid = Math.floor(grandTotal * 0.4);
             balDue = grandTotal - amtPaid;
             payStatus = "Partially Paid";
-            
+
             newTxns.push({
               id: `TXN-TEMP-${invId}-1`,
               invoiceId: invId,
@@ -662,10 +866,10 @@ export default function SettingsTab({
             });
           }
         }
-        
+
         const hasAgent = Math.random() > 0.8;
         const agent = hasAgent ? mockAgents[Math.floor(Math.random() * mockAgents.length)] : null;
-        
+
         newInvoices.push({
           invoiceId: invId,
           invoiceNo: invNo,
@@ -694,33 +898,27 @@ export default function SettingsTab({
         });
       }
     });
-    
+
     const currentProducts = SheetsSyncEngine.getProducts();
     const currentCustomers = SheetsSyncEngine.getCustomers();
     const currentAgents = SheetsSyncEngine.getAgents();
     const currentInvoices = SheetsSyncEngine.getInvoices();
     const currentItems = SheetsSyncEngine.getInvoiceItems();
     const currentTxns = SheetsSyncEngine.getPaymentTransactions();
-    
+
     SheetsSyncEngine.saveProducts([...mockProducts, ...currentProducts]);
     SheetsSyncEngine.saveCustomers([...mockCustomers, ...currentCustomers]);
     SheetsSyncEngine.saveAgents([...mockAgents, ...currentAgents]);
     SheetsSyncEngine.savePaymentTransactions([...newTxns, ...currentTxns]);
     SheetsSyncEngine.saveInvoices([...newInvoices, ...currentInvoices], true);
     SheetsSyncEngine.saveInvoiceItems([...newItems, ...currentItems]);
-    
+
     onShowNotification("✓ Generated 1-year extreme simulation data: 1000+ invoices, 8 products, 20 customers, 4 agents!", "success");
     onRefresh();
   };
 
   const handleClearMockData = () => {
     if (!isAdmin) return;
-
-    // Helper: check if a value starts with a TEMP prefix
-    const isTemp = (val: string | undefined, prefix: string) =>
-      typeof val === 'string' && val.startsWith(prefix);
-
-    // Read raw data
     const currentProducts = SheetsSyncEngine.getProducts();
     const currentCustomers = SheetsSyncEngine.getCustomers();
     const currentAgents = SheetsSyncEngine.getAgents();
@@ -728,46 +926,23 @@ export default function SettingsTab({
     const currentItems = SheetsSyncEngine.getInvoiceItems();
     const currentTxns = SheetsSyncEngine.getPaymentTransactions();
 
-    // Filter — use OR so either the ID or the invoice number match removes the record
-    const cleanProducts  = currentProducts.filter(p  => !isTemp(p.id, "PROD-TEMP-"));
-    const cleanCustomers = currentCustomers.filter(c  => !isTemp(c.id, "CUST-TEMP-"));
-    const cleanAgents    = currentAgents.filter(a    => !isTemp(a.id, "AGT-TEMP-"));
-    const cleanTxns      = currentTxns.filter(t      => !isTemp(t.id, "TXN-TEMP-"));
+    const cleanProducts = currentProducts.filter(p => !p.id.startsWith("PROD-TEMP-"));
+    const cleanCustomers = currentCustomers.filter(c => !c.id.startsWith("CUST-TEMP-"));
+    const cleanAgents = currentAgents.filter(a => !a.id.startsWith("AGT-TEMP-"));
+    const cleanInvoices = currentInvoices.filter(inv => !inv.invoiceId?.startsWith("INV-TEMP-") && !inv.invoiceNo?.startsWith("YR-TEMP-"));
+    const cleanItems = currentItems.filter(item => !item.invoiceId?.startsWith("INV-TEMP-") && !item.invoiceNo?.startsWith("YR-TEMP-"));
+    const cleanTxns = currentTxns.filter(t => !t.id.startsWith("TXN-TEMP-"));
 
-    // Invoices: remove if invoiceId OR invoiceNo has any TEMP prefix
-    const cleanInvoices = currentInvoices.filter(inv =>
-      !isTemp(inv.invoiceId, "INV-TEMP-") && !isTemp(inv.invoiceNo, "YR-TEMP-")
-    );
-    const cleanItems = currentItems.filter(item =>
-      !isTemp(item.invoiceId, "INV-TEMP-") && !isTemp((item as any).invoiceNo, "YR-TEMP-")
-    );
-
-    // Write via SheetsSyncEngine to ensure background sync-up is queued.
-    // Pass isSyncPull = true for products/agents to bypass their soft-deleted merge logic.
-    SheetsSyncEngine.saveProducts(cleanProducts, true);
+    SheetsSyncEngine.saveProducts(cleanProducts);
     SheetsSyncEngine.saveCustomers(cleanCustomers);
-    SheetsSyncEngine.saveAgents(cleanAgents, true);
+    SheetsSyncEngine.saveAgents(cleanAgents);
     SheetsSyncEngine.savePaymentTransactions(cleanTxns);
     SheetsSyncEngine.saveInvoices(cleanInvoices, true);
     SheetsSyncEngine.saveInvoiceItems(cleanItems);
 
-    const removed = {
-      invoices:  currentInvoices.length  - cleanInvoices.length,
-      items:     currentItems.length     - cleanItems.length,
-      products:  currentProducts.length  - cleanProducts.length,
-      customers: currentCustomers.length - cleanCustomers.length,
-      agents:    currentAgents.length    - cleanAgents.length,
-      txns:      currentTxns.length      - cleanTxns.length,
-    };
-    console.log("[Clear TEMP] Removed records:", removed);
-
-    onShowNotification(
-      `✓ Cleared TEMP data — ${removed.invoices} invoices, ${removed.products} products, ${removed.customers} customers removed.`,
-      "success"
-    );
+    onShowNotification("✓ Successfully cleared all mock simulation records!", "success");
     onRefresh();
   };
-
 
  const handleBackupExportJson = () => {
  if (!isAdmin) return;
@@ -1480,390 +1655,225 @@ export default function SettingsTab({
 
  {/* SENSITIVE BLOCKS: HIDDEN OR SEVERELY LOCKED FOR NON-ADMINS */}
  {isAdmin ? (
-  <div className="space-y-6 lg:col-span-2 h-fit mb-6 animate-in zoom-in-95 duration-200">
-    {/* Google Sheets Backup Settings Card */}
-    <div className="rounded-xl border border-default dark:border-default bg-card p-5 shadow-sm space-y-4 transition-colors">
-      <div className="flex items-center gap-1.5 border-b border-default pb-3">
-        <Server className="h-4 w-4 text-blue-600" />
-        <h2 className="font-bold text-primary dark:text-primary text-sm font-sans">Google Sheets Backup Settings</h2>
+    <div className="space-y-6 lg:col-span-2 h-fit mb-6 animate-in zoom-in-95 duration-200">
+      {/* Supabase Connection Settings Card */}
+      <div className="rounded-xl border border-default dark:border-default bg-card p-5 shadow-sm space-y-4 transition-colors">
+        <div className="flex items-center gap-1.5 border-b border-default pb-3">
+          <Server className="h-4 w-4 text-blue-600" />
+          <h2 className="font-bold text-primary dark:text-primary text-sm font-sans">Supabase Database Connection</h2>
+        </div>
+
+        <div className="rounded-lg bg-blue-50/50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30 p-4 space-y-2 text-xs leading-relaxed text-muted dark:text-muted">
+          <div className="flex items-start gap-1.5 font-bold text-blue-700 dark:text-blue-400">
+            <Info className="h-4 w-4 shrink-0 mt-0.5" />
+            <span>Connect to your Supabase Project</span>
+          </div>
+          <p>
+            Connect your Smart Billing System directly to your own Supabase instance.
+            Make sure to copy the SQL schema script below and execute it in your Supabase dashboard SQL Editor first.
+          </p>
+        </div>
+
+        {/* CONNECTION SETTINGS FIELDS */}
+        <div className="space-y-3 pt-2">
+          <div className="space-y-1">
+            <label className="text-[10px] uppercase font-bold text-muted">
+              Supabase Project URL
+            </label>
+            <input
+              type="text"
+              placeholder="https://your-project-id.supabase.co"
+              value={supabaseUrl}
+              onChange={(e) => setSupabaseUrl(e.target.value)}
+              className="w-full rounded-lg border border-default bg-surface px-3 py-2 text-xs focus:border-blue-500 outline-none font-mono text-primary dark:text-gray-100"
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-[10px] uppercase font-bold text-muted">
+              Supabase Anon Key (API Key)
+            </label>
+            <input
+              type="password"
+              placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+              value={supabaseAnonKey}
+              onChange={(e) => setSupabaseAnonKey(e.target.value)}
+              className="w-full rounded-lg border border-default bg-surface px-3 py-2 text-xs focus:border-blue-500 outline-none font-mono text-primary dark:text-gray-100"
+            />
+          </div>
+        </div>
+
+        {/* ACTION HANDLERS */}
+        <div className="flex flex-col gap-2 pt-3 border-t border-default">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <button
+              onClick={async () => {
+                if (!isAdmin) return;
+                const updatedConn: ConnectionSettings = {
+                  supabaseUrl: supabaseUrl.trim(),
+                  supabaseAnonKey: supabaseAnonKey.trim(),
+                  isConnected: isConnected,
+                  lastSyncTime: connSettings.lastSyncTime || new Date().toLocaleTimeString(),
+                  spreadsheetId: "",
+                  spreadsheetName: isConnected ? "Supabase Database" : "Not Connected",
+                  appsScriptUrl: "",
+                  apiKey: "",
+                  productsSheetName: "products",
+                  customersSheetName: "customers",
+                  invoicesSheetName: "invoices",
+                  invoiceItemsSheetName: "invoice_items",
+                  settingsSheetName: "company_settings",
+                  agentsSheetName: "agents"
+                };
+                SheetsSyncEngine.saveConnectionSettings(updatedConn);
+                onShowNotification("✓ Supabase connection parameters saved.", "success");
+              }}
+              disabled={isSyncing}
+              className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-blue-600 bg-blue-600 py-2.5 text-xs font-semibold text-primary hover:bg-blue-700 disabled:opacity-50 cursor-pointer"
+            >
+              <Server className="h-4 w-4" />
+              <span>Save Configuration</span>
+            </button>
+            <button
+              onClick={handleTestConnection}
+              disabled={isSyncing}
+              className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-default dark:border-zinc-700 py-2.5 text-xs font-semibold text-secondary dark:text-gray-200 hover:bg-surface dark:hover:bg-zinc-800 disabled:opacity-50 cursor-pointer bg-card"
+            >
+              <Check className="h-4 w-4" />
+              <span>Test Connection</span>
+            </button>
+            <button
+              onClick={() => {
+                if (!isAdmin) return;
+                if (!confirm("Are you sure you want to clear the Supabase connection configuration?")) return;
+                setSupabaseUrl("");
+                setSupabaseAnonKey("");
+                setIsConnected(false);
+                setSpreadsheetName("Not Connected");
+                
+                const updatedConn: ConnectionSettings = {
+                  supabaseUrl: "",
+                  supabaseAnonKey: "",
+                  isConnected: false,
+                  lastSyncTime: "",
+                  spreadsheetId: "",
+                  spreadsheetName: "Not Connected",
+                  appsScriptUrl: "",
+                  apiKey: "",
+                  productsSheetName: "products",
+                  customersSheetName: "customers",
+                  invoicesSheetName: "invoices",
+                  invoiceItemsSheetName: "invoice_items",
+                  settingsSheetName: "company_settings",
+                  agentsSheetName: "agents"
+                };
+                SheetsSyncEngine.saveConnectionSettings(updatedConn);
+                onShowNotification("Connection defaults cleared globally.", "info");
+              }}
+              disabled={isSyncing}
+              className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-rose-200 dark:border-rose-900/30 py-2.5 text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/20 disabled:opacity-50 cursor-pointer bg-card"
+            >
+              <RefreshCw className="h-4 w-4" />
+              <span>Reset Connection</span>
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
+            <button
+              onClick={handleSyncPull}
+              disabled={isSyncing || !isConnected}
+              className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-blue-600 py-2.5 text-xs font-semibold text-primary hover:bg-blue-700 disabled:opacity-50 border-none cursor-pointer"
+            >
+              <RefreshCw className={`h-4 w-4 ${isSyncing ? "animate-spin" : ""}`} />
+              <span>Force Sync Cache (Pull)</span>
+            </button>
+            <button
+              onClick={copySqlSchema}
+              className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-purple-600 py-2.5 text-xs font-semibold text-primary hover:bg-purple-700 border-none cursor-pointer"
+            >
+              {copiedCode ? <Check className="h-4 w-4 text-emerald-100" /> : <Copy className="h-4 w-4" />}
+              <span>Copy SQL Initialization Schema</span>
+            </button>
+          </div>
+        </div>
       </div>
 
- <div className="rounded-lg bg-blue-50/50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30 p-4 space-y-2 text-xs leading-relaxed text-muted dark:text-muted">
- <div className="flex items-center gap-1.5 font-bold text-blue-700 dark:text-blue-400">
- <Info className="h-4 w-4 shrink-0" />
- <span>Permanent Database Configuration</span>
- </div>
- <p>Connect your Smart Billing System with any Google Spreadsheet to write real-time invoices. This configuration is permanent across deployments and devices.</p>
- <div className="pt-2">
- <ol className="list-decimal pl-4 space-y-1">
- <li>Deploy our compiled <strong>google-apps-script-backend.gs</strong> as a Web App (Anyone, Execute as: Me).</li>
- <li>Enter your copied <strong>Web App URL</strong> below.</li>
- <li>Save Configuration or Test Connection to verify!</li>
- </ol>
- </div>
- </div>
-
- {/* CONNECTION SETTINGS FIELDS */}
- <div className="space-y-3 pt-2">
-    {/* CONNECTION MODE SELECTOR */}
-    <div className="space-y-1">
-      <label className="text-[10px] uppercase font-bold text-muted">Connection Mode</label>
-      <div className="flex gap-1.5 p-1 bg-surface border border-default rounded-lg w-fit transition-colors">
-        <button
-          type="button"
-          onClick={() => {
-            setConnectionMode("auto");
-            setAppsScriptUrl(HARDCODED_APPS_SCRIPT_URL);
-            setSpreadsheetId(connSettings.spreadsheetId || "");
-          }}
-          className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all cursor-pointer ${
-            connectionMode === "auto"
-              ? "bg-blue-600 text-white shadow-sm"
-              : "text-muted hover:text-primary"
-          }`}
-        >
-          Automatic Setup
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            setConnectionMode("manual");
-            if (connSettings.connectionMode === "manual") {
-              setAppsScriptUrl(connSettings.appsScriptUrl || "");
-              setSpreadsheetId(connSettings.spreadsheetId || "");
-            } else {
-              setAppsScriptUrl("");
-              setSpreadsheetId("");
-            }
-          }}
-          className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all cursor-pointer ${
-            connectionMode === "manual"
-              ? "bg-blue-600 text-white shadow-sm"
-              : "text-muted hover:text-primary"
-          }`}
-        >
-          Manual Setup
-        </button>
-      </div>
-    </div>
-
-    <div className="space-y-1">
-      <div className="flex justify-between items-center">
-        <label className="text-[10px] uppercase font-bold text-muted">
-          Apps Script URL {connectionMode === "auto" && "(Auto)"}
-        </label>
-        <button
-          onClick={copyScriptCode}
-          className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
-        >
-          {copiedCode ? <Check className="h-3.5 w-3.5 text-green-600" /> : <Copy className="h-3.5 w-3.5" />}
-          <span>Copy Script Code</span>
-        </button>
-      </div>
-      <input
-        type="text"
-        placeholder="https://script.google.com/macros/s/.../exec"
-        value={appsScriptUrl}
-        onChange={(e) => setAppsScriptUrl(e.target.value)}
-        disabled={connectionMode === "auto"}
-        className="w-full rounded-lg border border-default bg-surface px-3 py-2 text-xs focus:border-blue-500 outline-none font-mono text-primary dark:text-gray-100 disabled:opacity-60 disabled:cursor-not-allowed"
-      />
-    </div>
-
-    <div className="grid gap-3 grid-cols-2">
-      <div className="space-y-1 col-span-1">
-        <label className="text-[10px] uppercase font-bold text-muted">
-          Spreadsheet ID {connectionMode === "auto" && "(Auto)"}
-        </label>
-        <input
-          type="text"
-          placeholder="1aBcD-EfgHiJklMn..."
-          value={spreadsheetId}
-          onChange={(e) => setSpreadsheetId(e.target.value)}
-          disabled={connectionMode === "auto"}
-          className="w-full rounded-lg border border-default bg-surface px-3 py-2 text-xs focus:border-blue-500 outline-none font-mono text-primary dark:text-gray-100 disabled:opacity-60 disabled:cursor-not-allowed"
+      {/* SQL Script Viewer */}
+      <div className="rounded-xl border border-default dark:border-default bg-card p-5 shadow-sm space-y-3 transition-colors">
+        <div className="flex justify-between items-center border-b border-default pb-2">
+          <div className="flex items-center gap-1.5">
+            <Database className="h-4 w-4 text-purple-600" />
+            <h3 className="font-bold text-primary text-sm font-sans">SQL Initialization Schema</h3>
+          </div>
+        </div>
+        <p className="text-[11px] text-muted leading-relaxed font-sans text-left">
+          Execute this script in the **SQL Editor** of your Supabase dashboard to set up the necessary database tables and seeding.
+        </p>
+        <textarea
+          readOnly
+          value={SQL_SCHEMA}
+          className="w-full h-44 font-mono text-[10px] bg-surface border border-default rounded-lg p-2.5 outline-none resize-y text-secondary"
         />
       </div>
 
- <div className="space-y-1 col-span-1">
- <label className="text-[10px] uppercase font-bold text-muted">Spreadsheet Name</label>
- <input
- type="text"
- placeholder="Will autofill on connection test..."
- value={spreadsheetName}
- onChange={(e) => setSpreadsheetName(e.target.value)}
- className="w-full rounded-lg border border-default bg-surface px-3 py-2 text-xs font-semibold text-primary dark:text-gray-100 outline-none font-sans"
- />
- </div>
- </div>
- </div>
+      {/* System Administration Tools */}
+      <div className="rounded-xl border border-default dark:border-default bg-card p-5 shadow-sm space-y-4 transition-colors">
+        <div className="flex items-center gap-1.5 border-b border-default pb-3">
+          <Database className="h-4 w-4 text-blue-600" />
+          <h3 className="font-bold text-primary text-xs">System Administration</h3>
+        </div>
 
- {/* ACTION HANDLERS */}
- <div className="flex flex-col gap-2 pt-3 border-t border-default">
- <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
- <button
- onClick={async () => {
- if (!isAdmin) return;
- const activeMapping = {
- productsSheetName: productsSheet,
- customersSheetName: customersSheet,
- invoicesSheetName: invoicesSheet,
- invoiceItemsSheetName: invoiceItemsSheet,
- settingsSheetName: settingsSheet,
- agentsSheetName: agentsSheet,
- };
- const updatedConn: ConnectionSettings = {
- spreadsheetId: spreadsheetId.trim(),
- spreadsheetName: spreadsheetName.trim(),
- appsScriptUrl: appsScriptUrl.trim(),
- apiKey: apiKey,
- isConnected: isConnected,
- lastSyncTime: connSettings.lastSyncTime || new Date().toLocaleTimeString(),
- ...activeMapping,
- connectionMode: connectionMode,
- backupInterval: backupInterval,
- };
- SheetsSyncEngine.saveConnectionSettings(updatedConn);
- onShowNotification("Database Connection Settings permanently saved.","success");
- }}
- disabled={isSyncing}
- className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-blue-600 bg-blue-600 py-2.5 text-xs font-semibold text-primary hover:bg-blue-700 disabled:opacity-50 cursor-pointer"
- >
- <Server className="h-4 w-4" />
- <span>Save Configuration</span>
- </button>
- <button
- onClick={handleTestConnection}
- disabled={isSyncing}
- className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-default dark:border-zinc-700 py-2.5 text-xs font-semibold text-secondary dark:text-gray-200 hover:bg-surface dark:hover:bg-zinc-800 disabled:opacity-50 cursor-pointer bg-card"
- >
- <Check className="h-4 w-4" />
- <span>Test Connection</span>
- </button>
- <button
- onClick={() => {
- if (!isAdmin) return;
- if (!confirm("Are you sure you want to clear the global database connection configuration?")) return;
- setAppsScriptUrl("");
- setSpreadsheetId("");
- setSpreadsheetName("");
- setIsConnected(false);
- setConnectionMode("manual");
- 
- const activeMapping = {
- productsSheetName: productsSheet,
- customersSheetName: customersSheet,
- invoicesSheetName: invoicesSheet,
- invoiceItemsSheetName: invoiceItemsSheet,
- settingsSheetName: settingsSheet,
- agentsSheetName: agentsSheet,
- };
- const updatedConn: ConnectionSettings = {
- spreadsheetId:"",
- spreadsheetName:"",
- appsScriptUrl:"",
- apiKey:"",
- isConnected: false,
- lastSyncTime:"",
- ...activeMapping,
- connectionMode: "manual",
- };
- SheetsSyncEngine.saveConnectionSettings(updatedConn);
- onShowNotification("Connection defaults cleared globally.","info");
- }}
- disabled={isSyncing}
- className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-rose-200 dark:border-rose-900/30 py-2.5 text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/20 disabled:opacity-50 cursor-pointer bg-card"
- >
- <RefreshCw className="h-4 w-4" />
- <span>Reset Connection</span>
- </button>
- </div>
+        <div className="grid gap-2 sm:grid-cols-2">
+          <button
+            onClick={handleBackupExportJson}
+            className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-default bg-card py-2 text-xs font-medium text-secondary hover:bg-surface cursor-pointer"
+          >
+            <Download className="h-3.5 w-3.5" />
+            <span>JSON Complete Backup</span>
+          </button>
 
- <div className="grid grid-cols-2 gap-2 mt-2">
- <button
- onClick={handleInitializeDatabase}
- disabled={isSyncing}
- className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-emerald-600 py-2.5 text-xs font-semibold text-primary hover:bg-emerald-700 disabled:opacity-50 cursor-pointer border-none"
- >
- <Sparkles className="h-4 w-4 text-emerald-100 fill-emerald-100 animate-pulse" />
- <span>Initialize Database</span>
- </button>
- <button
- onClick={handleUpdateSchema}
- disabled={isSyncing || !isConnected}
- className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-purple-600 py-2.5 text-xs font-semibold text-primary hover:bg-purple-700 disabled:opacity-50 cursor-pointer border-none"
- >
- <Sparkles className="h-4 w-4 text-purple-100 fill-purple-100" />
- <span>Update Schema</span>
- </button>
-  <button
-    onClick={handleSyncPull}
-    disabled={isSyncing || !isConnected}
-    className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-blue-600 py-2.5 text-xs font-semibold text-primary hover:bg-blue-700 disabled:opacity-50 border-none cursor-pointer"
-  >
-    <RefreshCw className={`h-4 w-4 ${isSyncing ? "animate-spin" : ""}`} />
-    <span>Refresh Cache (Pull)</span>
-  </button>
-  <button
-    onClick={handleSyncPush}
-    disabled={isSyncing || !isConnected}
-    className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-emerald-600 py-2.5 text-xs font-semibold text-primary hover:bg-emerald-700 disabled:opacity-50 border-none cursor-pointer"
-  >
-    <Upload className="h-4 w-4 text-white" />
-    <span>Upload Cache (Push)</span>
-  </button>
-  <button
-    onClick={async () => {
-      if(!isAdmin) return;
-      if(!isConnected || !appsScriptUrl) {
-        onShowNotification("Please connect to Google Sheets backend first.", "error"); return;
-      }
-      if(!confirm("Are you sure you want to repair the invoice counters?")) return;
-      setIsSyncing(true);
-      try {
-        const payload = { action: "repairCounters", spreadsheetId: spreadsheetId };
-        const res = await fetch(appsScriptUrl, { 
-          method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(payload), redirect: "follow"
-        });
-        const resJson = await res.json();
-        if(resJson.success) {
-          onShowNotification("✓ Counters repaired successfully across Google Sheets databases.", "success");
-        } else {
-          onShowNotification("Failed to repair counters: " + resJson.message, "error");
-        }
-      } catch(e: any) {
-        onShowNotification("Failed to connect to Google Apps Script.", "error");
-      } finally {
-        setIsSyncing(false);
-      }
-    }}
-    disabled={isSyncing || !isConnected}
-    className="col-span-2 flex items-center justify-center gap-2 rounded-lg bg-yellow-600 py-2.5 text-xs font-semibold text-primary hover:bg-yellow-700 disabled:opacity-50 cursor-pointer border-none"
-  >
-    <Database className="h-4 w-4" />
-    <span>Repair Invoice Counters</span>
-  </button>
- </div>
- </div>
+          <button
+            onClick={handleProductCsvExport}
+            className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-default bg-card py-2 text-xs font-medium text-secondary hover:bg-surface cursor-pointer"
+          >
+            <Upload className="h-3.5 w-3.5" />
+            <span>CSV Catalog Export</span>
+          </button>
+        </div>
 
- <details className="pt-2 outline-none">
- <summary className="cursor-pointer text-[11px] font-bold text-muted uppercase select-none hover:text-blue-600 list-none flex items-center gap-1 font-mono">
- Advanced Sheet Worksheets Mappings &rarr;
- </summary>
- <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 pt-3">
- <div className="space-y-1">
- <label className="text-[10px] text-muted uppercase">Products Sheet</label>
- <input
- type="text"
- value={productsSheet}
- onChange={(e) => setProductsSheet(e.target.value)}
- className="w-full rounded-md border border-default bg-surface px-2 py-1 text-xs font-mono text-primary border-none"
- />
- </div>
- <div className="space-y-1">
- <label className="text-[10px] text-muted uppercase">Customers Sheet</label>
- <input
- type="text"
- value={customersSheet}
- onChange={(e) => setCustomersSheet(e.target.value)}
- className="w-full rounded-md border border-default bg-surface px-2 py-1 text-xs font-mono text-primary border-none"
- />
- </div>
- <div className="space-y-1">
- <label className="text-[10px] text-muted uppercase">Invoices Sheet</label>
- <input
- type="text"
- value={invoicesSheet}
- onChange={(e) => setInvoicesSheet(e.target.value)}
- className="w-full rounded-md border border-default bg-surface px-2 py-1 text-xs font-mono text-primary border-none"
- />
- </div>
- <div className="space-y-1">
- <label className="text-[10px] text-muted uppercase">InvoiceItems Sheet</label>
- <input
- type="text"
- value={invoiceItemsSheet}
- onChange={(e) => setInvoiceItemsSheet(e.target.value)}
- className="w-full rounded-md border border-default bg-surface px-2 py-1 text-xs font-mono text-primary border-none"
- />
- </div>
- <div className="space-y-1">
- <label className="text-[10px] text-muted uppercase">Settings Sheet</label>
- <input
- type="text"
- value={settingsSheet}
- onChange={(e) => setSettingsSheet(e.target.value)}
- className="w-full rounded-md border border-default bg-surface px-2 py-1 text-xs font-mono text-primary border-none"
- />
- </div>
- <div className="space-y-1">
- <label className="text-[10px] text-muted uppercase">Agents Sheet</label>
- <input
- type="text"
- value={agentsSheet}
- onChange={(e) => setAgentsSheet(e.target.value)}
- className="w-full rounded-md border border-default bg-surface px-2 py-1 text-xs font-mono text-primary border-none"
- />
- </div>
- </div>
- </details>
-
- {/* DATABASE EXPORTS BACKUP */}
- <div className="border-t border-default pt-5 space-y-4">
- <div className="flex items-center gap-1.5">
- <Database className="h-4 w-4 text-blue-600" />
- <h3 className="font-bold text-primary text-xs">System Administration</h3>
- </div>
-
- <div className="grid gap-2 sm:grid-cols-2">
- <button
- onClick={handleBackupExportJson}
- className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-default bg-card py-2 text-xs font-medium text-secondary hover:bg-surface cursor-pointer"
- >
- <Download className="h-3.5 w-3.5" />
- <span>JSON Complete Backup</span>
- </button>
-
- <button
- onClick={handleProductCsvExport}
- className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-default bg-card py-2 text-xs font-medium text-secondary hover:bg-surface cursor-pointer"
- >
- <Upload className="h-3.5 w-3.5" />
- <span>CSV Catalog Export</span>
- </button>
- </div>
-
- <div className="flex flex-col gap-2.5 rounded-xl border border-dashed border-default p-4">
- <div className="flex items-start gap-2 text-[11px] text-muted">
- <AlertCircle className="h-4 w-4 shrink-0 text-amber-500" />
- <p>Import a JSON file to restore complete database structures or refresh standard session grids.</p>
- </div>
- <div className="flex gap-2">
- <label className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-default bg-card px-3 py-2 text-xs font-semibold text-secondary hover:bg-surface cursor-pointer">
- <Upload className="h-3.5 w-3.5" />
- <span>Restore JSON backup</span>
- <input
- type="file"
- accept=".json"
- onChange={handleRestoreBackupJson}
- className="hidden"
- />
- </label>
- <button
- onClick={handleResetDefaults}
- className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-dashed border-red-200 hover:border-red-300 text-red-600 hover:bg-red-50/55 px-3 py-2 text-xs font-bold bg-transparent cursor-pointer"
- >
- <ShieldAlert className="h-3.5 w-3.5 text-red-500" />
- <span>Reset Demo Logs</span>
- </button>
- <button
- onClick={handleClearLocalData}
- className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-dashed border-rose-200 hover:border-rose-300 text-rose-600 hover:bg-rose-50/55 px-3 py-2 text-xs font-bold bg-transparent cursor-pointer"
- >
- <ShieldAlert className="h-3.5 w-3.5 text-rose-500" />
- <span>Remove Local Data</span>
- </button>
- </div>
+        <div className="flex flex-col gap-2.5 rounded-xl border border-dashed border-default p-4">
+          <div className="flex items-start gap-2 text-[11px] text-muted">
+            <AlertCircle className="h-4 w-4 shrink-0 text-amber-500" />
+            <p>Import a JSON file to restore complete database structures or refresh standard session grids.</p>
+          </div>
+          <div className="flex gap-2">
+            <label className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-default bg-card px-3 py-2 text-xs font-semibold text-secondary hover:bg-surface cursor-pointer">
+              <Upload className="h-3.5 w-3.5" />
+              <span>Restore JSON backup</span>
+              <input
+                type="file"
+                accept=".json"
+                onChange={handleRestoreBackupJson}
+                className="hidden"
+              />
+            </label>
+            <button
+              onClick={handleResetDefaults}
+              className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-dashed border-red-200 hover:border-red-300 text-red-600 hover:bg-red-50/55 px-3 py-2 text-xs font-bold bg-transparent cursor-pointer"
+            >
+              <ShieldAlert className="h-3.5 w-3.5 text-red-500" />
+              <span>Reset Demo Logs</span>
+            </button>
+            <button
+              onClick={handleClearLocalData}
+              className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-dashed border-rose-200 hover:border-rose-300 text-rose-600 hover:bg-rose-50/55 px-3 py-2 text-xs font-bold bg-transparent cursor-pointer"
+            >
+              <ShieldAlert className="h-3.5 w-3.5 text-rose-500" />
+              <span>Remove Local Data</span>
+            </button>
+          </div>
+        </div>
+      </div>
 
   {/* DATABASE BACKUPS & CLOUD PROTECTION */}
   <div className="border-t border-default pt-5 space-y-4">
@@ -2000,9 +2010,6 @@ export default function SettingsTab({
     </div>
   </div>
 
-  </div>
-  </div>
-  </div>
   </div>
   ) : (
  /* LOCK SCREEN ACCORDION PANEL FOR EMPLOYEES & MANAGERS */

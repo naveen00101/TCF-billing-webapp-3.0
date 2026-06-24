@@ -50,6 +50,7 @@ import {
 import { Invoice, InvoiceStatus, Customer, Product, InvoiceItem } from"../types";
 import { formatIndianCurrencyShort } from"../utils/currencyUtils";
 import { AnalyticsPreferenceService } from"../utils/analyticsPreferenceService";
+import { SheetsSyncEngine } from "../utils/sheetsSync";
 import { 
  getTodayStr, 
  isDateInCurrentWeek, 
@@ -363,27 +364,18 @@ export default function RevenueAnalyticsTab({
 
  // Master Fallback database registers to guarantee offline sync capabilities
  const fallbackCustomers = useMemo<Customer[]>(() => {
- if (customers && customers.length > 0) return customers;
- try {
- const raw = localStorage.getItem("billing_customers");
- return raw ? JSON.parse(raw) : [];
- } catch { return []; }
+   if (customers && customers.length > 0) return customers;
+   return SheetsSyncEngine.getCustomers();
  }, [customers]);
 
  const fallbackProducts = useMemo<Product[]>(() => {
- if (products && products.length > 0) return products;
- try {
- const raw = localStorage.getItem("billing_products");
- return raw ? JSON.parse(raw) : [];
- } catch { return []; }
+   if (products && products.length > 0) return products;
+   return SheetsSyncEngine.getProducts();
  }, [products]);
 
  const fallbackInvoiceItems = useMemo<InvoiceItem[]>(() => {
- if (invoiceItems && invoiceItems.length > 0) return invoiceItems;
- try {
- const raw = localStorage.getItem("billing_invoice_items");
- return raw ? JSON.parse(raw) : [];
- } catch { return []; }
+   if (invoiceItems && invoiceItems.length > 0) return invoiceItems;
+   return SheetsSyncEngine.getInvoiceItems();
  }, [invoiceItems]);
 
  const activeInvoices = useMemo(() => {

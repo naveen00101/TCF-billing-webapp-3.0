@@ -249,11 +249,11 @@ export default function App() {
 
   const handleManualSync = async () => {
     const conn = SheetsSyncEngine.getConnectionSettings();
-    if (!conn.isConnected || !conn.appsScriptUrl) {
-      showNotification("⚠️ No active Google Sheets connection configured.", "error");
+    if (!conn.isConnected) {
+      showNotification("⚠️ No active Supabase connection configured.", "error");
       return;
     }
-    showNotification("Refreshing database from Google Sheets...", "info");
+    showNotification("Refreshing database from Supabase...", "info");
     try {
       const result = await SheetsSyncEngine.syncDownFromSheets(conn);
       if (result.success) {
@@ -392,10 +392,10 @@ export default function App() {
       // Mark app as loaded IMMEDIATELY so the diagnostic screen doesn't trigger
       (window as any).appLoaded = true;
 
-      // 3. Attempt background sync from Google Sheets (fire-and-forget, never blocks app)
+      // 3. Attempt background sync from Supabase (fire-and-forget, never blocks app)
       try {
         const conn = SheetsSyncEngine.getConnectionSettings();
-        if (conn.isConnected && conn.appsScriptUrl) {
+        if (conn.isConnected) {
           SheetsSyncEngine.syncDownFromSheets(conn)
             .then((result) => {
               if (result.success) {
@@ -403,7 +403,7 @@ export default function App() {
               }
             })
             .catch(() => {
-              console.warn("Failed to automatically synchronize with Google Sheets.");
+              console.warn("Failed to automatically synchronize with Supabase.");
             });
         }
       } catch (syncErr) {
@@ -413,42 +413,14 @@ export default function App() {
 
     bootSequence();
 
-    // Start 5-second periodic auto-sync (pull remote updates almost in real-time)
-    const syncInterval = setInterval(() => {
-      const conn = SheetsSyncEngine.getConnectionSettings();
-      if (conn.isConnected && conn.appsScriptUrl) {
-        console.log("[Auto-Sync] Periodically fetching latest Google Sheets data...");
-        SheetsSyncEngine.syncDownFromSheets(conn)
-          .then((result) => {
-            if (result.success) {
-              reloadApplicationState();
-            }
-          })
-          .catch((err) => {
-            console.warn("[Auto-Sync] Periodic sync failed:", err);
-          });
-      }
-    }, 5000); // 5 seconds
-
-    // Add window focus listener to sync immediately when operator switches back to this tab
-    const handleFocusSync = () => {
-      const conn = SheetsSyncEngine.getConnectionSettings();
-      if (conn.isConnected && conn.appsScriptUrl) {
-        console.log("[Focus-Sync] Window focused, syncing with Google Sheets...");
-        SheetsSyncEngine.syncDownFromSheets(conn)
-          .then((result) => {
-            if (result.success) {
-              reloadApplicationState();
-            }
-          })
-          .catch(() => {});
-      }
-    };
-    window.addEventListener("focus", handleFocusSync);
+    // Subscribe to SheetsSyncEngine realtime database notifications
+    const unsubscribeRealtime = SheetsSyncEngine.registerRealtimeListener(() => {
+      console.log("[Realtime Sync] Triggering application state reload due to remote database changes...");
+      reloadApplicationState();
+    });
 
     return () => {
-      clearInterval(syncInterval);
-      window.removeEventListener("focus", handleFocusSync);
+      unsubscribeRealtime();
     };
   }, []);
 
