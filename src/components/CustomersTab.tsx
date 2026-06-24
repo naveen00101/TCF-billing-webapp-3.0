@@ -14,7 +14,8 @@ import {
  FileText,
  ChevronRight,
  UserPlus,
- AlertCircle
+ AlertCircle,
+ Trash2
 } from"lucide-react";
 import { Customer, Invoice, User, AddressHistoryRecord } from"../types";
 import { formatIndianCurrencyShort } from"../utils/currencyUtils";
@@ -213,6 +214,52 @@ export default function CustomersTab({
  };
  };
 
+  // Execute delete customer (soft delete to sync via pushTransaction)
+  const executeDeleteCustomer = async (customer: Customer) => {
+    if (!window.confirm(`Are you sure you want to delete customer '${customer.name}'?`)) {
+      return;
+    }
+    try {
+      const updatedCustomer = { ...customer, isSoftDeleted: true };
+      
+      // 1. Update in-memory local caches and save to localStorage/Supabase via engine
+      const updatedCustomers = customers.map(c => c.id === customer.id ? updatedCustomer : c);
+      SheetsSyncEngine.saveCustomers(updatedCustomers);
+      
+      // 2. Push sync transaction to Supabase
+      await SheetsSyncEngine.pushTransaction(
+        SheetsSyncEngine.getConnectionSettings(),
+        "upsertCustomer",
+        updatedCustomer
+      );
+      
+      // 3. Log audit event
+      SheetsSyncEngine.addAuditLog(
+        "Customer Delete",
+        currentUser?.fullName || "Admin",
+        customer.name,
+        "DELETED"
+      );
+
+      if (onShowNotification) {
+        onShowNotification(`✓ Customer '${customer.name}' deleted successfully.`, "success");
+      }
+      
+      // 4. De-select the deleted customer in UI
+      setSelectedCustomerId(null);
+      
+      // 5. Trigger reload of parent state
+      if (onRefresh) {
+        onRefresh();
+      }
+    } catch (err: any) {
+      console.error("[CustomersTab] Error deleting customer:", err);
+      if (onShowNotification) {
+        onShowNotification("Error deleting customer record.", "error");
+      }
+    }
+  };
+ 
  // Trigger Edit customer
  const triggerStartEdit = () => {
  if (!activeCustomer) return;
@@ -844,12 +891,22 @@ export default function CustomersTab({
  <h2 className="font-extrabold text-primary dark:text-primary text-sm tracking-tight">{activeCustomer.name}</h2>
  <span className="font-mono text-xs font-bold text-blue-600 dark:text-blue-400">{activeCustomer.id}</span>
  </div>
- <button
- onClick={triggerStartEdit}
- className="flex items-center gap-1 text-[11px] font-bold text-blue-600 hover:underline cursor-pointer bg-transparent border-none outline-none"
- >
- <Edit2 className="h-3 w-3" /> Edit Profile
- </button>
+ <div className="flex items-center gap-3">
+  <button
+  onClick={triggerStartEdit}
+  className="flex items-center gap-1 text-[11px] font-bold text-blue-600 hover:underline cursor-pointer bg-transparent border-none outline-none animate-none"
+  >
+  <Edit2 className="h-3 w-3" /> Edit Profile
+  </button>
+  {["Admin", "Manager"].includes(currentUser?.role || "") && (
+  <button
+  onClick={() => executeDeleteCustomer(activeCustomer)}
+  className="flex items-center gap-1 text-[11px] font-bold text-rose-600 hover:underline cursor-pointer bg-transparent border-none outline-none animate-none"
+  >
+  <Trash2 className="h-3 w-3" /> Delete Customer
+  </button>
+  )}
+ </div>
  </div>
 
  {/* CRM Parameters Display */}
