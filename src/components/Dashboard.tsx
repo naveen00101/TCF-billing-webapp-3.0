@@ -307,6 +307,7 @@ export default function Dashboard({ stats, onRefresh, onNavigateToTab, userRole 
   };
 
   const activities = SheetsSyncEngine.getUserActivities();
+  const limitLogs = SheetsSyncEngine.getAuditLogs().slice(0, 10);
   const operatorsWithGps = Array.from(new Set(
     activities
       .filter(act => act.latitude && act.longitude)
