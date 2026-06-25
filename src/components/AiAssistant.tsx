@@ -70,9 +70,9 @@ export default function AiAssistant({ isOpen: parentIsOpen, setIsOpen: parentSet
 
  try {
  // Gather current business state securely to inject as backend context
- const products = SheetsSyncEngine.getProducts();
- const customers = SheetsSyncEngine.getCustomers();
- const invoices = SheetsSyncEngine.getInvoices();
+ const products = SheetsSyncEngine.getProducts().filter(p => !p.isSoftDeleted);
+ const customers = SheetsSyncEngine.getCustomers().filter(c => !c.isSoftDeleted);
+ const invoices = SheetsSyncEngine.getInvoices().filter(i => !i.isSoftDeleted);
  const invoiceItems = SheetsSyncEngine.getInvoiceItems();
  const company = SheetsSyncEngine.getCompanySettings();
 

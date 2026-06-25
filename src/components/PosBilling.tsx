@@ -569,7 +569,7 @@ export default function PosBilling({
     
     if (!isNew && draft.mobileNumber) {
       const cleanedMobile = String(draft.mobileNumber).replace(/\D/g, "");
-      const customerList = customers.length > 0 ? customers : SheetsSyncEngine.getCustomers();
+      const customerList = customers.length > 0 ? customers : SheetsSyncEngine.getCustomers().filter(c => !c.isSoftDeleted);
       const matchedCust = customerList.find(c => String(c.mobile || "").replace(/\D/g, "") === cleanedMobile);
       if (matchedCust) {
         setExistingCustomerSearch(`${matchedCust.id} - ${matchedCust.name}`);

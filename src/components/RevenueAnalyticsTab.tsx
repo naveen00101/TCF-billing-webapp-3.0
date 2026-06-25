@@ -365,12 +365,12 @@ export default function RevenueAnalyticsTab({
  // Master Fallback database registers to guarantee offline sync capabilities
  const fallbackCustomers = useMemo<Customer[]>(() => {
    if (customers && customers.length > 0) return customers;
-   return SheetsSyncEngine.getCustomers();
+   return SheetsSyncEngine.getCustomers().filter(c => !c.isSoftDeleted);
  }, [customers]);
 
  const fallbackProducts = useMemo<Product[]>(() => {
    if (products && products.length > 0) return products;
-   return SheetsSyncEngine.getProducts();
+    return SheetsSyncEngine.getProducts().filter(p => !p.isSoftDeleted);
  }, [products]);
 
  const fallbackInvoiceItems = useMemo<InvoiceItem[]>(() => {
