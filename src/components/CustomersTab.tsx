@@ -481,11 +481,11 @@ export default function CustomersTab({
  if (onRefresh) onRefresh();
  };
 
- const handleDeleteAddressHistory = (id: string) => {
- if (currentUser?.role !=="Admin") {
- if (onShowNotification) onShowNotification("Only Admin can delete address history records.","error");
- return;
- }
+  const handleDeleteAddressHistory = (id: string) => {
+  if (currentUser?.role !=="Admin" && currentUser?.role !== "Superadmin") {
+  if (onShowNotification) onShowNotification("Only Admin can delete address history records.","error");
+  return;
+  }
  if (!activeCustomer) return;
 
  const recordToDelete = activeCustomer.addressHistory?.find(h => h.id === id);
@@ -898,14 +898,14 @@ export default function CustomersTab({
   >
   <Edit2 className="h-3 w-3" /> Edit Profile
   </button>
-  {["Admin", "Manager"].includes(currentUser?.role || "") && (
-  <button
-  onClick={() => executeDeleteCustomer(activeCustomer)}
-  className="flex items-center gap-1 text-[11px] font-bold text-rose-600 hover:underline cursor-pointer bg-transparent border-none outline-none animate-none"
-  >
-  <Trash2 className="h-3 w-3" /> Delete Customer
-  </button>
-  )}
+   {["Superadmin", "Admin", "Manager"].includes(currentUser?.role || "") && (
+   <button
+   onClick={() => executeDeleteCustomer(activeCustomer)}
+   className="flex items-center gap-1 text-[11px] font-bold text-rose-600 hover:underline cursor-pointer bg-transparent border-none outline-none animate-none"
+   >
+   <Trash2 className="h-3 w-3" /> Delete Customer
+   </button>
+   )}
  </div>
  </div>
 
@@ -968,7 +968,7 @@ export default function CustomersTab({
  >
  Restore
  </button>
- {currentUser?.role ==="Admin" && (
+ {(currentUser?.role ==="Admin" || currentUser?.role === "Superadmin") && (
  <button
  type="button"
  onClick={() => handleDeleteAddressHistory(hist.id)}

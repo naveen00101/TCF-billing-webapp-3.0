@@ -161,7 +161,7 @@ export default function RevenueAnalyticsTab({
  initiallySelectedModule,
  onClearSelectedModule
 }: RevenueAnalyticsTabProps) {
- if (userRole !=="Admin") {
+ if (userRole !=="Admin" && userRole !== "Superadmin") {
  return (
  <div className="flex h-[400px] flex-col items-center justify-center rounded-xl border border-dashed border-red-200 bg-red-50/50 p-8 text-center dark:border-red-900/30 dark:bg-red-950/20">
  <ShieldAlert className="h-12 w-12 text-red-500 mb-4 opacity-80" />

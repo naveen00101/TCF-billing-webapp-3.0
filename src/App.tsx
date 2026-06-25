@@ -1150,6 +1150,7 @@ export default function App() {
     <AuditTrailTab 
       initiallySelectedAuditId={selectedAuditId}
       onClearSelected={() => setSelectedAuditId(null)}
+      userRole={userRole}
     />
   )}
 

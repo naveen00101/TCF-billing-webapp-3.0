@@ -556,8 +556,8 @@ export default function HistoryTab({
 
  // Handle Address Edit & Saving with proper Address History
  const handleSaveAddress = async () => {
- if (userRole !=="Admin") {
- onShowNotification("Access Denied: Only Admins can modify customer primary addresses.","error");
+ if (userRole !== "Superadmin") {
+ onShowNotification("Access Denied: Only Superadmin has clearance to modify customer primary addresses.","error");
  return;
  }
  if (!inspectedInvoice) return;
@@ -686,8 +686,8 @@ export default function HistoryTab({
 
  // Switch to Editing view
  const startEditingInvoice = (inv: Invoice) => {
- if (userRole ==="Employee") {
- onShowNotification("Access Denied: Employees do not have clearance to edit invoices.","error");
+ if (userRole !== "Superadmin") {
+ onShowNotification("Access Denied: Only Superadmin has clearance to edit invoices.","error");
  return;
  }
  setEditStatus(inv.status);
@@ -700,6 +700,10 @@ export default function HistoryTab({
  // Submit invoice fields alteration
  const handleSaveEditInvoice = async () => {
  if (!inspectedInvoice) return;
+ if (userRole !== "Superadmin") {
+ onShowNotification("Access Denied: Only Superadmin has clearance to save changes to invoices.","error");
+ return;
+ }
 
  const TODAY_ISO = getTodayStr();
  const TIME_STR = getCurrentTimeStr();
@@ -902,7 +906,7 @@ export default function HistoryTab({
 
  // Delete invoice with confirm options (Hard Purge vs Soft delete)
  const handleDeleteInvoice = async (inv: Invoice) => {
- if (userRole !=="Admin") {
+ if (userRole !== "Admin" && userRole !== "Superadmin") {
  onShowNotification("Access Denied: Only Admin users are cleared to delete invoices.","error");
  return;
  }
@@ -1055,7 +1059,7 @@ export default function HistoryTab({
 
  // Restore Soft-Deleted Invoice
  const handleRestoreInvoice = async (inv: Invoice) => {
- if (userRole !=="Admin") {
+ if (userRole !== "Admin" && userRole !== "Superadmin") {
  onShowNotification("Access Denied: Only Admin can restore invoices.","error");
  return;
  }
@@ -1244,7 +1248,7 @@ export default function HistoryTab({
  <p className="text-xs text-muted">Query and amend statuses, filter dates, track employees, or print.</p>
  </div>
  <div className="flex items-center gap-2">
- {userRole ==="Admin" && (
+ {(userRole === "Admin" || userRole === "Superadmin") && (
  <button
  onClick={() => { setShowSoftDeletedOnly(!showSoftDeletedOnly); setInspectedInvoice(null); }}
  className={`text-[10px] uppercase font-bold py-1 px-2.5 rounded border transition-colors ${
@@ -1694,7 +1698,7 @@ export default function HistoryTab({
  </div>
  ) : null}
  </div>
- {userRole !=="Employee" && (
+ {userRole === "Superadmin" && (
  <button
  onClick={() => startEditingInvoice(inspectedInvoice)}
  className="absolute right-3.5 top-3.5 text-[10px] font-bold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-0.5 bg-transparent border-none cursor-pointer"
@@ -1761,7 +1765,7 @@ export default function HistoryTab({
  <div>
  <div className="flex justify-between items-center mb-1">
  <strong className="text-[10px] uppercase text-muted">Address:</strong>
- {userRole ==="Admin" && matchedCustForLedger && (
+ {userRole === "Superadmin" && matchedCustForLedger && (
  <button
  onClick={() => {
  setEditAddressCurrent(displayAddressText);
@@ -2036,7 +2040,6 @@ export default function HistoryTab({
  <button
  id="btn-download"
  onClick={() => {
- setSelectedDownloadFormat(company.defaultDownloadFormat ||"A4");
  setShowDownloadModal(true);
  }}
  className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-default py-1.5 text-xs font-semibold text-secondary hover:bg-surface cursor-pointer bg-card"
@@ -2045,7 +2048,7 @@ export default function HistoryTab({
  <span>Download</span>
  </button>
  
- {userRole ==="Admin" && !inspectedInvoice.isSoftDeleted && (
+ {(userRole === "Admin" || userRole === "Superadmin") && !inspectedInvoice.isSoftDeleted && (
  <button
  onClick={() => handleDeleteInvoice(inspectedInvoice)}
  className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-red-100 hover:border-red-200 bg-red-50/50 hover:bg-red-50 py-1.5 text-xs font-bold text-red-600 cursor-pointer"
@@ -2055,7 +2058,7 @@ export default function HistoryTab({
  </button>
  )}
 
- {userRole ==="Admin" && inspectedInvoice.isSoftDeleted && (
+ {(userRole === "Admin" || userRole === "Superadmin") && inspectedInvoice.isSoftDeleted && (
  <button
  onClick={() => handleRestoreInvoice(inspectedInvoice)}
  className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-green-200 hover:border-green-300 bg-green-50/60 hover:bg-green-50 py-1.5 text-xs font-bold text-green-600 cursor-pointer"

@@ -46,51 +46,67 @@ export function getAuditModule(actionType: string): string {
 }
 
 interface AuditTrailTabProps {
- initiallySelectedAuditId?: string | null;
- onClearSelected?: () => void;
+  initiallySelectedAuditId?: string | null;
+  onClearSelected?: () => void;
+  userRole?: string;
+  onShowNotification?: (text: string, type: "success" | "error" | "info") => void;
 }
 
-export default function AuditTrailTab({ initiallySelectedAuditId, onClearSelected }: AuditTrailTabProps = {}) {
- const [logs, setLogs] = useState<AuditLog[]>(() => SheetsSyncEngine.getAuditLogs());
- const [search, setSearch] = useState("");
- const [timeFilter, setTimeFilter] = useState<"Today" |"Week" |"Month" |"Year" |"All Time">("All Time");
- const [sortBy, setSortBy] = useState<"id" |"user" |"action" |"module" |"timestamp">("timestamp");
- const [sortOrder, setSortOrder] = useState<"asc" |"desc">("desc");
- const [currentPage, setCurrentPage] = useState(1);
- const itemsPerPage = 10;
+export default function AuditTrailTab({ 
+  initiallySelectedAuditId, 
+  onClearSelected,
+  userRole,
+  onShowNotification
+}: AuditTrailTabProps = {}) {
+  const [logs, setLogs] = useState<AuditLog[]>(() => SheetsSyncEngine.getAuditLogs());
+  const [search, setSearch] = useState("");
+  const [timeFilter, setTimeFilter] = useState<"Today" | "Week" | "Month" | "Year" | "All Time">("All Time");
+  const [sortBy, setSortBy] = useState<"id" | "user" | "action" | "module" | "timestamp">("timestamp");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
- // Selected audit log for detail view modal
- const [selectedAuditLog, setSelectedAuditLog] = useState<AuditLog | null>(null);
+  // Selected audit log for detail view modal
+  const [selectedAuditLog, setSelectedAuditLog] = useState<AuditLog | null>(null);
 
- // Handle prop-driven auto selection for audit log drill-downs
- React.useEffect(() => {
- if (initiallySelectedAuditId) {
- const match = logs.find(log => log.id === initiallySelectedAuditId);
- if (match) {
- setSelectedAuditLog(match);
- if (onClearSelected) onClearSelected();
- }
- }
- }, [initiallySelectedAuditId, logs, onClearSelected]);
+  // Handle prop-driven auto selection for audit log drill-downs
+  React.useEffect(() => {
+    if (initiallySelectedAuditId) {
+      const match = logs.find(log => log.id === initiallySelectedAuditId);
+      if (match) {
+        setSelectedAuditLog(match);
+        if (onClearSelected) onClearSelected();
+      }
+    }
+  }, [initiallySelectedAuditId, logs, onClearSelected]);
 
- const handleClearLogs = () => {
- const confirmClear = window.confirm("Are you sure you want to clear system audit trail archives? This task cannot be undone.");
- if (!confirmClear) return;
- 
- const initialLog: AuditLog = {
- id: `AUDIT-CLEARED-${Date.now()}`,
- actionType:"Audit cleared",
- userName: SheetsSyncEngine.getCurrentUser()?.fullName ||"System Admin",
- date: new Date().toISOString().split("T")[0],
- time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
- previousValue:"Previous audit trail",
- newValue:"Log history cleared and resynchronized by authorized Admin."
- };
+  const handleClearLogs = () => {
+    if (userRole !== "Superadmin") {
+      if (onShowNotification) {
+        onShowNotification("Access Denied: Only Superadmin has clearance to purge system audit logs.", "error");
+      } else {
+        alert("Access Denied: Only Superadmin has clearance to purge system audit logs.");
+      }
+      return;
+    }
 
- SheetsSyncEngine.saveAuditLogs([initialLog]);
- setLogs([initialLog]);
- setCurrentPage(1);
- };
+    const confirmClear = window.confirm("Are you sure you want to clear system audit trail archives? This task cannot be undone.");
+    if (!confirmClear) return;
+    
+    const initialLog: AuditLog = {
+      id: `AUDIT-CLEARED-${Date.now()}`,
+      actionType: "Audit cleared",
+      userName: SheetsSyncEngine.getCurrentUser()?.fullName || "System Admin",
+      date: new Date().toISOString().split("T")[0],
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      previousValue: "Previous audit trail",
+      newValue: "Log history cleared and resynchronized by authorized Admin."
+    };
+
+    SheetsSyncEngine.saveAuditLogs([initialLog]);
+    setLogs([initialLog]);
+    setCurrentPage(1);
+  };
 
  const reloadLogs = () => {
  setLogs(SheetsSyncEngine.getAuditLogs());
@@ -213,13 +229,14 @@ export default function AuditTrailTab({ initiallySelectedAuditId, onClearSelecte
  <RefreshCw className="h-3.5 w-3.5" />
  <span>Reload Logs</span>
  </button>
- 
- <button
- onClick={handleClearLogs}
- className="inline-flex items-center gap-1.5 bg-rose-50 dark:bg-rose-950/20 text-rose-600 border border-rose-200 dark:border-rose-900/40 rounded-lg px-3 py-1.5 text-xs font-bold hover:bg-rose-100 dark:hover:bg-rose-950/30 active:scale-95 transition-all cursor-pointer"
- >
- <span>Purge Ledger</span>
- </button>
+  {userRole === "Superadmin" && (
+    <button
+      onClick={handleClearLogs}
+      className="inline-flex items-center gap-1.5 bg-rose-50 dark:bg-rose-950/20 text-rose-600 border border-rose-200 dark:border-rose-900/40 rounded-lg px-3 py-1.5 text-xs font-bold hover:bg-rose-100 dark:hover:bg-rose-950/30 active:scale-95 transition-all cursor-pointer"
+    >
+      <span>Purge Ledger</span>
+    </button>
+  )}
  </div>
  </div>
 
