@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from"react";
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from"recharts";
+import React, { useState, useEffect } from "react";
+import { ResponsiveContainer, BarChart, Bar, LineChart, Line, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 import { 
   DollarSign, 
   FileText, 
@@ -104,6 +104,27 @@ export default function Dashboard({ stats, onRefresh, onNavigateToTab, userRole 
   const [selectedGpsUsername, setSelectedGpsUsername] = useState<string | null>(null);
   const [localNotification, setLocalNotification] = useState<string | null>(null);
 
+  // Upgrade States
+  const [latencyHistory, setLatencyHistory] = useState<{ time: string; latency: number }[]>(() => {
+    return Array.from({ length: 10 }, (_, i) => ({
+      time: `${i + 1}s`,
+      latency: 42
+    }));
+  });
+
+  const [shellLogs, setShellLogs] = useState<string[]>([
+    "OMNI-TELEMATRIX OS [Version 4.2.1]",
+    "(c) 2026 Omni Telematrix Corporate. All rights reserved.",
+    "Database Node: SUPABASE_LIVE_01 (CONNECTED)",
+    "Security clearance: SUPERADMIN (GOD_MODE)",
+    "Type 'help' to dump active command shunts.",
+    ""
+  ]);
+  const [shellInput, setShellInput] = useState("");
+  const consoleInputRef = React.useRef<HTMLInputElement>(null);
+  const terminalLogsRef = React.useRef<HTMLDivElement>(null);
+  const [activeAuditModal, setActiveAuditModal] = useState<any | null>(null);
+
   const triggerLocalNotification = (msg: string) => {
     setLocalNotification(msg);
     setTimeout(() => setLocalNotification(null), 4000);
@@ -131,25 +152,159 @@ export default function Dashboard({ stats, onRefresh, onNavigateToTab, userRole 
   useEffect(() => {
     if (!isSuperadmin) return;
     const timer = setInterval(() => {
+      const nextCpu = +(10 + Math.random() * 5).toFixed(1);
+      const nextMemory = Math.round(340 + (Math.random() - 0.5) * 6);
+      const nextLatency = Math.max(15, Math.round(42 + (Math.random() - 0.5) * 8));
+
       setTelemetry(prev => ({
-        cpu: +(prev.cpu + (Math.random() - 0.5) * 1.5).toFixed(1),
-        memory: Math.round(prev.memory + (Math.random() - 0.5) * 4),
-        latency: Math.max(10, Math.round(prev.latency + (Math.random() - 0.5) * 6)),
+        cpu: nextCpu,
+        memory: nextMemory,
+        latency: nextLatency,
         network: "CONNECTED",
       }));
+
       setBackendPerf(prev => ({
-        latency: Math.max(15, Math.round(prev.latency + (Math.random() - 0.5) * 6)),
+        latency: nextLatency,
         activeConnections: Math.max(1, Math.min(15, Math.round(prev.activeConnections + (Math.random() - 0.5) * 2))),
         idleConnections: Math.max(5, Math.min(25, Math.round(prev.idleConnections + (Math.random() - 0.5) * 2))),
         txRate: +(Math.max(0.2, prev.txRate + (Math.random() - 0.5) * 0.4)).toFixed(1),
         cacheHitRate: +(Math.max(90, Math.min(100, prev.cacheHitRate + (Math.random() - 0.5) * 0.5))).toFixed(1),
       }));
+
+      setLatencyHistory(prev => {
+        const nextHist = [...prev.slice(1), { 
+          time: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' }).substring(6, 8) + 's', 
+          latency: nextLatency 
+        }];
+        return nextHist;
+      });
+
       if (soundEnabled) {
         playBeep(120, 0.01, "sine");
       }
     }, 3000);
     return () => clearInterval(timer);
   }, [isSuperadmin, soundEnabled]);
+
+  // Terminal Auto-scroller Effect
+  useEffect(() => {
+    if (terminalLogsRef.current) {
+      terminalLogsRef.current.scrollTop = terminalLogsRef.current.scrollHeight;
+    }
+  }, [shellLogs]);
+
+  // Shell command executor shunts
+  const handleShellCommand = () => {
+    const cmd = shellInput.trim();
+    if (!cmd) return;
+
+    const newLogs = [...shellLogs, `guest@omni_telematrix:~$ ${cmd}`];
+    if (soundEnabled) playBeep(700, 0.05, "sine");
+
+    const cmdTokens = cmd.split(" ");
+    const cleanCmd = cmdTokens[0].toLowerCase();
+    let response: string[] = [];
+
+    switch (cleanCmd) {
+      case "help":
+        response = [
+          "Available terminal command shunts:",
+          "  help               - Display this help matrix",
+          "  status             - Read active database & resource telemetry status",
+          "  sysinfo            - Print server node configuration parameters",
+          "  optimize / vacuum  - Rebuild indexes and vacuum database shunts",
+          "  operator <name>    - Target live map focus onto specific username",
+          "  sound              - Toggle audio telemetry feedback chime",
+          "  matrix             - Trigger metric cascade visual shunts",
+          "  clear              - Flush terminal log buffer"
+        ];
+        break;
+      case "clear":
+        setShellLogs([]);
+        setShellInput("");
+        return;
+      case "status":
+        response = [
+          `[OMNI NODE TELEMETRY REPORT]`,
+          `  CPU Core Load:  ${telemetry.cpu}%`,
+          `  Heap Memory:    ${telemetry.memory} MB / 16 GB`,
+          `  Latency:        ${backendPerf.latency} ms`,
+          `  Sync Mode:      ACTIVE SUPABASE`,
+          `  Sockets Limit:  128 / 500 Links`
+        ];
+        break;
+      case "sysinfo":
+        response = [
+          `[SERVER PARAMETERS]`,
+          `  DB Engine:     PostgreSQL 15.6 (Supabase LIVE)`,
+          `  Host Node ID:  SUPABASE_AP_SOUTH_1_LIVE`,
+          `  Terminal ID:   ${SheetsSyncEngine.getTerminalId()}`,
+          `  Active User:   ${currentUser?.fullName} (@${currentUser?.username})`,
+          `  Role Level:    SUPERADMIN`
+        ];
+        break;
+      case "optimize":
+      case "vacuum":
+        response = [
+          "Initiating database indices reorganization...",
+          "Vacuuming descriptors...",
+          "Rebuilding b-tree indexes..."
+        ];
+        if (soundEnabled) {
+          setTimeout(() => playBeep(200, 0.4, "triangle"), 100);
+          setTimeout(() => playBeep(400, 0.4, "triangle"), 300);
+          setTimeout(() => playBeep(800, 0.6, "sine"), 500);
+        }
+        setTimeout(() => {
+          setShellLogs(prev => [
+            ...prev,
+            "Vacuum optimization complete. 0.45MB descriptor space reclaimed."
+          ]);
+        }, 1200);
+        break;
+      case "operator":
+        const targetUser = cmdTokens[1];
+        if (!targetUser) {
+          response = ["Error: Specify operator username. Example: 'operator admin'"];
+        } else {
+          const found = activities.find(act => act.username.toLowerCase() === targetUser.toLowerCase());
+          if (found) {
+            setSelectedGpsUsername(found.username);
+            response = [
+              `Target lock confirmed: @${found.username}`,
+              `Panned GPS map focus to active operator coordinates.`
+            ];
+            if (soundEnabled) {
+              playBeep(450, 0.1, "sine");
+              setTimeout(() => playBeep(900, 0.2, "sine"), 100);
+            }
+          } else {
+            response = [`Error: Operator @${targetUser} not found in telemetry registries.`];
+          }
+        }
+        break;
+      case "sound":
+        const nextSound = !soundEnabled;
+        setSoundEnabled(nextSound);
+        localStorage.setItem("telemetry_sound_enabled", nextSound ? "true" : "false");
+        response = [`Audio telemetry chimes changed: ${nextSound ? "MUTED" : "ENABLED"}`];
+        if (nextSound) playBeep(600, 0.15, "triangle");
+        break;
+      case "matrix":
+        response = [
+          "01001101 01000001 01010100 01010010 01001001 01011000",
+          "  INTRUSION_DETECTION_SHUNTS: ENABLED",
+          "  >> METRIC FLOW DECRYPTED SUCCESS <<",
+          "  " + Array.from({ length: 3 }, () => Math.random().toString(36).substring(2, 10).toUpperCase()).join(" :: ")
+        ];
+        break;
+      default:
+        response = [`Command not found: '${cleanCmd}'. Type 'help' to print list.`];
+    }
+
+    setShellLogs([...newLogs, ...response, ""]);
+    setShellInput("");
+  };
 
   const activities = SheetsSyncEngine.getUserActivities();
   const operatorsWithGps = Array.from(new Set(
@@ -379,33 +534,32 @@ export default function Dashboard({ stats, onRefresh, onNavigateToTab, userRole 
           </div>
         </div>
 
-        {/* 3. MIDDLE ROW (Map & Active Sessions) */}
+        {/* 3. MIDDLE ROW (Map, Active Sessions, and CLI Terminal) */}
         <div className="grid gap-6 lg:grid-cols-3">
           {/* Live Operator Geolocation Map */}
-          <div className="rounded-xl border border-default bg-card p-5 shadow-sm lg:col-span-2 flex flex-col h-[400px]">
+          <div className="rounded-xl border border-default bg-card p-5 shadow-sm flex flex-col h-[360px]">
             <div className="flex items-center justify-between mb-3 border-b border-default pb-3">
               <div className="flex items-center gap-2">
                 <Globe className="h-5 w-5 text-blue-600 dark:text-blue-450 animate-spin-slow" />
                 <div>
-                  <h3 className="font-bold text-primary text-sm font-sans">Live Operator Geolocation Tracking</h3>
-                  <p className="text-[11px] text-muted font-sans">Active field operators coordinate lock</p>
+                  <h3 className="font-bold text-primary text-sm font-sans">Live Geolocation Map</h3>
+                  <p className="text-[11px] text-muted font-sans">Active field operator lock</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-xs text-secondary font-sans">Operator:</span>
                 <select
                   value={selectedGpsUsername || ""}
                   onChange={(e) => setSelectedGpsUsername(e.target.value || null)}
-                  className="bg-surface border border-default rounded px-2 py-1 text-xs text-primary outline-none cursor-pointer"
+                  className="bg-surface border border-default rounded px-2 py-0.5 text-[11px] text-primary outline-none cursor-pointer"
                 >
-                  <option value="">-- Active Operator --</option>
+                  <option value="">-- Operator --</option>
                   {operatorsWithGps.map(username => (
                     <option key={username} value={username}>@{username}</option>
                   ))}
                 </select>
               </div>
             </div>
-            <div className="flex-1 relative rounded-lg overflow-hidden border border-default bg-surface shadow-inner min-h-[220px]">
+            <div className="flex-1 relative rounded-lg overflow-hidden border border-default bg-surface shadow-inner">
               <iframe
                 ref={iframeRef}
                 title="GPS Geolocation Map"
@@ -422,13 +576,13 @@ export default function Dashboard({ stats, onRefresh, onNavigateToTab, userRole 
           </div>
 
           {/* Active User Sessions */}
-          <div className="rounded-xl border border-default bg-card p-5 shadow-sm flex flex-col h-[400px]">
+          <div className="rounded-xl border border-default bg-card p-5 shadow-sm flex flex-col h-[360px]">
             <div className="mb-3 border-b border-default pb-3 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Users className="h-5 w-5 text-purple-600 dark:text-purple-450" />
                 <div>
                   <h3 className="font-bold text-primary text-sm font-sans">Active User Sessions</h3>
-                  <p className="text-[11px] text-muted font-sans">Currently logged in operators</p>
+                  <p className="text-[11px] text-muted font-sans">Currently online operators</p>
                 </div>
               </div>
               <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
@@ -436,13 +590,13 @@ export default function Dashboard({ stats, onRefresh, onNavigateToTab, userRole 
                 {onlineOperators.length} Active
               </span>
             </div>
-            <div className="flex-1 overflow-y-auto space-y-3 pr-1">
+            <div className="flex-1 overflow-y-auto space-y-3 pr-1 scrollbar-thin">
               {onlineOperators.map((op, idx) => (
                 <div key={idx} className="text-xs border-b border-default pb-2.5 last:border-0 last:pb-0 flex items-center justify-between">
                   <div className="space-y-0.5">
                     <div className="flex items-center gap-2">
                       <span className="font-bold text-primary">@{op.username}</span>
-                      <span className="text-[9px] px-1.5 py-0.2 rounded bg-blue-500/10 text-blue-505 font-semibold">{op.os || "OS"}</span>
+                      <span className="text-[9px] px-1.5 py-0.2 rounded bg-blue-500/10 text-blue-600 font-semibold">{op.os || "OS"}</span>
                     </div>
                     <div className="text-[10px] text-secondary flex items-center gap-1.5 font-sans">
                       <span>IP: {op.ipAddress.split(" ")[0]}</span>
@@ -464,29 +618,74 @@ export default function Dashboard({ stats, onRefresh, onNavigateToTab, userRole 
               )}
             </div>
           </div>
+
+          {/* Interactive Monospace CLI Terminal */}
+          <div className="rounded-xl border border-default bg-card p-5 shadow-sm flex flex-col h-[360px]">
+            <div className="mb-3 border-b border-default pb-3 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Terminal className="h-5 w-5 text-blue-605 dark:text-blue-450" />
+                <div>
+                  <h3 className="font-bold text-primary text-sm font-sans">Interactive CLI Shell</h3>
+                  <p className="text-[11px] text-muted font-sans">Direct database and server node control</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-[9px] text-emerald-600 dark:text-emerald-450 font-bold font-sans">SYS_READY</span>
+              </div>
+            </div>
+            <div className="flex-1 bg-zinc-950 text-zinc-200 rounded-lg p-3 font-mono text-[11px] flex flex-col justify-between overflow-hidden shadow-inner border border-zinc-800">
+              <div 
+                ref={terminalLogsRef}
+                className="flex-1 overflow-y-auto space-y-1.5 mb-2 scrollbar-thin scrollbar-thumb-zinc-800 pr-1 select-text"
+              >
+                {shellLogs.map((log, idx) => (
+                  <div key={idx} className="whitespace-pre-wrap leading-relaxed">
+                    {log}
+                  </div>
+                ))}
+              </div>
+              <div className="flex items-center border-t border-zinc-850 pt-2 shrink-0">
+                <span className="text-emerald-500 mr-1.5 select-none font-bold">guest@omni:~$</span>
+                <input
+                  ref={consoleInputRef}
+                  type="text"
+                  value={shellInput}
+                  onChange={(e) => setShellInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      handleShellCommand();
+                    }
+                  }}
+                  placeholder="Type 'help'..."
+                  className="flex-1 bg-transparent text-zinc-100 outline-none border-0 p-0 font-mono text-[11px] placeholder-zinc-600 focus:ring-0 focus:outline-none"
+                />
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* 4. PERFORMANCE & CONTROLS & SECURITY AUDIT GRID (3 Columns) */}
+        {/* 4. TELEMETRY, REVENUE, AND TIMELINE (3 Columns) */}
         <div className="grid gap-6 lg:grid-cols-3">
-          {/* System Telemetry & Control Panel */}
-          <div className="rounded-xl border border-default bg-card p-5 shadow-sm flex flex-col h-[340px] justify-between">
-            <div>
-              <div className="mb-4 border-b border-default pb-3 flex items-center justify-between">
+          {/* Telemetry Monitor & Latency Graph */}
+          <div className="rounded-xl border border-default bg-card p-5 shadow-sm flex flex-col h-[380px] justify-between">
+            <div className="flex flex-col flex-1">
+              <div className="mb-4 border-b border-default pb-3 flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-2">
-                  <Cpu className="h-5 w-5 text-purple-600 dark:text-purple-405" />
+                  <Cpu className="h-5 w-5 text-purple-605 dark:text-purple-405" />
                   <div>
                     <h3 className="font-bold text-primary text-sm font-sans">System Telemetry</h3>
-                    <p className="text-[11px] text-muted font-sans">Real-time resources and control shunts</p>
+                    <p className="text-[11px] text-muted font-sans">Real-time resource performance</p>
                   </div>
                 </div>
               </div>
 
               {/* Telemetry Metrics */}
-              <div className="space-y-3 mb-5 font-mono text-xs">
+              <div className="space-y-2.5 font-mono text-xs shrink-0">
                 <div className="flex justify-between items-center border-b border-default/60 pb-1.5">
                   <span className="text-secondary font-sans font-medium flex items-center gap-1.5">
                     <Activity className="h-3.5 w-3.5 text-blue-505" />
-                    CPU Core Load
+                    CPU Load
                   </span>
                   <span className="text-primary font-bold flex items-center gap-2">
                     <div className="w-16 bg-gray-200 dark:bg-zinc-800 rounded-full h-1.5 overflow-hidden">
@@ -503,27 +702,43 @@ export default function Dashboard({ stats, onRefresh, onNavigateToTab, userRole 
                     <Database className="h-3.5 w-3.5 text-purple-500" />
                     Heap Memory
                   </span>
-                  <span className="text-primary font-bold">{telemetry.memory} MB / 16 GB</span>
+                  <span className="text-primary font-bold">{telemetry.memory} MB</span>
                 </div>
                 <div className="flex justify-between items-center border-b border-default/60 pb-1.5">
                   <span className="text-secondary font-sans font-medium flex items-center gap-1.5">
-                    <Clock className="h-3.5 w-3.5 text-amber-500" />
-                    System Uptime
+                    <Server className="h-3.5 w-3.5 text-emerald-500" />
+                    Cache Hit Rate
                   </span>
-                  <span className="text-primary font-bold">7D 14H 22M</span>
+                  <span className="text-primary font-bold">{backendPerf.cacheHitRate}%</span>
                 </div>
-                <div className="flex justify-between items-center border-b border-default/60 pb-1.5">
-                  <span className="text-secondary font-sans font-medium flex items-center gap-1.5">
-                    <Globe className="h-3.5 w-3.5 text-emerald-500" />
-                    Sync Mode
-                  </span>
-                  <span className="text-primary font-bold text-emerald-600 dark:text-emerald-450 font-sans">ACTIVE SUPABASE</span>
+              </div>
+
+              {/* Real-time Latency Graph */}
+              <div className="flex-1 min-h-[120px] mt-4 flex flex-col justify-end">
+                <h4 className="text-[10px] font-bold text-secondary uppercase mb-2 font-sans">Request Latency Trace (ms)</h4>
+                <div className="flex-1 w-full relative">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={latencyHistory} margin={{ top: 5, right: 10, left: -25, bottom: 0 }}>
+                      <XAxis dataKey="time" stroke={isDark ? "#71717a" : "#94a3b8"} fontSize={8} tickLine={false} />
+                      <YAxis stroke={isDark ? "#71717a" : "#94a3b8"} fontSize={8} tickLine={false} axisLine={false} />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: isDark ? "#18181b" : "#ffffff",
+                          borderRadius: "6px",
+                          border: isDark ? "1px solid #27272a" : "1px solid #e2e8f0",
+                          fontSize: "10px",
+                          color: isDark ? "#f4f4f5" : "#0f172a"
+                        }}
+                      />
+                      <Line type="monotone" dataKey="latency" stroke="#3b82f6" strokeWidth={2} dot={false} activeDot={{ r: 3 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
                 </div>
               </div>
             </div>
 
-            {/* Action Controls */}
-            <div className="space-y-2">
+            {/* Controls */}
+            <div className="space-y-2 mt-4 shrink-0">
               <div className="grid grid-cols-2 gap-2">
                 <button
                   onClick={handleVacuumDb}
@@ -567,124 +782,117 @@ export default function Dashboard({ stats, onRefresh, onNavigateToTab, userRole 
             </div>
           </div>
 
-          {/* Backend Performance Monitor */}
-          <div className="rounded-xl border border-default bg-card p-5 shadow-sm flex flex-col h-[340px] justify-between">
-            <div>
-              <div className="mb-4 border-b border-default pb-3 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Server className="h-5 w-5 text-emerald-600 dark:text-emerald-450" />
-                  <div>
-                    <h3 className="font-bold text-primary text-sm font-sans">Backend Performance</h3>
-                    <p className="text-[11px] text-muted font-sans">Live throughput & connections</p>
-                  </div>
-                </div>
-                <span className="text-[9px] text-emerald-600 dark:text-emerald-450 font-bold bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
-                  ONLINE
-                </span>
-              </div>
-
-              {/* Performance Metrics list */}
-              <div className="space-y-3 mb-5 font-mono text-xs">
-                <div className="flex justify-between items-center border-b border-default/60 pb-1.5">
-                  <span className="text-secondary font-sans font-medium">Request Latency</span>
-                  <span className="text-primary font-bold flex items-center gap-2">
-                    <div className="w-16 bg-gray-200 dark:bg-zinc-800 rounded-full h-1.5 overflow-hidden">
-                      <div 
-                        className="bg-emerald-500 h-1.5 rounded-full transition-all duration-300"
-                        style={{ width: `${Math.min(100, (backendPerf.latency / 120) * 100)}%` }}
-                      />
-                    </div>
-                    {backendPerf.latency} ms
-                  </span>
-                </div>
-                <div className="flex justify-between items-center border-b border-default/60 pb-1.5">
-                  <span className="text-secondary font-sans font-medium">DB Connection Pool</span>
-                  <span className="text-primary font-bold flex items-center gap-1.5 flex-wrap">
-                    <span className="text-emerald-600 dark:text-emerald-450">{backendPerf.activeConnections} Active</span>
-                    <span className="text-secondary">/</span>
-                    <span className="text-muted">{backendPerf.idleConnections} Idle</span>
-                  </span>
-                </div>
-                <div className="flex justify-between items-center border-b border-default/60 pb-1.5">
-                  <span className="text-secondary font-sans font-medium">Transaction Rate</span>
-                  <span className="text-primary font-bold">{backendPerf.txRate} tx/s</span>
-                </div>
-                <div className="flex justify-between items-center border-b border-default/60 pb-1.5">
-                  <span className="text-secondary font-sans font-medium">Cache Hit Rate</span>
-                  <span className="text-primary font-bold text-emerald-600 dark:text-emerald-450">{backendPerf.cacheHitRate}%</span>
+          {/* Monthly Revenue Trend Line/Area Chart */}
+          <div className="rounded-xl border border-default bg-card p-5 shadow-sm flex flex-col h-[380px]">
+            <div className="mb-4 flex items-center justify-between border-b border-default pb-3 shrink-0">
+              <div className="flex items-center gap-2">
+                <TrendingUp className="h-5 w-5 text-blue-605 dark:text-blue-450" />
+                <div>
+                  <h3 className="font-bold text-primary text-sm font-sans">Monthly Revenue</h3>
+                  <p className="text-[11px] text-muted font-sans">Gross billing sales cycles</p>
                 </div>
               </div>
+              <span className="font-mono text-[9px] text-muted uppercase">Gross Sales (₹)</span>
             </div>
-
-            {/* Performance health radar visual details */}
-            <div className="p-2.5 bg-surface rounded-lg border border-default flex items-center justify-between text-[10px]">
-              <span className="text-secondary font-sans font-medium">
-                Sockets: <strong>{onlineOperators.length + 1} Links</strong>
-              </span>
-              <div className="flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-ping" />
-                <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-450 font-mono">OPERATIONAL</span>
-              </div>
+            <div className="flex-1 w-full relative min-h-[220px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={stats.monthlySales} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="revenueGlow" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.15}/>
+                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke={isDark ? "#27272a" : "#f1f5f9"} vertical={false} />
+                  <XAxis dataKey="month" stroke={isDark ? "#71717a" : "#94a3b8"} fontSize={9} tickLine={false} />
+                  <YAxis stroke={isDark ? "#71717a" : "#94a3b8"} fontSize={9} tickLine={false} axisLine={false} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: isDark ? "#18181b" : "#ffffff",
+                      borderRadius: "8px",
+                      border: isDark ? "1px solid #27272a" : "1px solid #e2e8f0",
+                      color: isDark ? "#f4f4f5" : "#0f172a",
+                      fontSize: "11px"
+                    }}
+                    formatter={(value: any) => [`₹${value.toLocaleString('en-IN')}`, "Sales"]}
+                  />
+                  <Area type="monotone" dataKey="sales" stroke="#3b82f6" strokeWidth={2.5} fillOpacity={1} fill="url(#revenueGlow)" />
+                </AreaChart>
+              </ResponsiveContainer>
             </div>
           </div>
 
-          {/* Security Audit Ledger Logs */}
-          <div className="rounded-xl border border-default bg-card p-5 shadow-sm flex flex-col h-[340px] justify-between">
-            <div>
-              <div className="mb-4 border-b border-default pb-3 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Shield className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
-                  <div>
-                    <h3 className="font-bold text-primary text-sm font-sans">Security Audit Trail</h3>
-                    <p className="text-[11px] text-muted font-sans">Latest node execution traces</p>
-                  </div>
+          {/* Interactive Chronological Security Timeline */}
+          <div className="rounded-xl border border-default bg-card p-5 shadow-sm flex flex-col h-[380px]">
+            <div className="mb-4 border-b border-default pb-3 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-2">
+                <Shield className="h-5 w-5 text-indigo-650 dark:text-indigo-400" />
+                <div>
+                  <h3 className="font-bold text-primary text-sm font-sans">Visual Security Timeline</h3>
+                  <p className="text-[11px] text-muted font-sans">Interactive system trace ledger</p>
                 </div>
-                <button
-                  onClick={handleExportLedgerDump}
-                  className="p-1 rounded hover:bg-surface text-secondary hover:text-primary transition"
-                  title="Download Ledger Dump"
-                >
-                  <Download className="h-4 w-4" />
-                </button>
               </div>
+              <button
+                onClick={handleExportLedgerDump}
+                className="p-1 rounded hover:bg-surface text-secondary hover:text-primary transition"
+                title="Download Ledger Dump"
+              >
+                <Download className="h-4 w-4" />
+              </button>
+            </div>
 
-              {/* Scrollable logs list */}
-              <div className="overflow-y-auto max-h-[175px] space-y-2.5 pr-1 font-sans">
-                {limitLogs.map((log) => (
-                  <div 
-                    key={log.id} 
-                    className="text-xs p-2 rounded-lg bg-surface/50 border border-default/60 hover:bg-surface transition"
-                    title={`Event Trace: ${log.id}`}
-                  >
-                    <div className="flex items-center justify-between font-mono text-[9px] text-muted">
-                      <span>{log.date} {log.time}</span>
-                      <span>@{log.userName}</span>
+            <div className="flex-1 overflow-y-auto pr-1 relative scrollbar-thin min-h-[220px]">
+              <div className="absolute left-[13px] top-2 bottom-2 w-[2px] bg-zinc-200 dark:bg-zinc-800" />
+              <div className="space-y-4 relative">
+                {limitLogs.map((log) => {
+                  const isCritical = log.actionType.includes("Delete") || log.actionType.includes("Purge") || log.actionType.includes("Force");
+                  const isAuth = log.actionType.includes("Log") || log.actionType.includes("Auth");
+                  return (
+                    <div 
+                      key={log.id} 
+                      onClick={() => setActiveAuditModal(log)}
+                      className="relative pl-7 group cursor-pointer hover:translate-x-0.5 transition-all duration-150"
+                    >
+                      <div className={`absolute left-2.5 top-1.5 w-2 h-2 rounded-full -translate-x-[3px] ring-4 ${
+                        isCritical 
+                          ? "bg-red-500 ring-red-500/20 group-hover:scale-125" 
+                          : isAuth 
+                          ? "bg-blue-500 ring-blue-500/20 group-hover:scale-125"
+                          : "bg-indigo-500 ring-indigo-500/20 group-hover:scale-125"
+                      } transition-transform duration-150`} />
+
+                      <div className="p-2.5 bg-surface/50 border border-default rounded-lg hover:border-blue-500/50 hover:bg-surface transition-all duration-150 shadow-sm">
+                        <div className="flex items-center justify-between">
+                          <span className="font-mono text-[9px] text-muted">{log.date} {log.time}</span>
+                          <span className="text-[9px] font-bold text-secondary">@{log.userName}</span>
+                        </div>
+                        <div className="flex items-center justify-between mt-1 gap-1">
+                          <span className={`inline-block px-1.5 py-0.2 rounded text-[8px] font-bold ${
+                            isCritical
+                              ? "bg-red-500/10 text-red-500"
+                              : isAuth
+                              ? "bg-blue-500/10 text-blue-500"
+                              : "bg-indigo-500/10 text-indigo-500"
+                          }`}>
+                            {log.actionType}
+                          </span>
+                          <span className="font-mono text-[8px] text-muted">#{log.id.substring(0, 5)}</span>
+                        </div>
+                        <p className="text-secondary text-[10px] leading-snug mt-1.5 line-clamp-2 break-all">{log.newValue || "System execution trace."}</p>
+                      </div>
                     </div>
-                    <div className="flex items-center justify-between mt-1 gap-1">
-                      <span className={`inline-block px-1.5 py-0.2 rounded text-[8px] font-bold ${
-                        log.actionType.includes("Delete") || log.actionType.includes("Purge")
-                          ? "bg-red-500/10 text-red-500"
-                          : log.actionType.includes("Log") || log.actionType.includes("Auth")
-                          ? "bg-blue-500/10 text-blue-500"
-                          : "bg-purple-500/10 text-purple-500"
-                      }`}>
-                        {log.actionType}
-                      </span>
-                      <span className="font-mono text-[8px] text-muted shrink-0">#{log.id.substring(0, 5)}</span>
-                    </div>
-                    <p className="text-secondary text-[10px] leading-snug mt-1.5 line-clamp-2 break-all">{log.newValue || "System execution check."}</p>
-                  </div>
-                ))}
+                  );
+                })}
                 {limitLogs.length === 0 && (
-                  <div className="flex flex-col items-center justify-center py-8 text-center text-muted">
+                  <div className="flex flex-col items-center justify-center py-12 text-center text-muted">
                     <Shield className="h-6 w-6 text-muted/50 mb-1.5" />
-                    <p className="text-xs">No records found</p>
+                    <p className="text-xs">No traces recorded</p>
                   </div>
                 )}
               </div>
             </div>
-            
-            <div className="pt-2 border-t border-default/60 flex items-center justify-between">
+
+            <div className="pt-3 border-t border-default/60 mt-3 flex items-center justify-between shrink-0">
               <button
                 onClick={() => onNavigateToTab("audit")}
                 className="text-[10px] font-bold text-blue-600 dark:text-blue-450 hover:underline cursor-pointer bg-transparent border-0"
@@ -695,6 +903,103 @@ export default function Dashboard({ stats, onRefresh, onNavigateToTab, userRole 
             </div>
           </div>
         </div>
+
+        {/* Details Modal Overlay */}
+        {activeAuditModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+            <div 
+              className="bg-card border border-default rounded-xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col animate-in zoom-in-95 duration-200"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="p-4 border-b border-default flex items-center justify-between bg-surface/50">
+                <div className="flex items-center gap-2">
+                  <Shield className="h-5 w-5 text-blue-650" />
+                  <div>
+                    <h3 className="font-bold text-primary text-sm font-sans">Audit Trace Details</h3>
+                    <p className="text-[10px] text-muted font-sans">Transaction verification matrix</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setActiveAuditModal(null)}
+                  className="text-secondary hover:text-primary transition text-xs font-semibold p-1 hover:bg-surface rounded-lg cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="p-5 space-y-4 text-xs overflow-y-auto max-h-[60vh]">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-0.5">
+                    <span className="text-secondary text-[10px] uppercase font-bold">Event ID</span>
+                    <p className="font-mono text-primary font-bold tracking-tight select-all">{activeAuditModal.id}</p>
+                  </div>
+                  <div className="space-y-0.5">
+                    <span className="text-secondary text-[10px] uppercase font-bold">Timestamp</span>
+                    <p className="text-primary font-mono">{activeAuditModal.date} {activeAuditModal.time}</p>
+                  </div>
+                  <div className="space-y-0.5">
+                    <span className="text-secondary text-[10px] uppercase font-bold">Authorized Operator</span>
+                    <p className="text-primary font-semibold">@{activeAuditModal.userName}</p>
+                  </div>
+                  <div className="space-y-0.5">
+                    <span className="text-secondary text-[10px] uppercase font-bold">Action Type</span>
+                    <div>
+                      <span className={`inline-block px-2 py-0.5 rounded text-[9px] font-bold ${
+                        activeAuditModal.actionType.includes("Delete") || activeAuditModal.actionType.includes("Purge")
+                          ? "bg-red-500/10 text-red-500"
+                          : activeAuditModal.actionType.includes("Log") || activeAuditModal.actionType.includes("Auth")
+                          ? "bg-blue-500/10 text-blue-550"
+                          : "bg-purple-500/10 text-purple-505"
+                      }`}>
+                        {activeAuditModal.actionType}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <span className="text-secondary text-[10px] uppercase font-bold">Details / Mutation trace</span>
+                  <div className="p-3 bg-surface border border-default rounded-lg font-mono text-[11px] text-secondary leading-relaxed break-all select-all whitespace-pre-wrap">
+                    {activeAuditModal.newValue || "No details provided."}
+                  </div>
+                </div>
+
+                {activeAuditModal.oldValue && (
+                  <div className="space-y-1">
+                    <span className="text-secondary text-[10px] uppercase font-bold">Prior State Reference</span>
+                    <div className="p-3 bg-surface border border-default rounded-lg font-mono text-[11px] text-secondary leading-relaxed break-all select-all whitespace-pre-wrap">
+                      {activeAuditModal.oldValue}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="p-4 border-t border-default bg-surface/50 flex justify-end gap-2 shrink-0">
+                <button
+                  onClick={() => {
+                    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(activeAuditModal, null, 2));
+                    const downloadAnchor = document.createElement("a");
+                    downloadAnchor.setAttribute("href", dataStr);
+                    downloadAnchor.setAttribute("download", `Trace_${activeAuditModal.id}.json`);
+                    document.body.appendChild(downloadAnchor);
+                    downloadAnchor.click();
+                    downloadAnchor.remove();
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-default bg-card px-3 py-2 text-xs font-semibold text-secondary hover:text-primary hover:bg-surface transition cursor-pointer"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  <span>Export Trace</span>
+                </button>
+                <button
+                  onClick={() => setActiveAuditModal(null)}
+                  className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700 transition cursor-pointer"
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {localNotification && (
           <div className="fixed bottom-4 right-4 z-50 flex items-center gap-2 px-4 py-3 text-sm font-semibold rounded-xl bg-card border border-default text-primary shadow-2xl animate-in slide-in-from-bottom-6 duration-300">
