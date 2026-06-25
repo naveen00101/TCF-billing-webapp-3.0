@@ -45,8 +45,8 @@ export default function LoginPage({ onLoginSuccess, onShowNotification }: LoginP
  return;
  }
 
- if (matchedUser.status ==="Disabled") {
- onShowNotification("This employee account has been disabled by the administrator.","error");
+ if (matchedUser.status ==="Disabled" || matchedUser.status === "Deleted") {
+ onShowNotification("This employee account has been disabled or deleted.","error");
  setIsLoading(false);
  return;
  }

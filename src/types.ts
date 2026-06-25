@@ -347,7 +347,7 @@ export interface User {
   email: string;
   mobile: string;
   role: UserRole;
-  status: "Active" | "Disabled";
+  status: "Active" | "Disabled" | "Deleted";
   dateCreated: string;
   lastLogin?: string;
   passwordHash: string; // Text storage for simulated offline engine

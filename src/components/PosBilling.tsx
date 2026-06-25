@@ -432,7 +432,7 @@ export default function PosBilling({
  }
  const cleanInp = promoCodeInput.trim().toUpperCase();
  const available = SheetsSyncEngine.getPromoCodes();
- const found = available.find(p => p.promoCode === cleanInp);
+ const found = available.find(p => !p.isSoftDeleted && p.promoCode === cleanInp);
 
  if (!found) {
  onShowNotification(`Coupon Code '${cleanInp}' is invalid or has expired.`,"error");

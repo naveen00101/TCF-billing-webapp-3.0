@@ -1820,6 +1820,24 @@ export class SheetsSyncEngine {
     }
   }
 
+  public static async deleteUserPermanently(userId: string): Promise<void> {
+    const list = this.getUsers().filter(u => u.id !== userId);
+    this.memoryCache["billing_user_registry"] = list;
+    if (supabase) {
+      const { error } = await supabase.from("users").delete().eq("id", userId);
+      if (error) console.error("[SyncEngine] Error deleting user permanently:", error);
+    }
+  }
+
+  public static async deletePromoCodePermanently(code: string): Promise<void> {
+    const list = this.getPromoCodes().filter(p => p.promoCode !== code);
+    this.memoryCache["billing_promo_codes"] = list;
+    if (supabase) {
+      const { error } = await supabase.from("promo_codes").delete().eq("promo_code", code);
+      if (error) console.error("[SyncEngine] Error deleting promo code permanently:", error);
+    }
+  }
+
   public static async deleteAgentPermanently(agentId: string): Promise<void> {
     const list = this.getAgents().filter(a => a.id !== agentId);
     this.memoryCache["billing_agents_registry"] = list;
@@ -1858,7 +1876,7 @@ export class SheetsSyncEngine {
     }
   }
 
-  public static async clearAllTrashOfType(type: "products" | "invoices" | "agents" | "customers"): Promise<void> {
+  public static async clearAllTrashOfType(type: "products" | "invoices" | "agents" | "customers" | "users" | "promo_codes"): Promise<void> {
     if (type === "products") {
       const deletedProds = this.getProducts().filter(p => p.isSoftDeleted);
       for (const p of deletedProds) {
@@ -1878,6 +1896,16 @@ export class SheetsSyncEngine {
       const deletedCusts = this.getCustomers().filter(c => c.isSoftDeleted);
       for (const c of deletedCusts) {
         await this.deleteCustomerPermanently(c.id);
+      }
+    } else if (type === "users") {
+      const deletedUsers = this.getUsers().filter(u => u.status === "Deleted");
+      for (const u of deletedUsers) {
+        await this.deleteUserPermanently(u.id);
+      }
+    } else if (type === "promo_codes") {
+      const deletedPromos = this.getPromoCodes().filter(p => p.isSoftDeleted);
+      for (const p of deletedPromos) {
+        await this.deletePromoCodePermanently(p.promoCode);
       }
     }
   }

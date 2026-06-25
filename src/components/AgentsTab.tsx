@@ -45,7 +45,7 @@ export default function AgentsTab({
  const isEmployee = userRole ==="Employee";
 
  // Data state
- const [agents, setAgents] = useState<Agent[]>(() => SheetsSyncEngine.getAgents());
+ const [agents, setAgents] = useState<Agent[]>(() => SheetsSyncEngine.getAgents().filter(a => !a.isSoftDeleted));
  const [invoices, setInvoices] = useState<Invoice[]>(() => SheetsSyncEngine.getInvoices());
 
  // Navigation state within Agents tab
@@ -85,11 +85,11 @@ export default function AgentsTab({
  const [status, setStatus] = useState<AgentStatus>("Active");
  const [notes, setNotes] = useState("");
 
- const reloadData = () => {
- setAgents(SheetsSyncEngine.getAgents());
- setInvoices(SheetsSyncEngine.getInvoices());
- onRefresh();
- };
+  const reloadData = () => {
+    setAgents(SheetsSyncEngine.getAgents().filter(a => !a.isSoftDeleted));
+    setInvoices(SheetsSyncEngine.getInvoices());
+    onRefresh();
+  };
 
  const resetForm = () => {
  setAgentName("");

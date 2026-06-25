@@ -9,7 +9,7 @@ interface PromoCodesTabProps {
 }
 
 export default function PromoCodesTab({ onShowNotification, onRefresh }: PromoCodesTabProps) {
- const [promos, setPromos] = useState<PromoCode[]>(SheetsSyncEngine.getPromoCodes());
+ const [promos, setPromos] = useState<PromoCode[]>(() => SheetsSyncEngine.getPromoCodes().filter(p => !p.isSoftDeleted));
  
  // Dialog / form states
  const [isAdding, setIsAdding] = useState(false);
@@ -28,7 +28,7 @@ export default function PromoCodesTab({ onShowNotification, onRefresh }: PromoCo
  const currentUser = SheetsSyncEngine.getCurrentUser();
 
  const reloadPromos = () => {
- const list = SheetsSyncEngine.getPromoCodes();
+ const list = SheetsSyncEngine.getPromoCodes().filter(p => !p.isSoftDeleted);
  setPromos(list);
  onRefresh();
  };
@@ -156,24 +156,24 @@ export default function PromoCodesTab({ onShowNotification, onRefresh }: PromoCo
  reloadPromos();
  };
 
- const handleDeletePromo = (code: string) => {
- const doubleConfirm = window.confirm(`Are you sure you want to permanently delete Promo Code '${code}'?`);
- if (!doubleConfirm) return;
+  const handleDeletePromo = (code: string) => {
+    const doubleConfirm = window.confirm(`Are you sure you want to delete Promo Code '${code}'?`);
+    if (!doubleConfirm) return;
 
- const list = SheetsSyncEngine.getPromoCodes();
- const filtered = list.filter(p => p.promoCode !== code);
- SheetsSyncEngine.savePromoCodes(filtered);
+    const list = SheetsSyncEngine.getPromoCodes();
+    const updated = list.map(p => p.promoCode === code ? { ...p, isSoftDeleted: true } : p);
+    SheetsSyncEngine.savePromoCodes(updated);
 
- SheetsSyncEngine.addAuditLog(
-"Promo Deleted",
- currentUser?.fullName ||"System Admin",
- `Coupon: ${code}`,
- `Deleted coupon permanently from the ledger.`
- );
+    SheetsSyncEngine.addAuditLog(
+      "Promo Deleted",
+      currentUser?.fullName || "System Admin",
+      `Coupon: ${code}`,
+      `Moved promo code to Trash.`
+    );
 
- onShowNotification(`✓ Promo Code ${code} deleted.`,"success");
- reloadPromos();
- };
+    onShowNotification(`✓ Promo Code ${code} moved to Trash.`, "success");
+    reloadPromos();
+  };
 
  const handleTogglePromoStatus = (promo: PromoCode) => {
  const nextStatus:"Active" |"Disabled" = promo.activeStatus ==="Active" ?"Disabled" :"Active";

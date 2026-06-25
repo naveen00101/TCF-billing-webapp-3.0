@@ -10,7 +10,7 @@ interface UserControlsTabProps {
 }
 
 export default function UserControlsTab({ onShowNotification, onRefresh }: UserControlsTabProps) {
- const [users, setUsers] = useState<User[]>(SheetsSyncEngine.getUsers());
+ const [users, setUsers] = useState<User[]>(() => SheetsSyncEngine.getUsers().filter(u => u.status !== "Deleted"));
  
  // Dialog / Edit states
  const [isAdding, setIsAdding] = useState(false);
@@ -29,7 +29,7 @@ export default function UserControlsTab({ onShowNotification, onRefresh }: UserC
  const [showResetPassword, setShowResetPassword] = useState(false);
 
  const reloadUsers = () => {
- const list = SheetsSyncEngine.getUsers();
+ const list = SheetsSyncEngine.getUsers().filter(u => u.status !== "Deleted");
  setUsers(list);
  if (onRefresh) onRefresh();
  };
@@ -42,7 +42,7 @@ export default function UserControlsTab({ onShowNotification, onRefresh }: UserC
  return;
  }
 
- const checkDuplicate = users.some(u => u.username.toLowerCase() === username.trim().toLowerCase());
+ const checkDuplicate = SheetsSyncEngine.getUsers().filter(u => u.status !== "Deleted").some(u => u.username.toLowerCase() === username.trim().toLowerCase());
  if (checkDuplicate) {
  onShowNotification(`A user with username '${username}' already exists.`,"error");
  return;
@@ -60,8 +60,9 @@ export default function UserControlsTab({ onShowNotification, onRefresh }: UserC
  passwordHash: MD5(password).toString()
  };
 
- const updated = [...users, newUser];
- SheetsSyncEngine.saveUsers(updated);
+ const allUsersAdd = SheetsSyncEngine.getUsers();
+ const updatedAdd = [...allUsersAdd, newUser];
+ SheetsSyncEngine.saveUsers(updatedAdd);
  
  // Audit log
  const currentUser = SheetsSyncEngine.getCurrentUser();
@@ -83,7 +84,8 @@ export default function UserControlsTab({ onShowNotification, onRefresh }: UserC
  e.preventDefault();
  if (!editingUser) return;
 
- const updated: User[] = users.map(u => {
+ const allUsersEdit = SheetsSyncEngine.getUsers();
+ const updatedEdit: User[] = allUsersEdit.map(u => {
  if (u.id === editingUser.id) {
  return {
  ...u,
@@ -96,7 +98,7 @@ export default function UserControlsTab({ onShowNotification, onRefresh }: UserC
  return u;
  });
 
- SheetsSyncEngine.saveUsers(updated);
+ SheetsSyncEngine.saveUsers(updatedEdit);
  
  const currentUser = SheetsSyncEngine.getCurrentUser();
  SheetsSyncEngine.addAuditLog(
@@ -117,14 +119,15 @@ export default function UserControlsTab({ onShowNotification, onRefresh }: UserC
  e.preventDefault();
  if (!resettingUser || !newPasswordValue.trim()) return;
 
- const updated: User[] = users.map(u => {
+ const allUsersReset = SheetsSyncEngine.getUsers();
+ const updatedReset: User[] = allUsersReset.map(u => {
  if (u.id === resettingUser.id) {
  return { ...u, passwordHash: MD5(newPasswordValue.trim()).toString() };
  }
  return u;
  });
 
- SheetsSyncEngine.saveUsers(updated);
+ SheetsSyncEngine.saveUsers(updatedReset);
 
  const currentUser = SheetsSyncEngine.getCurrentUser();
  SheetsSyncEngine.addAuditLog(
@@ -150,14 +153,15 @@ export default function UserControlsTab({ onShowNotification, onRefresh }: UserC
  }
 
  const nextStatus:"Active" |"Disabled" = u.status ==="Active" ?"Disabled" :"Active";
- const updated: User[] = users.map(item => {
+ const allUsersToggle = SheetsSyncEngine.getUsers();
+ const updatedToggle: User[] = allUsersToggle.map(item => {
  if (item.id === u.id) {
  return { ...item, status: nextStatus };
  }
  return item;
  });
 
- SheetsSyncEngine.saveUsers(updated);
+ SheetsSyncEngine.saveUsers(updatedToggle);
 
  SheetsSyncEngine.addAuditLog(
 "User Status Changed",
@@ -171,29 +175,31 @@ export default function UserControlsTab({ onShowNotification, onRefresh }: UserC
  };
 
  // 5. Delete User account
- const handleDeleteUser = (u: User) => {
- const currentUser = SheetsSyncEngine.getCurrentUser();
- if (currentUser && currentUser.username === u.username) {
- onShowNotification("You cannot delete your own active session account.","error");
- return;
- }
+  const handleDeleteUser = (u: User) => {
+    const currentUser = SheetsSyncEngine.getCurrentUser();
+    if (currentUser && currentUser.username === u.username) {
+      onShowNotification("You cannot delete your own active session account.", "error");
+      return;
+    }
 
- const confirmDel = window.confirm(`Permanently terminate and delete ${u.fullName}'s account? This action is recorded in audit trails.`);
- if (!confirmDel) return;
+    const confirmDel = window.confirm(`Are you sure you want to delete user '${u.fullName}'?`);
+    if (!confirmDel) return;
 
- const updated = users.filter(item => item.id !== u.id);
- SheetsSyncEngine.saveUsers(updated);
+    // Load full list to map the deletion
+    const fullList = SheetsSyncEngine.getUsers();
+    const updated = fullList.map(item => item.id === u.id ? { ...item, status: "Deleted" as const } : item);
+    SheetsSyncEngine.saveUsers(updated);
 
- SheetsSyncEngine.addAuditLog(
-"User Removed",
- currentUser?.fullName ||"System Admin",
- `${u.fullName} (${u.role})`,
- `Deleted account file from local directories`
- );
+    SheetsSyncEngine.addAuditLog(
+      "User Deleted",
+      currentUser?.fullName || "System Admin",
+      `${u.fullName} (${u.role})`,
+      `Moved user account to Trash`
+    );
 
- onShowNotification(`✓ Account for ${u.fullName} purged successfully.`,"success");
- reloadUsers();
- };
+    onShowNotification(`✓ Account for ${u.fullName} moved to Trash successfully.`, "success");
+    reloadUsers();
+  };
 
  const resetForm = () => {
  setFullName("");
