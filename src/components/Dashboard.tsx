@@ -74,6 +74,7 @@ export default function Dashboard({ stats, onRefresh, onNavigateToTab, userRole 
   });
   const [localNotification, setLocalNotification] = useState<string | null>(null);
   const [isVacuuming, setIsVacuuming] = useState(false);
+  const [selectedGpsUsername, setSelectedGpsUsername] = useState<string | null>(null);
 
   const triggerLocalNotification = (msg: string) => {
     setLocalNotification(msg);
@@ -142,9 +143,40 @@ export default function Dashboard({ stats, onRefresh, onNavigateToTab, userRole 
     const limitLogs = SheetsSyncEngine.getAuditLogs().slice(0, 5);
     const activities = SheetsSyncEngine.getUserActivities();
     
-    // Find the latest active session with coordinates
-    const activeMapSession = activities.find(act => act.latitude && act.longitude);
-    
+    // Find all unique usernames that have at least one session with coordinates
+    const operatorsWithGps = Array.from(new Set(
+      activities
+        .filter(act => act.latitude && act.longitude)
+        .map(act => act.username)
+    ));
+
+    // Determine which session to show on the map:
+    // If selectedGpsUsername is set, find their latest session with coordinates
+    // Otherwise, default to the latest overall active session with coordinates
+    let activeMapSession = null;
+    if (selectedGpsUsername) {
+      activeMapSession = activities.find(act => act.username === selectedGpsUsername && act.latitude && act.longitude);
+    }
+    if (!activeMapSession) {
+      activeMapSession = activities.find(act => act.latitude && act.longitude);
+    }
+
+    // Memoize GPS Geolocation map iframe to prevent iframe reload flicker on state changes
+    const mapElement = React.useMemo(() => {
+      if (!activeMapSession?.latitude || !activeMapSession?.longitude) return null;
+      return (
+        <iframe
+          title="Live Geolocation Tracker Map"
+          width="100%"
+          height="100%"
+          style={{ border: 0 }}
+          src={`https://maps.google.com/maps?q=${activeMapSession.latitude},${activeMapSession.longitude}&hl=en&z=13&output=embed`}
+          allowFullScreen
+          loading="lazy"
+        />
+      );
+    }, [activeMapSession?.latitude, activeMapSession?.longitude]);
+
     return (
       <div className="space-y-6 text-left font-sans">
         {/* Local Toast Slideout for Superadmin Quick Actions */}
@@ -338,26 +370,54 @@ export default function Dashboard({ stats, onRefresh, onNavigateToTab, userRole 
             {activeMapSession ? (
               <div className="flex-1 flex flex-col justify-between space-y-3">
                 <div className="relative rounded-xl overflow-hidden border border-default bg-surface h-48">
-                  <iframe
-                    title="Live Geolocation Tracker Map"
-                    width="100%"
-                    height="100%"
-                    style={{ border: 0 }}
-                    src={`https://maps.google.com/maps?q=${activeMapSession.latitude},${activeMapSession.longitude}&hl=en&z=13&output=embed`}
-                    allowFullScreen
-                    loading="lazy"
-                  />
+                  {mapElement}
                 </div>
                 <div className="text-[11px] p-2.5 rounded-lg bg-surface border border-default space-y-1 transition-colors">
                   <div className="flex justify-between items-center text-[10px]">
                     <span className="text-muted">Active Operator:</span>
-                    <strong className="text-purple-600 dark:text-purple-400 font-mono">@{activeMapSession.username}</strong>
+                    <strong className="text-purple-600 dark:text-purple-400 font-mono font-bold">@{activeMapSession.username}</strong>
                   </div>
-                  <div className="flex justify-between items-center text-[10px]">
+                  <div className="flex justify-between items-center text-[10px] pb-1.5 border-b border-default/60">
                     <span className="text-muted">Terminal Location:</span>
                     <span className="text-primary font-semibold text-right max-w-[150px] truncate" title={activeMapSession.locationName}>
                       {activeMapSession.locationName || "Resolving GPS..."}
                     </span>
+                  </div>
+                  
+                  {/* Clickable Active Operators selection list */}
+                  <div className="pt-1.5 space-y-1">
+                    <span className="text-[9px] uppercase font-bold text-muted block tracking-wide">Tracking Nodes</span>
+                    <div className="flex flex-wrap gap-1 max-h-20 overflow-y-auto pr-1">
+                      {operatorsWithGps.map(uname => {
+                        const isSelected = (selectedGpsUsername === uname) || (!selectedGpsUsername && activeMapSession?.username === uname);
+                        // Check if currently online (active within 5 minutes and no logout)
+                        const isOnline = activities.some(act => 
+                          act.username === uname && 
+                          !act.logoutTime && 
+                          act.lastActiveAt && 
+                          (Date.now() - new Date(act.lastActiveAt).getTime()) < 300000
+                        );
+                        return (
+                          <button
+                            key={uname}
+                            onClick={() => setSelectedGpsUsername(uname)}
+                            className={`px-1.5 py-0.5 rounded text-[9px] font-mono font-bold border transition-all cursor-pointer ${
+                              isSelected
+                                ? "bg-purple-500/15 border-purple-500 text-purple-400 shadow-sm"
+                                : "bg-card border-default text-muted hover:text-primary hover:border-gray-400"
+                            }`}
+                          >
+                            <span className="flex items-center gap-1">
+                              <span className={`h-1.5 w-1.5 rounded-full ${isOnline ? "bg-green-500 animate-pulse" : "bg-zinc-500"}`} />
+                              @{uname}
+                            </span>
+                          </button>
+                        );
+                      })}
+                      {operatorsWithGps.length === 0 && (
+                        <span className="text-[9px] text-muted italic">No terminals with GPS tracking.</span>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>

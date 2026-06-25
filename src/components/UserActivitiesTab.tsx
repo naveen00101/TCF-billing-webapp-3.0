@@ -25,6 +25,7 @@ export default function UserActivitiesTab() {
   const [selectedSession, setSelectedSession] = useState<UserActivity | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState<'all' | 'online' | 'unique'>('all');
+  const [selectedHistoryId, setSelectedHistoryId] = useState<string | null>(null);
 
   // Compute stats
   const totalLoggedInSessions = activities.length;
@@ -83,21 +84,41 @@ export default function UserActivitiesTab() {
     ? activities.find(a => a.id === selectedSession.id) || selectedSession 
     : null;
 
+  // Map session coordinates tracking (could be historical coordinate selected by user)
+  const mapSessionToDisplay = selectedHistoryId 
+    ? activities.find(a => a.id === selectedHistoryId) || currentSelected 
+    : currentSelected;
+
+  // Get all session history with coordinates for the selected user
+  const userGpsHistory = currentSelected
+    ? activities.filter(act => 
+        act.username.toLowerCase() === currentSelected.username.toLowerCase() &&
+        act.latitude &&
+        act.longitude
+      )
+    : [];
+
+  const sortedGpsHistory = [...userGpsHistory].sort((a, b) => {
+    const datetimeA = new Date(`${a.loginDate}T${a.loginTime}`).getTime() || 0;
+    const datetimeB = new Date(`${b.loginDate}T${b.loginTime}`).getTime() || 0;
+    return datetimeB - datetimeA;
+  });
+
   // Memoize GPS Geolocation map iframe to prevent iframe reload flicker on state changes
   const mapElement = React.useMemo(() => {
-    if (!currentSelected?.latitude || !currentSelected?.longitude) return null;
+    if (!mapSessionToDisplay?.latitude || !mapSessionToDisplay?.longitude) return null;
     return (
       <iframe
         title="GPS Geolocation Map"
         width="100%"
         height="100%"
         style={{ border: 0 }}
-        src={`https://maps.google.com/maps?q=${currentSelected.latitude},${currentSelected.longitude}&hl=en&z=14&output=embed`}
+        src={`https://maps.google.com/maps?q=${mapSessionToDisplay.latitude},${mapSessionToDisplay.longitude}&hl=en&z=14&output=embed`}
         allowFullScreen
         loading="lazy"
       />
     );
-  }, [currentSelected?.latitude, currentSelected?.longitude]);
+  }, [mapSessionToDisplay?.latitude, mapSessionToDisplay?.longitude]);
 
   return (
     <div className="space-y-6">
@@ -299,7 +320,7 @@ export default function UserActivitiesTab() {
                   return (
                     <tr 
                       key={act.id} 
-                      onClick={() => setSelectedSession(act)}
+                      onClick={() => { setSelectedSession(act); setSelectedHistoryId(null); }}
                       className={`cursor-pointer transition-all duration-150 border-l-[3px] ${
                         isSelected 
                           ? "bg-purple-500/5 dark:bg-purple-500/10 border-l-purple-500 dark:border-l-purple-400" 
@@ -509,13 +530,13 @@ export default function UserActivitiesTab() {
                 </div>
 
                 {/* Interactive Map Embed */}
-                {currentSelected.latitude && currentSelected.longitude ? (
+                {mapSessionToDisplay?.latitude && mapSessionToDisplay?.longitude ? (
                   <div className="space-y-2">
                     <div className="relative rounded-xl overflow-hidden border border-default bg-surface shadow-inner h-48 transition-colors">
                       {mapElement}
                     </div>
                     <a
-                      href={`https://www.google.com/maps/search/?api=1&query=${currentSelected.latitude},${currentSelected.longitude}`}
+                      href={`https://www.google.com/maps/search/?api=1&query=${mapSessionToDisplay.latitude},${mapSessionToDisplay.longitude}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-purple-200 dark:border-purple-900/40 bg-purple-50/50 dark:bg-purple-950/20 py-2 text-xs font-bold text-purple-600 dark:text-purple-400 hover:bg-purple-100/50 dark:hover:bg-purple-950/40 active:scale-95 transition-all cursor-pointer"
@@ -533,6 +554,55 @@ export default function UserActivitiesTab() {
                     <p className="font-sans leading-relaxed">
                       This session doesn't have active GPS coordinates. This can happen if the device denied location permissions or if this is an older historic record logged before GPS integration.
                     </p>
+                  </div>
+                )}
+
+                {/* Tracked Geolocation History Timeline */}
+                {sortedGpsHistory.length > 0 && (
+                  <div className="text-[11px] space-y-2 bg-surface p-3.5 rounded-xl border border-default transition-colors">
+                    <div className="flex justify-between items-center border-b border-default/60 pb-1.5 mb-1.5">
+                      <span className="text-muted font-semibold">Tracked Location History</span>
+                      <span className="text-[9px] px-1.5 py-0.2 font-bold rounded bg-purple-500/10 text-purple-500 border border-purple-500/20 font-mono">
+                        {sortedGpsHistory.length} Record{sortedGpsHistory.length > 1 ? "s" : ""}
+                      </span>
+                    </div>
+                    <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                      {sortedGpsHistory.map((histAct, index) => {
+                        const isCurrentActive = histAct.id === mapSessionToDisplay?.id;
+                        return (
+                          <div
+                            key={histAct.id}
+                            onClick={() => setSelectedHistoryId(histAct.id)}
+                            className={`p-2 rounded-lg border text-left cursor-pointer transition-all duration-200 ${
+                              isCurrentActive
+                                ? "bg-purple-500/10 border-purple-500 ring-1 ring-purple-500/20"
+                                : "bg-card border-default hover:border-gray-400"
+                            }`}
+                          >
+                            <div className="flex justify-between items-center text-[10px]">
+                              <span className="font-bold text-primary">
+                                {histAct.id === currentSelected.id ? "📍 Current Session" : `🕒 Session #${sortedGpsHistory.length - index}`}
+                              </span>
+                              <span className="font-mono text-muted text-[9px]">{histAct.loginDate} {histAct.loginTime}</span>
+                            </div>
+                            <div className="text-[10px] text-primary truncate mt-1" title={histAct.locationName || "Resolving GPS..."}>
+                              {histAct.locationName || "Resolving GPS..."}
+                            </div>
+                            <div className="text-[9px] font-mono text-muted mt-0.5">
+                              {histAct.latitude?.toFixed(5)}, {histAct.longitude?.toFixed(5)}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {selectedHistoryId && selectedHistoryId !== currentSelected.id && (
+                      <button
+                        onClick={() => setSelectedHistoryId(null)}
+                        className="w-full text-center text-[10px] font-bold text-purple-600 dark:text-purple-400 mt-1 hover:underline cursor-pointer border-none bg-transparent"
+                      >
+                        Reset Map to Current Session
+                      </button>
+                    )}
                   </div>
                 )}
 
