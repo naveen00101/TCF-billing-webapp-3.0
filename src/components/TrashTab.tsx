@@ -1,7 +1,7 @@
 import React, { useState } from "react";
-import { Trash2, RotateCcw, Package, FileText, Award, X, ShieldAlert, Lock, Key } from "lucide-react";
+import { Trash2, RotateCcw, Package, FileText, Award, X, ShieldAlert, Lock, Key, Users } from "lucide-react";
 import { SheetsSyncEngine } from "../utils/sheetsSync";
-import { Product, Invoice, Agent } from "../types";
+import { Product, Invoice, Agent, Customer } from "../types";
 import MD5 from "crypto-js/md5";
 
 interface TrashTabProps {
@@ -9,7 +9,7 @@ interface TrashTabProps {
   onShowNotification: (text: string, type: "success" | "error" | "info") => void;
 }
 
-type TrashType = "products" | "invoices" | "agents";
+type TrashType = "products" | "invoices" | "agents" | "customers";
 
 export default function TrashTab({ onRefresh, onShowNotification }: TrashTabProps) {
   const [activeType, setActiveType] = useState<TrashType>("products");
@@ -30,6 +30,21 @@ export default function TrashTab({ onRefresh, onShowNotification }: TrashTabProp
   const deletedProducts = SheetsSyncEngine.getProducts().filter((p) => p.isSoftDeleted);
   const deletedInvoices = SheetsSyncEngine.getInvoices().filter((i) => i.isSoftDeleted);
   const deletedAgents = SheetsSyncEngine.getAgents().filter((a) => a.isSoftDeleted);
+  const deletedCustomers = SheetsSyncEngine.getCustomers().filter((c) => c.isSoftDeleted);
+
+  const handleRestoreCustomer = async (customer: Customer) => {
+    try {
+      const allCustomers = SheetsSyncEngine.getCustomers();
+      const updated = allCustomers.map((c) =>
+        c.id === customer.id ? { ...c, isSoftDeleted: false } : c
+      );
+      await SheetsSyncEngine.saveCustomers(updated);
+      onShowNotification(`✓ Customer '${customer.name}' successfully restored.`, "success");
+      onRefresh();
+    } catch (e) {
+      onShowNotification("Error restoring customer", "error");
+    }
+  };
 
   const handleRestoreProduct = async (product: Product) => {
     try {
@@ -99,6 +114,9 @@ export default function TrashTab({ onRefresh, onShowNotification }: TrashTabProp
       } else if (type === "invoices") {
         await SheetsSyncEngine.deleteInvoicePermanently(id);
         onShowNotification(`✓ Invoice '${name}' permanently deleted.`, "success");
+      } else if (type === "customers") {
+        await SheetsSyncEngine.deleteCustomerPermanently(id);
+        onShowNotification(`✓ Customer '${name}' permanently deleted.`, "success");
       }
       
       setShowSingleDeleteModal(false);
@@ -148,7 +166,8 @@ export default function TrashTab({ onRefresh, onShowNotification }: TrashTabProp
   const getActiveTabCount = () => {
     if (activeType === "products") return deletedProducts.length;
     if (activeType === "invoices") return deletedInvoices.length;
-    return deletedAgents.length;
+    if (activeType === "agents") return deletedAgents.length;
+    return deletedCustomers.length;
   };
 
   return (
@@ -203,6 +222,17 @@ export default function TrashTab({ onRefresh, onShowNotification }: TrashTabProp
             >
               <Award className="h-3.5 w-3.5" />
               <span>Agents ({deletedAgents.length})</span>
+            </button>
+            <button
+              onClick={() => setActiveType("customers")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-md transition-all cursor-pointer border-none ${
+                activeType === "customers"
+                  ? "bg-rose-600 text-white shadow-sm"
+                  : "text-muted hover:text-primary bg-transparent"
+              }`}
+            >
+              <Users className="h-3.5 w-3.5" />
+              <span>Customers ({deletedCustomers.length})</span>
             </button>
           </div>
 
@@ -367,6 +397,60 @@ export default function TrashTab({ onRefresh, onShowNotification }: TrashTabProp
                           {isAdmin && (
                             <button
                               onClick={() => triggerSingleDelete(agt.id, agt.name, "agents")}
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white rounded-md transition-colors cursor-pointer border-none shadow-sm"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                              <span>Delete</span>
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {activeType === "customers" && (
+          <div className="rounded-xl border border-default bg-card shadow-sm overflow-hidden">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="border-b border-default bg-card-secondary font-bold text-muted font-sans">
+                  <th className="p-4">Customer ID</th>
+                  <th className="p-4">Name</th>
+                  <th className="p-4">Primary Phone</th>
+                  <th className="p-4">Address</th>
+                  <th className="p-4 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-default font-medium text-primary font-sans">
+                {deletedCustomers.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="p-8 text-center text-muted font-normal">
+                      No deleted customers found in the database.
+                    </td>
+                  </tr>
+                ) : (
+                  deletedCustomers.map((c) => (
+                    <tr key={c.id} className="hover:bg-card-secondary/20">
+                      <td className="p-4 font-mono">{c.id}</td>
+                      <td className="p-4 font-bold">{c.name}</td>
+                      <td className="p-4 font-mono">{c.mobile}</td>
+                      <td className="p-4 truncate max-w-[250px]" title={c.address}>{c.address || "No Address"}</td>
+                      <td className="p-4 text-right">
+                        <div className="flex justify-end gap-2">
+                          <button
+                            onClick={() => handleRestoreCustomer(c)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-md transition-colors cursor-pointer border-none shadow-sm"
+                          >
+                            <RotateCcw className="h-3 w-3" />
+                            <span>Restore</span>
+                          </button>
+                          {isAdmin && (
+                            <button
+                              onClick={() => triggerSingleDelete(c.id, c.name, "customers")}
                               className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white rounded-md transition-colors cursor-pointer border-none shadow-sm"
                             >
                               <Trash2 className="h-3 w-3" />

@@ -1485,7 +1485,7 @@ export class SheetsSyncEngine {
 
     const items = this.getInvoiceItems();
 
-    let customers = this.getCustomers();
+    let customers = this.getCustomers().filter(c => !c.isSoftDeleted);
     if (userRole === "Employee") {
       const employeeCustomerNames = new Set(invoices.map(inv => inv.customerName.toLowerCase().trim()));
       customers = customers.filter(c => employeeCustomerNames.has(c.name.toLowerCase().trim()));
@@ -1829,6 +1829,16 @@ export class SheetsSyncEngine {
     }
   }
 
+  public static async deleteCustomerPermanently(customerId: string): Promise<void> {
+    const list = this.getCustomers().filter(c => c.id !== customerId);
+    this.memoryCache["billing_customers"] = list;
+    this.setStorageItem("billing_customers", list);
+    if (supabase) {
+      const { error } = await supabase.from("customers").delete().eq("id", customerId);
+      if (error) console.error("[SyncEngine] Error deleting customer permanently:", error);
+    }
+  }
+
   public static async deleteInvoicePermanently(invoiceId: string): Promise<void> {
     const invoices = this.getInvoices().filter(inv => inv.invoiceId !== invoiceId && inv.invoiceNo !== invoiceId);
     this.memoryCache["billing_invoices"] = invoices;
@@ -1848,7 +1858,7 @@ export class SheetsSyncEngine {
     }
   }
 
-  public static async clearAllTrashOfType(type: "products" | "invoices" | "agents"): Promise<void> {
+  public static async clearAllTrashOfType(type: "products" | "invoices" | "agents" | "customers"): Promise<void> {
     if (type === "products") {
       const deletedProds = this.getProducts().filter(p => p.isSoftDeleted);
       for (const p of deletedProds) {
@@ -1863,6 +1873,11 @@ export class SheetsSyncEngine {
       const deletedInvs = this.getInvoices().filter(i => i.isSoftDeleted);
       for (const inv of deletedInvs) {
         await this.deleteInvoicePermanently(inv.invoiceId || inv.invoiceNo);
+      }
+    } else if (type === "customers") {
+      const deletedCusts = this.getCustomers().filter(c => c.isSoftDeleted);
+      for (const c of deletedCusts) {
+        await this.deleteCustomerPermanently(c.id);
       }
     }
   }
