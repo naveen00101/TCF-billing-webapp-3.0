@@ -40,7 +40,7 @@ export default function AgentsTab({
  const currentUser = SheetsSyncEngine.getCurrentUser();
  const userRole: UserRole = currentUser?.role ||"Employee";
  
- const isAdmin = userRole ==="Admin";
+ const isAdmin = userRole === "Admin" || userRole === "Superadmin";
  const isManager = userRole ==="Manager";
  const isEmployee = userRole ==="Employee";
 

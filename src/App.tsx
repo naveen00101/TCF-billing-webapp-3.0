@@ -916,6 +916,8 @@ export default function App() {
  activeTab ==="promos" ?"Voucher Operations" : 
  activeTab ==="users" ?"Personnel Security" : 
  activeTab ==="revenue" ?"Revenue Analytics" : 
+ activeTab ==="audit" ?"System Audit Trail" :
+ activeTab ==="activities" ?"Operator Activities" :
  activeTab ==="settings" ?"Configuration Manager" :
  activeTab ==="trash" ?"Trash Bin Manager" :
  activeTab}
@@ -1151,6 +1153,7 @@ export default function App() {
       initiallySelectedAuditId={selectedAuditId}
       onClearSelected={() => setSelectedAuditId(null)}
       userRole={userRole}
+      onShowNotification={showNotification}
     />
   )}
 

@@ -786,10 +786,10 @@ export default function PosBilling({
  if (customerSelectionMode ==="new" && cleanedMobile.length >= 8) {
  const duplicateFound = customers.find((c) => String(c.mobile ||"").replace(/\D/g,"") === cleanedMobile);
  if (duplicateFound && !allowDuplicateCustomer) {
- if (currentUser?.role ==="Admin") {
- onShowNotification("Duplicate mobile detected. Click 'Create Anyway' to authorize bypass as Admin.","error");
- return;
- } else {
+  if (currentUser?.role ==="Admin" || currentUser?.role === "Superadmin") {
+  onShowNotification("Duplicate mobile detected. Click 'Create Anyway' to authorize bypass as Admin.","error");
+  return;
+  } else {
  onShowNotification("Duplicate mobile detected! Please link to existing customer or register with a unique mobile number.","error");
  return;
  }
@@ -1601,7 +1601,7 @@ export default function PosBilling({
  if (cleanedMobile.length >= 8) {
  const duplicateMatch = customers.find(c => String(c.mobile ||"").replace(/\D/g,"") === cleanedMobile);
  if (duplicateMatch) {
- const isAdminUser = currentUser?.role ==="Admin";
+ const isAdminUser = currentUser?.role ==="Admin" || currentUser?.role === "Superadmin";
  return (
  <div className="sm:col-span-2 p-3 bg-amber-500/10 border border-amber-500/20 text-xs text-amber-600 dark:text-amber-400 rounded-xl space-y-2 font-sans animate-in slide-in-from-top-1 text-left">
  <h4 className="font-extrabold flex items-center gap-1 uppercase tracking-wide text-xs">
