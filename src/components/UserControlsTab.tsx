@@ -10,7 +10,14 @@ interface UserControlsTabProps {
 }
 
 export default function UserControlsTab({ onShowNotification, onRefresh }: UserControlsTabProps) {
- const [users, setUsers] = useState<User[]>(() => SheetsSyncEngine.getUsers().filter(u => u.status !== "Deleted"));
+ const currentUser = SheetsSyncEngine.getCurrentUser();
+ const isSuperadmin = currentUser?.role === "Superadmin";
+
+ const [users, setUsers] = useState<User[]>(() => {
+   const list = SheetsSyncEngine.getUsers().filter(u => u.status !== "Deleted");
+   if (isSuperadmin) return list;
+   return list.filter(u => u.role !== "Superadmin");
+ });
  
  // Dialog / Edit states
  const [isAdding, setIsAdding] = useState(false);
@@ -29,9 +36,10 @@ export default function UserControlsTab({ onShowNotification, onRefresh }: UserC
  const [showResetPassword, setShowResetPassword] = useState(false);
 
  const reloadUsers = () => {
- const list = SheetsSyncEngine.getUsers().filter(u => u.status !== "Deleted");
- setUsers(list);
- if (onRefresh) onRefresh();
+   const list = SheetsSyncEngine.getUsers().filter(u => u.status !== "Deleted");
+   const filtered = isSuperadmin ? list : list.filter(u => u.role !== "Superadmin");
+   setUsers(filtered);
+   if (onRefresh) onRefresh();
  };
 
  // 1. Submit Add User
@@ -143,8 +151,21 @@ export default function UserControlsTab({ onShowNotification, onRefresh }: UserC
  reloadUsers();
  };
 
+ const startReset = (u: User) => {
+    if (u.role === "Superadmin" && !isSuperadmin) {
+      onShowNotification("Access Denied: Standard administrators cannot modify Superadmin accounts.", "error");
+      return;
+    }
+    setResettingUser(u);
+    setEditingUser(null);
+  };
+
  // 4. Toggle Status (Active / Disabled)
  const handleToggleStatus = (u: User) => {
+    if (u.role === "Superadmin" && !isSuperadmin) {
+      onShowNotification("Access Denied: Standard administrators cannot modify Superadmin accounts.", "error");
+      return;
+    }
  // Cannot disable yourself!
  const currentUser = SheetsSyncEngine.getCurrentUser();
  if (currentUser && currentUser.username === u.username) {
@@ -176,6 +197,10 @@ export default function UserControlsTab({ onShowNotification, onRefresh }: UserC
 
  // 5. Delete User account
   const handleDeleteUser = (u: User) => {
+    if (u.role === "Superadmin" && !isSuperadmin) {
+      onShowNotification("Access Denied: Standard administrators cannot modify Superadmin accounts.", "error");
+      return;
+    }
     const currentUser = SheetsSyncEngine.getCurrentUser();
     if (currentUser && currentUser.username === u.username) {
       onShowNotification("You cannot delete your own active session account.", "error");
@@ -211,6 +236,10 @@ export default function UserControlsTab({ onShowNotification, onRefresh }: UserC
  };
 
  const startEdit = (u: User) => {
+    if (u.role === "Superadmin" && !isSuperadmin) {
+      onShowNotification("Access Denied: Standard administrators cannot modify Superadmin accounts.", "error");
+      return;
+    }
  setEditingUser(u);
  setFullName(u.fullName);
  setUsername(u.username);
@@ -537,7 +566,7 @@ export default function UserControlsTab({ onShowNotification, onRefresh }: UserC
 
  {/* Reset Pass */}
  <button
- onClick={() => { setResettingUser(u); setEditingUser(null); }}
+ onClick={() => startReset(u)}
  title="Override Password Codes"
  className="text-muted hover:text-red-500 transition-colors"
  >
