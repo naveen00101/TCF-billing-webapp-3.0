@@ -302,18 +302,19 @@ export default function UserControlsTab({ onShowNotification, onRefresh }: UserC
  </div>
  </div>
 
- <div className="space-y-1">
- <label className="text-[10px] uppercase font-bold text-muted dark:text-muted">Officer Role Clearances</label>
- <select
- value={role}
- onChange={(e) => setRole(e.target.value as UserRole)}
- className="w-full rounded-lg border border-default bg-surface px-3 py-2 text-xs focus:border-blue-500 outline-none text-primary dark:text-primary font-sans"
- >
- <option value="Admin">Admin (Full Control + System Tools)</option>
- <option value="Manager">Manager (Edit, Print, View logs)</option>
- <option value="Employee">Employee (Checkout & Receipts only)</option>
- </select>
- </div>
+  <div className="space-y-1">
+  <label className="text-[10px] uppercase font-bold text-muted dark:text-muted">Officer Role Clearances</label>
+  <select
+  value={role}
+  onChange={(e) => setRole(e.target.value as UserRole)}
+  className="w-full rounded-lg border border-default bg-surface px-3 py-2 text-xs focus:border-blue-500 outline-none text-primary dark:text-primary font-sans"
+  >
+  <option value="Superadmin">Superadmin (All Clearance + Audit Trail)</option>
+  <option value="Admin">Admin (Control Panel without Operator Trail)</option>
+  <option value="Manager">Manager (Edit, Print, View logs)</option>
+  <option value="Employee">Employee (Checkout & Receipts only)</option>
+  </select>
+  </div>
 
  <div className="space-y-1">
  <label className="text-[10px] uppercase font-bold text-muted dark:text-muted">Primary Email Address</label>
@@ -382,18 +383,19 @@ export default function UserControlsTab({ onShowNotification, onRefresh }: UserC
  />
  </div>
 
- <div className="space-y-1">
- <label className="text-[10px] uppercase font-bold text-muted">Officer Role Clearances</label>
- <select
- value={role}
- onChange={(e) => setRole(e.target.value as UserRole)}
- className="w-full rounded-lg border border-default bg-surface px-3 py-2 text-xs focus:border-blue-500 outline-none text-primary dark:text-primary"
- >
- <option value="Admin">Admin (Full Control)</option>
- <option value="Manager">Manager (Edit Invoices)</option>
- <option value="Employee">Employee (Checkout, Print)</option>
- </select>
- </div>
+  <div className="space-y-1">
+  <label className="text-[10px] uppercase font-bold text-muted">Officer Role Clearances</label>
+  <select
+  value={role}
+  onChange={(e) => setRole(e.target.value as UserRole)}
+  className="w-full rounded-lg border border-default bg-surface px-3 py-2 text-xs focus:border-blue-500 outline-none text-primary dark:text-primary"
+  >
+  <option value="Superadmin">Superadmin (All Clearance)</option>
+  <option value="Admin">Admin (Control Panel)</option>
+  <option value="Manager">Manager (Edit Invoices)</option>
+  <option value="Employee">Employee (Checkout, Print)</option>
+  </select>
+  </div>
 
  <div className="space-y-1">
  <label className="text-[10px] uppercase font-bold text-muted">Email Address</label>
@@ -496,13 +498,14 @@ export default function UserControlsTab({ onShowNotification, onRefresh }: UserC
  </td>
  <td className="px-4 py-3">
  <div className="flex gap-1.5 flex-wrap">
- <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
- u.role ==="Admin" ?"bg-blue-500/10 text-blue-400 border border-blue-500/20" :
- u.role ==="Manager" ?"bg-amber-500/10 text-amber-500 border border-amber-500/20" :
-"bg-zinc-500/10 text-muted border border-zinc-500/20"
- }`}>
- {u.role.toUpperCase()}
- </span>
+  <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
+  u.role === "Superadmin" ? "bg-purple-500/10 text-purple-400 border border-purple-500/20" :
+  u.role ==="Admin" ?"bg-blue-500/10 text-blue-400 border border-blue-500/20" :
+  u.role ==="Manager" ?"bg-amber-500/10 text-amber-500 border border-amber-500/20" :
+  "bg-zinc-500/10 text-muted border border-zinc-500/20"
+  }`}>
+  {u.role.toUpperCase()}
+  </span>
 
  <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
  u.status ==="Active" ?"bg-green-500/10 text-green-400 border border-green-500/20" :

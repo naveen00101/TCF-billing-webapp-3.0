@@ -355,9 +355,9 @@ export default function SettingsTab({
  currentUserTheme,
  onUpdateTheme,
 }: SettingsTabProps) {
- const currentUser = SheetsSyncEngine.getCurrentUser();
- const userRole = currentUser?.role ||"Employee";
- const isAdmin = userRole ==="Admin";
+  const currentUser = SheetsSyncEngine.getCurrentUser();
+  const userRole = currentUser?.role ||"Employee";
+  const isAdmin = userRole ==="Admin" || userRole === "Superadmin";
 
  // Sync Status
  const [isSyncing, setIsSyncing] = useState(false);

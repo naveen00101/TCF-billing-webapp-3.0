@@ -144,35 +144,35 @@ export default function App() {
  // Mobile drawer State
  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
  const [isAiOpen, setIsAiOpen] = useState(false);
- const [activeTab, setActiveTab] = useState(() => {
- if (typeof window !=="undefined" && window.location.pathname ==="/analytics/revenue") {
- const uRole = SheetsSyncEngine.getCurrentUser()?.role ||"Employee";
- if (uRole !=="Admin") {
- return"dashboard";
- }
- return"revenue";
- }
- return"dashboard";
- });
- const [historyStatusFilter, setHistoryStatusFilter] = useState("All");
+  const [activeTab, setActiveTab] = useState(() => {
+    if (typeof window !== "undefined" && window.location.pathname === "/analytics/revenue") {
+      const uRole = SheetsSyncEngine.getCurrentUser()?.role || "Employee";
+      if (uRole !== "Admin" && uRole !== "Superadmin") {
+        return "dashboard";
+      }
+      return "revenue";
+    }
+    return "dashboard";
+  });
+  const [historyStatusFilter, setHistoryStatusFilter] = useState("All");
 
- useEffect(() => {
- const handlePopState = () => {
- if (window.location.pathname ==="/analytics/revenue") {
- const uRole = SheetsSyncEngine.getCurrentUser()?.role ||"Employee";
- if (uRole !=="Admin") {
- setActiveTab("dashboard");
- window.history.replaceState(null,"","/");
- } else {
- setActiveTab("revenue");
- }
- } else {
- setActiveTab("dashboard");
- }
- };
- window.addEventListener("popstate", handlePopState);
- return () => window.removeEventListener("popstate", handlePopState);
- }, []);
+  useEffect(() => {
+    const handlePopState = () => {
+      if (window.location.pathname === "/analytics/revenue") {
+        const uRole = SheetsSyncEngine.getCurrentUser()?.role || "Employee";
+        if (uRole !== "Admin" && uRole !== "Superadmin") {
+          setActiveTab("dashboard");
+          window.history.replaceState(null, "", "/");
+        } else {
+          setActiveTab("revenue");
+        }
+      } else {
+        setActiveTab("dashboard");
+      }
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
 
  // Advanced CRM / ERP deep linking state registers
  const [selectedInvoiceNo, setSelectedInvoiceNo] = useState<string | null>(null);
@@ -185,11 +185,11 @@ export default function App() {
  const [hasUnsavedInvoice, setHasUnsavedInvoice] = useState(false);
  const [pendingNavigation, setPendingNavigation] = useState<{tab: string, filter?: string, extraState?: { invoiceNo?: string; customerId?: string; agentId?: string; auditId?: string; revenueModule?: string }} | null>(null);
 
- const executeNavigation = (tab: string, filter?: string, extraState?: { invoiceNo?: string; customerId?: string; agentId?: string; auditId?: string; revenueModule?: string }) => {
- if (tab ==="revenue" && userRole !=="Admin") {
- showNotification("Access Denied: Revenue Analytics is restricted to Administrators.","error");
- tab ="dashboard";
- }
+  const executeNavigation = (tab: string, filter?: string, extraState?: { invoiceNo?: string; customerId?: string; agentId?: string; auditId?: string; revenueModule?: string }) => {
+    if (tab === "revenue" && userRole !== "Admin" && userRole !== "Superadmin") {
+      showNotification("Access Denied: Revenue Analytics is restricted to Administrators.", "error");
+      tab = "dashboard";
+    }
 
  setActiveTab(tab);
  if (tab ==="revenue") {
@@ -321,6 +321,23 @@ export default function App() {
  };
  }, [currentUser]); // renew on auth status switches
 
+  // Session Heartbeat Timer (updates last_active_at in Supabase every 60 seconds)
+  useEffect(() => {
+    const activeUser = SheetsSyncEngine.getCurrentUser();
+    const actId = localStorage.getItem("billing_active_activity_id");
+    
+    if (!activeUser || !actId) return;
+
+    // Send initial heartbeat immediately
+    SheetsSyncEngine.updateActivityHeartbeat(actId);
+
+    const interval = setInterval(() => {
+      SheetsSyncEngine.updateActivityHeartbeat(actId);
+    }, 60000); // 1 minute
+
+    return () => clearInterval(interval);
+  }, [currentUser]);
+
   // Subscribe to SheetsSyncEngine status changes
   useEffect(() => {
     const unsubscribe = SheetsSyncEngine.registerSyncStatusListener((status, err) => {
@@ -344,16 +361,16 @@ export default function App() {
        }
        setIsDbLoaded(true);
 
-       // If deep linked to revenue tab and user is Admin, adjust the active tab
-       if (window.location.pathname === "/analytics/revenue") {
-         const uRole = SheetsSyncEngine.getCurrentUser()?.role || "Employee";
-         if (uRole === "Admin") {
-           setActiveTab("revenue");
-         } else {
-           setActiveTab("dashboard");
-           window.history.replaceState(null, "", "/");
-         }
-       }
+        // If deep linked to revenue tab and user is Admin, adjust the active tab
+        if (window.location.pathname === "/analytics/revenue") {
+          const uRole = SheetsSyncEngine.getCurrentUser()?.role || "Employee";
+          if (uRole === "Admin" || uRole === "Superadmin") {
+            setActiveTab("revenue");
+          } else {
+            setActiveTab("dashboard");
+            window.history.replaceState(null, "", "/");
+          }
+        }
 
        // 1. First, attempt to load persistent deployment configuration
       // Use a very short timeout since this endpoint only exists on custom backends, not static hosting
@@ -518,16 +535,19 @@ export default function App() {
  { id:"agents", label:"Agent Analytics", icon: Award },
  ];
 
- // Render extra tabs only for Admin users
-  if (userRole ==="Admin") {
-  menuItems.push(
-  { id:"revenue", label:"Revenue Analytics", icon: TrendingUp },
-  { id:"users", label:"User Management", icon: ShieldAlert },
-  { id:"activities", label:"Operator Activities", icon: Activity },
-  { id:"audit", label:"System Audit Trail", icon: ShieldCheck },
-  { id:"promos", label:"Promo Manager", icon: Ticket },
-  { id:"trash", label:"Trash Bin", icon: Trash2 }
-  );
+  // Render extra tabs only for Admin or Superadmin users
+  if (userRole === "Admin" || userRole === "Superadmin") {
+    menuItems.push(
+      { id: "revenue", label: "Revenue Analytics", icon: TrendingUp },
+      { id: "users", label: "User Management", icon: ShieldAlert },
+      { id: "audit", label: "System Audit Trail", icon: ShieldCheck },
+      { id: "promos", label: "Promo Manager", icon: Ticket },
+      { id: "trash", label: "Trash Bin", icon: Trash2 }
+    );
+    // Operator Activities is visible only to Superadmin role
+    if (userRole === "Superadmin") {
+      menuItems.push({ id: "activities", label: "Operator Activities", icon: Activity });
+    }
   }
 
  // Static items for everyone
@@ -1083,62 +1103,62 @@ export default function App() {
  />
  )}
 
- {activeTab ==="revenue" && userRole ==="Admin" && (
- <RevenueAnalyticsTab
- invoices={invoices}
- customers={customers}
- products={products}
- invoiceItems={invoiceItems}
- onRefresh={reloadApplicationState}
- onShowNotification={showNotification}
- onNavigateToTab={handleNavigateToTab}
- userRole={userRole}
- initiallySelectedModule={selectedRevenueModule}
- onClearSelectedModule={() => setSelectedRevenueModule(null)}
- />
- )}
+  {activeTab ==="revenue" && (userRole ==="Admin" || userRole === "Superadmin") && (
+    <RevenueAnalyticsTab
+      invoices={invoices}
+      customers={customers}
+      products={products}
+      invoiceItems={invoiceItems}
+      onRefresh={reloadApplicationState}
+      onShowNotification={showNotification}
+      onNavigateToTab={handleNavigateToTab}
+      userRole={userRole}
+      initiallySelectedModule={selectedRevenueModule}
+      onClearSelectedModule={() => setSelectedRevenueModule(null)}
+    />
+  )}
 
- {activeTab ==="agents" && (
- <AgentsTab
- onRefresh={reloadApplicationState}
- onShowNotification={showNotification}
- initiallySelectedAgentId={selectedAgentId}
- onClearSelected={() => setSelectedAgentId(null)}
- />
- )}
+  {activeTab ==="agents" && (
+    <AgentsTab
+      onRefresh={reloadApplicationState}
+      onShowNotification={showNotification}
+      initiallySelectedAgentId={selectedAgentId}
+      onClearSelected={() => setSelectedAgentId(null)}
+    />
+  )}
 
- {activeTab ==="promos" && userRole ==="Admin" && (
- <PromoCodesTab
- onRefresh={reloadApplicationState}
- onShowNotification={showNotification}
- />
- )}
-
- {/* Render unique Admin-restricted Custom tab views */}
- {activeTab ==="users" && userRole ==="Admin" && (
- <UserControlsTab
- onShowNotification={showNotification}
- onRefresh={reloadApplicationState}
- />
- )}
-
- {activeTab ==="activities" && userRole ==="Admin" && (
- <UserActivitiesTab />
- )}
-
- {activeTab ==="audit" && userRole ==="Admin" && (
- <AuditTrailTab 
- initiallySelectedAuditId={selectedAuditId}
- onClearSelected={() => setSelectedAuditId(null)}
- />
- )}
-
- {activeTab ==="trash" && userRole ==="Admin" && (
-    <TrashTab
+  {activeTab ==="promos" && (userRole ==="Admin" || userRole === "Superadmin") && (
+    <PromoCodesTab
       onRefresh={reloadApplicationState}
       onShowNotification={showNotification}
     />
   )}
+
+  {/* Render unique Admin-restricted Custom tab views */}
+  {activeTab ==="users" && (userRole ==="Admin" || userRole === "Superadmin") && (
+    <UserControlsTab
+      onShowNotification={showNotification}
+      onRefresh={reloadApplicationState}
+    />
+  )}
+
+  {activeTab ==="activities" && userRole ==="Superadmin" && (
+    <UserActivitiesTab />
+  )}
+
+  {activeTab ==="audit" && (userRole ==="Admin" || userRole === "Superadmin") && (
+    <AuditTrailTab 
+      initiallySelectedAuditId={selectedAuditId}
+      onClearSelected={() => setSelectedAuditId(null)}
+    />
+  )}
+
+  {activeTab ==="trash" && (userRole ==="Admin" || userRole === "Superadmin") && (
+     <TrashTab
+       onRefresh={reloadApplicationState}
+       onShowNotification={showNotification}
+     />
+   )}
 
  {activeTab ==="settings" && connection && company && (
  <SettingsTab

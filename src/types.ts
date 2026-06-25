@@ -338,7 +338,7 @@ export interface MessageFeedback {
 }
 
 // Security, RBAC & Log interfaces
-export type UserRole = "Admin" | "Manager" | "Employee";
+export type UserRole = "Superadmin" | "Admin" | "Manager" | "Employee";
 
 export interface User {
   id: string;
@@ -364,6 +364,11 @@ export interface UserActivity {
   browser: string;
   ipAddress: string;
   activeSeconds: number; // for calculation
+  latitude?: number;
+  longitude?: number;
+  locationName?: string;
+  os?: string;
+  lastActiveAt?: string;
 }
 
 export interface AuditLog {

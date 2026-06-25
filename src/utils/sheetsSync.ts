@@ -549,6 +549,11 @@ const mapUserActivityFromDb = (row: any): UserActivity => ({
   browser: row.browser,
   ipAddress: row.ip_address,
   activeSeconds: Number(row.active_seconds),
+  latitude: row.latitude ? Number(row.latitude) : undefined,
+  longitude: row.longitude ? Number(row.longitude) : undefined,
+  locationName: row.location_name || undefined,
+  os: row.os || undefined,
+  lastActiveAt: row.last_active_at || undefined,
 });
 
 const mapUserActivityToDb = (ua: UserActivity) => ({
@@ -562,6 +567,11 @@ const mapUserActivityToDb = (ua: UserActivity) => ({
   browser: ua.browser ?? null,
   ip_address: ua.ipAddress ?? null,
   active_seconds: ua.activeSeconds ?? 0,
+  latitude: ua.latitude ?? null,
+  longitude: ua.longitude ?? null,
+  location_name: ua.locationName ?? null,
+  os: ua.os ?? null,
+  last_active_at: ua.lastActiveAt ?? null,
 });
 
 const mapAuditLogFromDb = (row: any): AuditLog => ({
@@ -1457,6 +1467,66 @@ export class SheetsSyncEngine {
     }
   }
 
+  public static async updateActivityDetails(
+    activityId: string,
+    ip: string,
+    locationName: string,
+    lat: number | null,
+    lon: number | null,
+    os: string
+  ): Promise<void> {
+    const list = this.getUserActivities();
+    const idx = list.findIndex(a => a.id === activityId);
+    if (idx !== -1) {
+      list[idx].ipAddress = ip;
+      list[idx].locationName = locationName;
+      list[idx].latitude = lat ?? undefined;
+      list[idx].longitude = lon ?? undefined;
+      list[idx].os = os;
+      list[idx].lastActiveAt = new Date().toISOString();
+      this.memoryCache["billing_user_activities"] = list;
+
+      if (supabase) {
+        try {
+          const payload = mapUserActivityToDb(list[idx]);
+          const { error } = await supabase
+            .from("user_activities")
+            .update(payload)
+            .eq("id", activityId);
+          if (error) {
+            console.warn("[SyncEngine] Failed to update user activity details in Supabase:", error.message);
+          }
+        } catch (e) {
+          console.warn("[SyncEngine] DB update for activity details failed:", e);
+        }
+      }
+    }
+  }
+
+  public static async updateActivityHeartbeat(activityId: string): Promise<void> {
+    const list = this.getUserActivities();
+    const idx = list.findIndex(a => a.id === activityId);
+    const nowStr = new Date().toISOString();
+    if (idx !== -1) {
+      list[idx].lastActiveAt = nowStr;
+      this.memoryCache["billing_user_activities"] = list;
+
+      if (supabase) {
+        try {
+          const { error } = await supabase
+            .from("user_activities")
+            .update({ last_active_at: nowStr })
+            .eq("id", activityId);
+          if (error) {
+            console.warn("[SyncEngine] Failed to update activity heartbeat in Supabase:", error.message);
+          }
+        } catch (e) {
+          console.warn("[SyncEngine] DB update for activity heartbeat failed:", e);
+        }
+      }
+    }
+  }
+
   public static logSessionExit(username: string): void {
     const list = this.getUserActivities();
     const activeAct = list.find(a => a.username === username && !a.logoutTime);
@@ -1500,7 +1570,7 @@ export class SheetsSyncEngine {
 
     let weeklySales = 0;
     let todaySales = 0;
-    if (userRole === "Admin") {
+    if (userRole === "Admin" || userRole === "Superadmin") {
       todaySales = todayInvoices.reduce((sum, inv) => sum + inv.grandTotal, 0);
       weeklySales = weeklyInvoices.reduce((sum, inv) => sum + inv.grandTotal, 0);
     }

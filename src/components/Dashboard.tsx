@@ -53,7 +53,7 @@ export default function Dashboard({ stats, onRefresh, onNavigateToTab, userRole 
 
 
  const currentUser = SheetsSyncEngine.getCurrentUser();
- const isAdmin = userRole ==="Admin";
+ const isAdmin = userRole ==="Admin" || userRole === "Superadmin";
  const isManager = userRole ==="Manager";
  const isEmployee = userRole ==="Employee";
 

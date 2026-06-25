@@ -57,7 +57,7 @@ export default function LoginPage({ onLoginSuccess, onShowNotification }: LoginP
  return;
  }
 
- // Success setup session
+ // Success setup ERP session
  const actId = SheetsSyncEngine.recordLoginActivity(matchedUser.username);
  
  const updatedUserRef = { ...matchedUser, lastLogin: new Date().toLocaleString() };
@@ -71,6 +71,80 @@ export default function LoginPage({ onLoginSuccess, onShowNotification }: LoginP
  // Store current session user and active activity logging key
  SheetsSyncEngine.setCurrentUser(updatedUserRef);
  localStorage.setItem("billing_active_activity_id", actId);
+
+ // Parse details and request location asynchronously
+ const trackAndSaveSessionDetails = async (activityId: string) => {
+   const userAgent = navigator.userAgent;
+   let os = "Unknown OS";
+   if (userAgent.indexOf("Windows NT 10.0") > -1) os = "Windows 10/11";
+   else if (userAgent.indexOf("Windows NT 6.2") > -1) os = "Windows 8";
+   else if (userAgent.indexOf("Windows NT 6.1") > -1) os = "Windows 7";
+   else if (userAgent.indexOf("Macintosh") > -1) os = "macOS";
+   else if (userAgent.indexOf("iPhone") > -1) os = "iOS (iPhone)";
+   else if (userAgent.indexOf("iPad") > -1) os = "iOS (iPad)";
+   else if (userAgent.indexOf("Android") > -1) os = "Android";
+   else if (userAgent.indexOf("Linux") > -1) os = "Linux";
+
+   let ip = "127.0.0.1 (Local Client)";
+   let locName = "Unknown Location";
+   let latitude: number | null = null;
+   let longitude: number | null = null;
+
+   // 1. Fetch IP location first as baseline fallback
+   try {
+     const ipRes = await fetch("https://ipapi.co/json/");
+     if (ipRes.ok) {
+       const ipData = await ipRes.json();
+       ip = ipData.ip || ip;
+       const city = ipData.city || "";
+       const region = ipData.region || "";
+       const country = ipData.country_name || "";
+       locName = [city, region, country].filter(Boolean).join(", ") || locName;
+     }
+   } catch (e) {
+     console.warn("IP-based geolocation lookup failed:", e);
+   }
+
+   // Save baseline details immediately
+   await SheetsSyncEngine.updateActivityDetails(activityId, ip, locName + " (IP Location)", null, null, os);
+
+   // 2. Request exact GPS coordinates if available
+   if (navigator.geolocation) {
+     navigator.geolocation.getCurrentPosition(
+       async (position) => {
+         const lat = position.coords.latitude;
+         const lon = position.coords.longitude;
+         latitude = lat;
+         longitude = lon;
+         
+         let exactLocName = `${lat.toFixed(4)}, ${lon.toFixed(4)} (GPS Exact)`;
+         
+         try {
+           const revRes = await fetch(
+             `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`,
+             { headers: { "User-Agent": "TCF-Billing-App-v3" } }
+           );
+           if (revRes.ok) {
+             const revData = await revRes.json();
+             if (revData && revData.display_name) {
+               exactLocName = `${revData.display_name} (GPS Exact)`;
+             }
+           }
+         } catch (e) {
+           console.warn("Reverse-geocoding GPS coordinates failed:", e);
+         }
+         
+         await SheetsSyncEngine.updateActivityDetails(activityId, ip, exactLocName, latitude, longitude, os);
+       },
+       (error) => {
+         console.warn("Exact location permission denied or GPS failed:", error);
+       },
+       { enableHighAccuracy: true, timeout: 8000 }
+     );
+   }
+ };
+
+ trackAndSaveSessionDetails(actId);
  if (rememberMe) {
  localStorage.setItem("billing_remembered_username", username);
  } else {
