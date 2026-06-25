@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&family=Share+Tech+Mono&display=swap');
 @import "tailwindcss";
 
 @custom-variant dark (&:where(.dark, .dark *));
@@ -96,5 +96,256 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--text-muted);
+}
+
+/* ==========================================================================
+   CYBER BRUTALISM THEME (SUPERADMIN ONLY)
+   ========================================================================== */
+
+.theme-cyber-brutalism {
+  --bg-surface: #06090c;
+  --bg-card: #0c0f13;
+  --bg-card-secondary: #13171c;
+  --text-primary: #ccff00;
+  --text-secondary: #a3e635;
+  --text-muted: #65a30d;
+  --border-default: #ccff00;
+  --border-primary: #ccff00;
+  --border-secondary: #a3e635;
+  --button-primary: #ccff00;
+  --button-secondary: #0c0f13;
+  --table-header: #13171c;
+  --table-row: #0c0f13;
+  --table-row-hover: #171d24;
+  --input-surface: #030507;
+  
+  background-color: #06090c;
+  background-image: 
+    linear-gradient(rgba(204, 255, 0, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(204, 255, 0, 0.02) 1px, transparent 1px);
+  background-size: 24px 24px;
+  color: #ccff00;
+}
+
+/* Force Monospace Font Stack globally */
+.theme-cyber-brutalism,
+.theme-cyber-brutalism *,
+.theme-cyber-brutalism input,
+.theme-cyber-brutalism button,
+.theme-cyber-brutalism select,
+.theme-cyber-brutalism textarea {
+  font-family: 'Share Tech Mono', 'Space Mono', 'JetBrains Mono', ui-monospace, monospace !important;
+  letter-spacing: 0.02em;
+}
+
+/* Remove rounded corners globally for cyber brutalism */
+.theme-cyber-brutalism div,
+.theme-cyber-brutalism section,
+.theme-cyber-brutalism button,
+.theme-cyber-brutalism input,
+.theme-cyber-brutalism select,
+.theme-cyber-brutalism table,
+.theme-cyber-brutalism th,
+.theme-cyber-brutalism td,
+.theme-cyber-brutalism tr,
+.theme-cyber-brutalism a,
+.theme-cyber-brutalism span,
+.theme-cyber-brutalism form,
+.theme-cyber-brutalism aside,
+.theme-cyber-brutalism main,
+.theme-cyber-brutalism header,
+.theme-cyber-brutalism input::placeholder {
+  border-radius: 0px !important;
+}
+
+/* Global scrollbar adjustments */
+.theme-cyber-brutalism ::-webkit-scrollbar-track {
+  background: #06090c !important;
+}
+.theme-cyber-brutalism ::-webkit-scrollbar-thumb {
+  background: #ccff00 !important;
+  border: 1px solid #000000 !important;
+}
+.theme-cyber-brutalism ::-webkit-scrollbar-thumb:hover {
+  background: #ffffff !important;
+}
+
+/* Sidebar Styling overrides */
+.theme-cyber-brutalism aside {
+  background-color: #0c0f13 !important;
+  border-right: 3px solid #ccff00 !important;
+}
+
+/* Active navigation item styling overrides */
+.theme-cyber-brutalism aside a.bg-primary\/5,
+.theme-cyber-brutalism aside button.bg-primary\/5,
+.theme-cyber-brutalism aside a[class*="bg-blue-50"],
+.theme-cyber-brutalism aside a[class*="text-blue-600"] {
+  background-color: #ccff00 !important;
+  color: #000000 !important;
+  border: 2px solid #ccff00 !important;
+  font-weight: 900 !important;
+}
+
+/* Non-active navigation hover states */
+.theme-cyber-brutalism aside a:hover,
+.theme-cyber-brutalism aside button:hover {
+  background-color: rgba(204, 255, 0, 0.1) !important;
+  color: #ccff00 !important;
+}
+
+/* Card panel styling overrides */
+.theme-cyber-brutalism .bg-card,
+.theme-cyber-brutalism .bg-surface,
+.theme-cyber-brutalism .cyber-panel {
+  background-color: #0c0f13 !important;
+  border: 2px solid #ccff00 !important;
+  box-shadow: 4px 4px 0px 0px #ccff00 !important;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.theme-cyber-brutalism .bg-card:hover,
+.theme-cyber-brutalism .cyber-panel:hover {
+  transform: translate(-2px, -2px) !important;
+  box-shadow: 6px 6px 0px 0px #ccff00 !important;
+}
+
+.theme-cyber-brutalism .bg-card-secondary {
+  background-color: #13171c !important;
+  border: 1px solid #a3e635 !important;
+  box-shadow: 2px 2px 0px 0px #a3e635 !important;
+}
+
+/* Table elements styling overrides */
+.theme-cyber-brutalism table {
+  border: 2px solid #ccff00 !important;
+  border-collapse: collapse !important;
+}
+.theme-cyber-brutalism th {
+  background-color: #13171c !important;
+  color: #ccff00 !important;
+  font-weight: bold !important;
+  text-transform: uppercase !important;
+  border-bottom: 2px solid #ccff00 !important;
+  border-right: 1px solid #ccff00 !important;
+  padding: 0.75rem !important;
+}
+.theme-cyber-brutalism td {
+  background-color: #0c0f13 !important;
+  color: #ccff00 !important;
+  border-bottom: 1px solid rgba(204, 255, 0, 0.2) !important;
+  border-right: 1px solid rgba(204, 255, 0, 0.2) !important;
+  padding: 0.75rem !important;
+}
+.theme-cyber-brutalism tr:hover td {
+  background-color: #1a232b !important;
+}
+
+/* Input and Select styling overrides */
+.theme-cyber-brutalism input,
+.theme-cyber-brutalism select,
+.theme-cyber-brutalism textarea {
+  background-color: #030507 !important;
+  border: 2px solid #ccff00 !important;
+  color: #ccff00 !important;
+  outline: none !important;
+  padding: 0.5rem 0.75rem !important;
+}
+.theme-cyber-brutalism input:focus,
+.theme-cyber-brutalism select:focus,
+.theme-cyber-brutalism textarea:focus {
+  box-shadow: 3px 3px 0px 0px #ccff00 !important;
+  border-color: #ccff00 !important;
+}
+
+/* Buttons styling overrides */
+.theme-cyber-brutalism button:not(.tab-btn-ignore) {
+  border: 2px solid #ccff00 !important;
+  background-color: #0c0f13 !important;
+  color: #ccff00 !important;
+  font-weight: bold !important;
+  text-transform: uppercase !important;
+  box-shadow: 3px 3px 0px 0px #ccff00 !important;
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+  cursor: pointer !important;
+}
+.theme-cyber-brutalism button:hover:not(.tab-btn-ignore) {
+  background-color: #ccff00 !important;
+  color: #000000 !important;
+  transform: translate(-1px, -1px);
+  box-shadow: 4px 4px 0px 0px #000000 !important;
+}
+.theme-cyber-brutalism button:active:not(.tab-btn-ignore) {
+  transform: translate(2px, 2px);
+  box-shadow: 0px 0px 0px 0px transparent !important;
+}
+
+/* Solid background action color mappings */
+.theme-cyber-brutalism .bg-blue-600,
+.theme-cyber-brutalism .bg-emerald-600,
+.theme-cyber-brutalism .bg-purple-600,
+.theme-cyber-brutalism .bg-indigo-600,
+.theme-cyber-brutalism .bg-red-600 {
+  background-color: #ccff00 !important;
+  color: #000000 !important;
+  border: 2px solid #ccff00 !important;
+  box-shadow: 3px 3px 0px 0px #a3e635 !important;
+}
+.theme-cyber-brutalism .bg-blue-600:hover,
+.theme-cyber-brutalism .bg-emerald-600:hover,
+.theme-cyber-brutalism .bg-purple-600:hover,
+.theme-cyber-brutalism .bg-indigo-600:hover,
+.theme-cyber-brutalism .bg-red-600:hover {
+  background-color: #ffffff !important;
+  border-color: #ffffff !important;
+  box-shadow: 3px 3px 0px 0px #ccff00 !important;
+}
+
+/* Text overrides */
+.theme-cyber-brutalism .text-primary,
+.theme-cyber-brutalism .text-secondary,
+.theme-cyber-brutalism .text-muted,
+.theme-cyber-brutalism .text-gray-900,
+.theme-cyber-brutalism .text-slate-900,
+.theme-cyber-brutalism .text-zinc-900,
+.theme-cyber-brutalism .text-black {
+  color: #ccff00 !important;
+}
+
+.theme-cyber-brutalism .text-gray-500,
+.theme-cyber-brutalism .text-slate-500,
+.theme-cyber-brutalism .text-zinc-500 {
+  color: #a3e635 !important;
+}
+
+/* Accent headers and hazard bars */
+.theme-cyber-brutalism h1,
+.theme-cyber-brutalism h2,
+.theme-cyber-brutalism h3,
+.theme-cyber-brutalism h4 {
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
+  color: #ccff00 !important;
+}
+
+/* Dialog and Modals styling overrides */
+.theme-cyber-brutalism [role="dialog"],
+.theme-cyber-brutalism [class*="modal"] {
+  background-color: #0c0f13 !important;
+  border: 3px solid #ccff00 !important;
+  box-shadow: 8px 8px 0px 0px #ccff00 !important;
+}
+
+/* Global scanline overlay */
+.theme-cyber-brutalism::after {
+  content: " ";
+  display: block;
+  position: fixed;
+  top: 0; left: 0; bottom: 0; right: 0;
+  background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%);
+  background-size: 100% 4px;
+  z-index: 99999;
+  pointer-events: none;
+  opacity: 0.35;
 }
 

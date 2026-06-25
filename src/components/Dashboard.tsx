@@ -614,11 +614,11 @@ export default function Dashboard({ stats, onRefresh, onNavigateToTab, userRole 
               {chartDimensions.width > 0 && (
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={stats.monthlySalesData}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#111827" />
-                    <XAxis dataKey="month" tickLine={false} axisLine={false} style={{ fontSize: "10px", fill: "#34d399" }} />
-                    <YAxis tickLine={false} axisLine={false} style={{ fontSize: "10px", fill: "#34d399" }} tickFormatter={(v) => `₹${formatIndianCurrencyShort(v)}`} />
-                    <Tooltip cursor={{ fill: "#111827", opacity: 0.4 }} contentStyle={{ backgroundColor: "#090d10", borderColor: "rgba(16,185,129,0.3)", borderRadius: "8px", fontSize: "11px", color: "#34d399" }} formatter={(value: any) => [`₹${value.toLocaleString()}`, "Gross Revenue"]} />
-                    <Bar dataKey="total" fill="#10b981" radius={[4, 4, 0, 0]} />
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isSuperadmin ? "rgba(204, 255, 0, 0.15)" : "#111827"} />
+                    <XAxis dataKey="month" tickLine={false} axisLine={false} style={{ fontSize: "10px", fill: isSuperadmin ? "#ccff00" : "#34d399" }} />
+                    <YAxis tickLine={false} axisLine={false} style={{ fontSize: "10px", fill: isSuperadmin ? "#ccff00" : "#34d399" }} tickFormatter={(v) => `₹${formatIndianCurrencyShort(v)}`} />
+                    <Tooltip cursor={{ fill: "#111827", opacity: 0.4 }} contentStyle={{ backgroundColor: "#090d10", borderColor: isSuperadmin ? "#ccff00" : "rgba(16,185,129,0.3)", borderRadius: isSuperadmin ? "0px" : "8px", fontSize: "11px", color: isSuperadmin ? "#ccff00" : "#34d399" }} formatter={(value: any) => [`₹${value.toLocaleString()}`, "Gross Revenue"]} />
+                    <Bar dataKey="total" fill={isSuperadmin ? "#ccff00" : "#10b981"} radius={isSuperadmin ? [0, 0, 0, 0] : [4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               )}

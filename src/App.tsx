@@ -558,7 +558,7 @@ export default function App() {
   const isStorageFallback = (window.localStorage as any)?.isPolyfill === true;
 
   return (
-    <div className="min-h-screen bg-surface flex flex-col font-sans">
+    <div className={`min-h-screen flex flex-col ${userRole === "Superadmin" ? "theme-cyber-brutalism bg-[#06090c]" : "bg-surface font-sans"}`}>
       {isStorageFallback && (
         <div className="bg-amber-500 text-amber-950 px-4 py-2 text-xs font-semibold text-center flex items-center justify-center gap-2 border-b border-amber-600 shadow-sm z-50">
           <AlertTriangle className="h-4 w-4 shrink-0" />
