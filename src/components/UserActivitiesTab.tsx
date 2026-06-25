@@ -104,13 +104,18 @@ export default function UserActivitiesTab() {
     return datetimeB - datetimeA;
   });
 
+  const fallbackLat = 16.2422;
+  const fallbackLon = 80.6473;
+  const hasGps = !!(mapSessionToDisplay?.latitude && mapSessionToDisplay?.longitude);
+  const displayLat = mapSessionToDisplay?.latitude ? Number(mapSessionToDisplay.latitude) : fallbackLat;
+  const displayLon = mapSessionToDisplay?.longitude ? Number(mapSessionToDisplay.longitude) : fallbackLon;
+
   const iframeRef = React.useRef<HTMLIFrameElement>(null);
   const prevCoordsRef = React.useRef<{lat: number, lon: number} | null>(null);
 
   React.useEffect(() => {
-    if (!mapSessionToDisplay?.latitude || !mapSessionToDisplay?.longitude) return;
-    const lat = Number(mapSessionToDisplay.latitude);
-    const lon = Number(mapSessionToDisplay.longitude);
+    const lat = displayLat;
+    const lon = displayLon;
     if (!prevCoordsRef.current) {
       prevCoordsRef.current = { lat, lon };
     } else if (prevCoordsRef.current.lat !== lat || prevCoordsRef.current.lon !== lon) {
@@ -119,13 +124,9 @@ export default function UserActivitiesTab() {
         iframeRef.current.src = `https://maps.google.com/maps?q=${lat},${lon}&hl=en&z=14&output=embed`;
       }
     }
-  }, [mapSessionToDisplay?.latitude, mapSessionToDisplay?.longitude]);
+  }, [displayLat, displayLon]);
 
-  const initialLat = mapSessionToDisplay?.latitude ? Number(mapSessionToDisplay.latitude) : null;
-  const initialLon = mapSessionToDisplay?.longitude ? Number(mapSessionToDisplay.longitude) : null;
-  const initialSrc = (initialLat && initialLon)
-    ? `https://maps.google.com/maps?q=${initialLat},${initialLon}&hl=en&z=14&output=embed`
-    : "";
+  const initialSrc = `https://maps.google.com/maps?q=${displayLat},${displayLon}&hl=en&z=14&output=embed`;
 
   return (
     <div className="space-y-6">
@@ -538,7 +539,7 @@ export default function UserActivitiesTab() {
 
                 {/* Interactive Map Embed */}
                 <div className="space-y-2">
-                  <div className={`relative rounded-xl overflow-hidden border border-default bg-surface shadow-inner h-48 transition-colors ${!(mapSessionToDisplay?.latitude && mapSessionToDisplay?.longitude) ? 'hidden' : ''}`}>
+                  <div className="relative rounded-xl overflow-hidden border border-default bg-surface shadow-inner h-48 transition-colors">
                     <iframe
                       ref={iframeRef}
                       title="GPS Geolocation Map"
@@ -550,9 +551,9 @@ export default function UserActivitiesTab() {
                       loading="lazy"
                     />
                   </div>
-                  {mapSessionToDisplay?.latitude && mapSessionToDisplay?.longitude ? (
+                  {hasGps ? (
                     <a
-                      href={`https://www.google.com/maps/search/?api=1&query=${mapSessionToDisplay.latitude},${mapSessionToDisplay.longitude}`}
+                      href={`https://www.google.com/maps/search/?api=1&query=${displayLat},${displayLon}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-purple-200 dark:border-purple-900/40 bg-purple-50/50 dark:bg-purple-950/20 py-2 text-xs font-bold text-purple-600 dark:text-purple-400 hover:bg-purple-100/50 dark:hover:bg-purple-950/40 active:scale-95 transition-all cursor-pointer"
@@ -561,13 +562,13 @@ export default function UserActivitiesTab() {
                       <span>Open in Google Maps</span>
                     </a>
                   ) : (
-                    <div className="p-4 rounded-xl border border-amber-200/50 dark:border-amber-900/30 bg-amber-50/40 dark:bg-amber-950/10 text-[11px] text-amber-700 dark:text-amber-400 space-y-2 transition-colors">
+                    <div className="p-3.5 rounded-xl border border-blue-200/50 dark:border-blue-900/30 bg-blue-50/40 dark:bg-blue-950/10 text-[11px] text-blue-700 dark:text-blue-400 space-y-1 transition-colors">
                       <div className="flex items-center gap-1.5 font-bold">
-                        <AlertCircle className="h-4 w-4 text-amber-500" />
-                        <span>GPS Coordinates Missing</span>
+                        <AlertCircle className="h-4 w-4 text-blue-500" />
+                        <span>Showroom HQ Location (Default Fallback)</span>
                       </div>
                       <p className="font-sans leading-relaxed">
-                        This session doesn't have active GPS coordinates. This can happen if the device denied location permissions or if this is an older historic record logged before GPS integration.
+                        This session doesn't have active GPS coordinates (e.g. local client/localhost or permission denied). Centering map on the main Showroom HQ.
                       </p>
                     </div>
                   )}
