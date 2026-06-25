@@ -71,6 +71,14 @@ export default function App() {
     preloadPDFLogo();
   }, []);
 
+  const [liveTime, setLiveTime] = useState(() => new Date().toLocaleTimeString('en-GB', { hour12: false }));
+  useEffect(() => {
+    const t = setInterval(() => {
+      setLiveTime(new Date().toLocaleTimeString('en-GB', { hour12: false }));
+    }, 1000);
+    return () => clearInterval(t);
+  }, []);
+
  // Load/apply theme preference on active user changes
  const [currentUserTheme, setCurrentUserTheme] = useState<string>(() => {
     const userStr = localStorage.getItem("billing_current_user");
@@ -556,6 +564,298 @@ export default function App() {
  );
 
   const isStorageFallback = (window.localStorage as any)?.isPolyfill === true;
+
+  if (userRole === "Superadmin") {
+    return (
+      <div className="min-h-screen theme-cyber-brutalism bg-[#06090c] text-[#ccff00] p-0 overflow-x-hidden relative select-none font-mono flex flex-col">
+        {/* GLOBAL TOAST BANNER SLIDEOUT */}
+        {notification && (
+          <div
+            id="toast-notification"
+            className="fixed top-4 right-4 z-[9999] flex items-center gap-2 px-4 py-3 text-sm font-semibold bg-black border border-[#ccff00] text-[#ccff00] shadow-2xl animate-in slide-in-from-top-6 duration-300"
+          >
+            {notification.type === "success" ? (
+              <CheckCircle2 className="h-4 w-4 shrink-0" />
+            ) : (
+              <AlertTriangle className="h-4 w-4 shrink-0" />
+            )}
+            <span>{notification.text}</span>
+            <button onClick={() => setNotification(null)} className="ml-2 hover:opacity-85 font-bold">
+              &times;
+            </button>
+          </div>
+        )}
+
+        {/* If activeTab is dashboard, render Dashboard tab directly (it has header/footer) */}
+        {activeTab === "dashboard" ? (
+          <Dashboard
+            stats={stats}
+            onRefresh={handleManualSync}
+            onNavigateToTab={handleNavigateToTab}
+            userRole={userRole}
+          />
+        ) : (
+          <>
+            {/* CYBER HEADER */}
+            <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b-2 border-[#ccff00] bg-black px-6 py-4 gap-4">
+              <div className="flex items-center gap-8">
+                <span 
+                  onClick={() => handleNavigateToTab("dashboard")}
+                  className="text-2xl font-black tracking-tighter text-[#ccff00] hover:scale-105 transition-transform duration-100 cursor-pointer"
+                >
+                  CYBR_
+                </span>
+                <nav className="flex flex-wrap items-center gap-6 text-[10px] font-bold text-[#ccff00] uppercase tracking-widest">
+                  <button onClick={() => handleNavigateToTab("revenue")} className="hover:text-white transition duration-100 bg-transparent border-0 shadow-none p-0 cursor-pointer tab-btn-ignore">WORK +</button>
+                  <button onClick={() => handleNavigateToTab("billing")} className="hover:text-white transition duration-100 bg-transparent border-0 shadow-none p-0 cursor-pointer tab-btn-ignore">SERVICES +</button>
+                  <button onClick={() => handleNavigateToTab("activities")} className="hover:text-white transition duration-100 bg-transparent border-0 shadow-none p-0 cursor-pointer tab-btn-ignore">ABOUT +</button>
+                  <button onClick={() => handleNavigateToTab("promos")} className="hover:text-white transition duration-100 bg-transparent border-0 shadow-none p-0 cursor-pointer tab-btn-ignore">LABS +</button>
+                  <button onClick={() => handleNavigateToTab("settings")} className="hover:text-white transition duration-100 bg-transparent border-0 shadow-none p-0 cursor-pointer tab-btn-ignore">CONTACT +</button>
+                </nav>
+              </div>
+              <div className="flex items-center justify-between sm:justify-end gap-6 text-[#ccff00]">
+                <div className="text-right leading-tight">
+                  <div className="text-zinc-550 font-bold uppercase tracking-wider text-[8px]">SYS_TIME</div>
+                  <div className="font-bold text-xs">{liveTime}</div>
+                  <div className="text-[7px] text-zinc-550">UTC+0</div>
+                </div>
+                <button 
+                  onClick={() => handleNavigateToTab("billing")}
+                  className="bg-[#ccff00] text-black px-4 py-2 text-xs font-black uppercase tracking-wider flex items-center gap-1.5 hover:bg-white active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all duration-100 tab-btn-ignore"
+                  style={{ boxShadow: 'none' }}
+                >
+                  <span>Start a Project</span>
+                  <span className="font-sans text-xs">↗</span>
+                </button>
+              </div>
+            </header>
+
+            {/* WORKSPACE CONTENT AREA */}
+            <main className="flex-1 p-6 md:p-12 overflow-y-auto space-y-8 flex flex-col">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-[10px] font-mono font-bold text-[#ccff00] uppercase tracking-widest">
+                  <span className="cursor-pointer hover:underline" onClick={() => handleNavigateToTab("dashboard")}>CONSOLE GATEWAY</span>
+                  <span>/</span>
+                  <span>{activeTab}</span>
+                </div>
+                <button 
+                  onClick={handleLogout}
+                  className="px-3 py-1 text-[10px] font-bold uppercase border border-[#ccff00] text-[#ccff00] hover:bg-[#ccff00] hover:text-black transition-colors"
+                >
+                  LOGOUT
+                </button>
+              </div>
+              
+              {/* Actual Tab Components */}
+              <div className="flex-1">
+                {activeTab === "billing" && (
+                  <PosBilling
+                    products={products}
+                    customers={customers}
+                    company={company || {
+                      companyName: "Tenali Central Furniture",
+                      address: "Guntur Road, Tenali-522201",
+                      phone: "+91 8644 223400",
+                      email: "contact@tcfshowroom.com",
+                      gstNumber: "GSTIN-37AAAAT9876C1Z0",
+                      invoicePrefix: "YR",
+                      nextInvoiceNumber: 1001,
+                    }}
+                    onInvoiceCreated={reloadApplicationState}
+                    onShowNotification={showNotification}
+                    onHasUnsavedChanges={setHasUnsavedInvoice}
+                    onNavigateToTab={handleNavigateToTab}
+                  />
+                )}
+                {activeTab === "drafts" && (
+                  <DraftsTab
+                    onNavigateToTab={handleNavigateToTab}
+                    onShowNotification={showNotification}
+                  />
+                )}
+                {activeTab === "products" && (
+                  <ProductsTab
+                    products={products}
+                    invoices={invoices}
+                    invoiceItems={invoiceItems}
+                    onRefresh={reloadApplicationState}
+                    onShowNotification={showNotification}
+                  />
+                )}
+                {activeTab === "customers" && (
+                  <CustomersTab
+                    customers={customers}
+                    invoices={invoices}
+                    onRefresh={reloadApplicationState}
+                    onShowNotification={showNotification}
+                    initiallySelectedCustomerId={selectedCustomerId}
+                    onClearSelected={() => setSelectedCustomerId(null)}
+                    onNavigateToTab={handleNavigateToTab}
+                  />
+                )}
+                {activeTab === "history" && (
+                  <HistoryTab
+                    invoices={invoices}
+                    invoiceItems={invoiceItems}
+                    company={company || {
+                      companyName: "Tenali Central Furniture",
+                      address: "Guntur Road, Tenali-522201",
+                      phone: "+91 8644 223400",
+                      email: "contact@tcfshowroom.com",
+                      gstNumber: "GSTIN-37AAAAT9876C1Z0",
+                      invoicePrefix: "YR",
+                      nextInvoiceNumber: 1001,
+                    }}
+                    onRefresh={reloadApplicationState}
+                    onShowNotification={showNotification}
+                    initialStatusFilter={historyStatusFilter}
+                    onResetStatusFilter={() => setHistoryStatusFilter("All")}
+                    initiallyInspectedInvoiceNo={selectedInvoiceNo}
+                    onClearInspected={() => setSelectedInvoiceNo(null)}
+                    onNavigateToTab={handleNavigateToTab}
+                  />
+                )}
+                {activeTab === "revenue" && (
+                  <RevenueAnalyticsTab
+                    invoices={invoices}
+                    customers={customers}
+                    products={products}
+                    invoiceItems={invoiceItems}
+                    onRefresh={reloadApplicationState}
+                    onShowNotification={showNotification}
+                    onNavigateToTab={handleNavigateToTab}
+                    userRole={userRole}
+                    initiallySelectedModule={selectedRevenueModule}
+                    onClearSelectedModule={() => setSelectedRevenueModule(null)}
+                  />
+                )}
+                {activeTab === "agents" && (
+                  <AgentsTab
+                    onRefresh={reloadApplicationState}
+                    onShowNotification={showNotification}
+                    initiallySelectedAgentId={selectedAgentId}
+                    onClearSelected={() => setSelectedAgentId(null)}
+                  />
+                )}
+                {activeTab === "promos" && (
+                  <PromoCodesTab
+                    onRefresh={reloadApplicationState}
+                    onShowNotification={showNotification}
+                  />
+                )}
+                {activeTab === "users" && (
+                  <UserControlsTab
+                    onShowNotification={showNotification}
+                    onRefresh={reloadApplicationState}
+                  />
+                )}
+                {activeTab === "activities" && (
+                  <UserActivitiesTab />
+                )}
+                {activeTab === "audit" && (
+                  <AuditTrailTab 
+                    initiallySelectedAuditId={selectedAuditId}
+                    onClearSelected={() => setSelectedAuditId(null)}
+                    userRole={userRole}
+                    onShowNotification={showNotification}
+                  />
+                )}
+                {activeTab === "trash" && (
+                  <TrashTab
+                    onRefresh={reloadApplicationState}
+                    onShowNotification={showNotification}
+                  />
+                )}
+                {activeTab === "settings" && connection && company && (
+                  <SettingsTab
+                    connSettings={connection}
+                    companySettings={company}
+                    onRefresh={reloadApplicationState}
+                    onShowNotification={showNotification}
+                    currentUserTheme={currentUserTheme}
+                    onUpdateTheme={handleUpdateTheme}
+                  />
+                )}
+              </div>
+            </main>
+
+            {/* CYBER FOOTER */}
+            <footer className="p-8 md:p-12 bg-black text-[#ccff00] space-y-12 border-t border-[#ccff00]/20">
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-8">
+                <div className="md:col-span-4 space-y-4">
+                  <span className="text-3xl font-black tracking-tighter block">CYBR_</span>
+                  <p className="text-[9px] text-[#ccff00]/55 font-sans leading-relaxed">
+                    © 2026 CYBR STUDIO.<br />ALL RIGHTS RESERVED.
+                  </p>
+                </div>
+                
+                {/* Nav links */}
+                <div className="md:col-span-2 space-y-3 text-left">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-[#ccff00]/55">Navigation</div>
+                  <ul className="text-xs space-y-2 text-[#ccff00] font-bold list-none p-0 m-0">
+                    <li><button onClick={() => handleNavigateToTab("revenue")} className="hover:text-white bg-transparent border-0 shadow-none p-0 cursor-pointer tab-btn-ignore text-left">Work</button></li>
+                    <li><button onClick={() => handleNavigateToTab("billing")} className="hover:text-white bg-transparent border-0 shadow-none p-0 cursor-pointer tab-btn-ignore text-left">Services</button></li>
+                    <li><button onClick={() => handleNavigateToTab("activities")} className="hover:text-white bg-transparent border-0 shadow-none p-0 cursor-pointer tab-btn-ignore text-left">About</button></li>
+                    <li><button onClick={() => handleNavigateToTab("promos")} className="hover:text-white bg-transparent border-0 shadow-none p-0 cursor-pointer tab-btn-ignore text-left">Labs</button></li>
+                    <li><button onClick={() => handleNavigateToTab("settings")} className="hover:text-white bg-transparent border-0 shadow-none p-0 cursor-pointer tab-btn-ignore text-left">Contact</button></li>
+                  </ul>
+                </div>
+
+                {/* Resources links */}
+                <div className="md:col-span-2 space-y-3 text-left">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-[#ccff00]/55">Resources</div>
+                  <ul className="text-xs space-y-2 text-[#ccff00] font-bold list-none p-0 m-0">
+                    <li><button onClick={() => handleNavigateToTab("audit")} className="hover:text-white bg-transparent border-0 shadow-none p-0 cursor-pointer tab-btn-ignore text-left">Manifesto</button></li>
+                    <li><button onClick={() => handleNavigateToTab("history")} className="hover:text-white bg-transparent border-0 shadow-none p-0 cursor-pointer tab-btn-ignore text-left">Blog</button></li>
+                    <li><button onClick={() => handleNavigateToTab("products")} className="hover:text-white bg-transparent border-0 shadow-none p-0 cursor-pointer tab-btn-ignore text-left">Style Guide</button></li>
+                    <li><button onClick={() => handleNavigateToTab("customers")} className="hover:text-white bg-transparent border-0 shadow-none p-0 cursor-pointer tab-btn-ignore text-left">Newsletter</button></li>
+                    <li><button onClick={() => handleNavigateToTab("users")} className="hover:text-white bg-transparent border-0 shadow-none p-0 cursor-pointer tab-btn-ignore text-left">Careers</button></li>
+                  </ul>
+                </div>
+
+                {/* Socials links */}
+                <div className="md:col-span-2 space-y-3 text-left">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-[#ccff00]/55">Socials</div>
+                  <ul className="text-xs space-y-2 text-[#ccff00] font-bold list-none p-0 m-0">
+                    <li><a href="#twitter" className="hover:text-white">X(Twitter)</a></li>
+                    <li><a href="#discord" className="hover:text-white">Discord</a></li>
+                    <li><a href="#github" className="hover:text-white">GitHub</a></li>
+                    <li><a href="#behance" className="hover:text-white">Behance</a></li>
+                    <li><a href="#youtube" className="hover:text-white">YouTube</a></li>
+                  </ul>
+                </div>
+
+                {/* Global Node Map */}
+                <div className="md:col-span-2 space-y-3 text-right">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-[#ccff00]/55 block">Global Node</div>
+                  <div className="text-xs font-bold text-[#ccff00]">LON + NY + TYO + BER</div>
+                  <div className="inline-block mt-2 opacity-65 grayscale hover:grayscale-0 transition duration-150 cursor-pointer" onClick={() => handleNavigateToTab("trash")}>
+                    {/* Minimal world radar grid */}
+                    <svg className="h-10 w-24 text-[#ccff00] stroke-1" viewBox="0 0 100 40" fill="none" stroke="currentColor">
+                      <path d="M5 20c25-10 65-10 90 0M5 10c25-5 65-5 90 0M5 30c25 5 65 5 90 0M10 5v30M30 5v30M50 5v30M70 5v30M90 5v30" stroke-dasharray="1 3" />
+                      <circle cx="50" cy="20" r="1.5" fill="#ccff00" />
+                      <circle cx="30" cy="15" r="1.5" fill="#ccff00" />
+                      <circle cx="70" cy="25" r="1.5" fill="#ccff00" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+            </footer>
+
+            {/* HAZARD ACCENT BAR */}
+            <div className="cyber-hazard-bar flex items-center justify-center py-2 bg-black border-t border-[#ccff00]/20">
+              <span className="bg-black text-[#ccff00] text-[9px] font-black tracking-widest px-4 py-0.5 border border-[#ccff00] select-none">
+                &gt; ACCESS GRANTED_
+              </span>
+            </div>
+          </>
+        )}
+
+        {/* CONTROLLED RESPONSIVE AI ASSISTANT PANEL */}
+        <AiAssistant isOpen={isAiOpen} setIsOpen={setIsAiOpen} />
+      </div>
+    );
+  }
 
   return (
     <div className={`min-h-screen flex flex-col ${userRole === "Superadmin" ? "theme-cyber-brutalism bg-[#06090c]" : "bg-surface font-sans"}`}>

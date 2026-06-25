@@ -62,6 +62,14 @@ export default function Dashboard({ stats, onRefresh, onNavigateToTab, userRole 
  }, []);
 
 
+  const [liveTime, setLiveTime] = useState(() => new Date().toLocaleTimeString('en-GB', { hour12: false }));
+  useEffect(() => {
+    const t = setInterval(() => {
+      setLiveTime(new Date().toLocaleTimeString('en-GB', { hour12: false }));
+    }, 1000);
+    return () => clearInterval(t);
+  }, []);
+
   const currentUser = SheetsSyncEngine.getCurrentUser();
   const isAdmin = userRole === "Admin";
   const isSuperadmin = userRole === "Superadmin";
@@ -377,496 +385,438 @@ export default function Dashboard({ stats, onRefresh, onNavigateToTab, userRole 
 
   // 1. SUPERADMIN "GOD-MODE" COMMAND CENTER
   if (isSuperadmin) {
+    const cpuBarLength = Math.max(0, Math.min(20, Math.round((telemetry?.cpu || 0) / 5)));
+    const cpuBar = "█".repeat(cpuBarLength) + "░".repeat(20 - cpuBarLength);
+
     return (
-      <div className="crt-overlay relative min-h-screen p-1">
-        <div className="crt-scanline" />
-        <style dangerouslySetInnerHTML={{__html: `
-          @keyframes scanline-anim {
-            0% { transform: translateY(-100%); }
-            100% { transform: translateY(100%); }
-          }
-          .crt-overlay {
-            position: relative;
-            overflow: hidden;
-            background-color: #06090c;
-            background-image: 
-              linear-gradient(rgba(16, 185, 129, 0.02) 1px, transparent 1px),
-              linear-gradient(90deg, rgba(16, 185, 129, 0.02) 1px, transparent 1px);
-            background-size: 24px 24px;
-          }
-          .crt-overlay::after {
-            content: " ";
-            display: block;
-            position: absolute;
-            top: 0; left: 0; bottom: 0; right: 0;
-            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.3) 50%), linear-gradient(90deg, rgba(16, 185, 129, 0.04), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.04));
-            z-index: 99;
-            background-size: 100% 3px, 6px 100%;
-            pointer-events: none;
-          }
-          .crt-scanline {
-            position: absolute;
-            top: 0; left: 0; right: 0; height: 100%;
-            background: linear-gradient(to bottom, rgba(16, 185, 129, 0), rgba(16, 185, 129, 0.05) 10%, rgba(16, 185, 129, 0) 20%);
-            animation: scanline-anim 12s linear infinite;
-            z-index: 100;
-            pointer-events: none;
-          }
-          .glow-text-green {
-            text-shadow: 0 0 8px rgba(16, 185, 129, 0.8);
-          }
-          .cyber-panel {
-            background: rgba(9, 13, 16, 0.85);
-            backdrop-filter: blur(8px);
-            border: 1px solid rgba(16, 185, 129, 0.15);
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-          }
-          .cyber-panel:hover {
-            border-color: rgba(16, 185, 129, 0.5);
-            box-shadow: 0 0 20px rgba(16, 185, 129, 0.25);
-            transform: translateY(-2px);
-          }
-        `}} />
-        <div className="space-y-6 text-left font-mono text-emerald-400">
-        {/* Local Toast Slideout for Superadmin Quick Actions */}
-        {localNotification && (
-          <div className="fixed top-4 right-4 z-[9999] flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold text-white bg-emerald-600 border border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.25)] animate-in slide-in-from-top-6 duration-300">
-            <CheckCircle2 className="h-4 w-4 shrink-0" />
-            <span>{localNotification}</span>
+      <div className="min-h-screen bg-black text-lime-400 p-0 overflow-x-hidden relative select-none font-mono">
+        {/* HEADER */}
+        <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b-2 border-lime-400 bg-black px-6 py-4 gap-4">
+          <div className="flex items-center gap-8">
+            <span className="text-2xl font-black tracking-tighter text-lime-400 hover:scale-105 transition-transform duration-100 cursor-pointer">CYBR_</span>
+            <nav className="flex flex-wrap items-center gap-6 text-[10px] font-bold text-lime-400 uppercase tracking-widest">
+              <a href="#work" className="hover:text-white transition duration-100">WORK +</a>
+              <a href="#services" className="hover:text-white transition duration-100">SERVICES +</a>
+              <a href="#about" className="hover:text-white transition duration-100">ABOUT +</a>
+              <a href="#labs" className="hover:text-white transition duration-100">LABS +</a>
+              <a href="#contact" className="hover:text-white transition duration-100">CONTACT +</a>
+            </nav>
           </div>
-        )}
+          <div className="flex items-center justify-between sm:justify-end gap-6 text-lime-400">
+            <div className="text-right leading-tight">
+              <div className="text-zinc-550 font-bold uppercase tracking-wider text-[8px]">SYS_TIME</div>
+              <div className="font-bold text-xs">{liveTime}</div>
+              <div className="text-[7px] text-zinc-550">UTC+0</div>
+            </div>
+            <button className="bg-lime-400 text-black px-4 py-2 text-xs font-black uppercase tracking-wider flex items-center gap-1.5 hover:bg-white active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all duration-100">
+              <span>Start a Project</span>
+              <span className="font-sans text-xs">↗</span>
+            </button>
+          </div>
+        </header>
 
-        {/* HEADER SECTION */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-emerald-500/20 pb-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-extrabold tracking-tight bg-gradient-to-r from-emerald-500 via-green-400 to-teal-400 bg-clip-text text-transparent uppercase shadow-[0_0_10px_rgba(16,185,129,0.1)]">
-                Omni-Command Telemetry Matrix
+        {/* HERO SECTION /01 */}
+        <section className="grid md:grid-cols-12 border-b-2 border-lime-400 min-h-[500px]">
+          {/* Hero Left Column */}
+          <div className="md:col-span-7 p-8 md:p-12 flex flex-col justify-between border-r-0 md:border-r-2 border-lime-400 space-y-8">
+            <div className="text-xs font-bold tracking-widest text-lime-500">/01 HERO</div>
+            <div className="space-y-6">
+              <h1 className="text-5xl md:text-7xl font-extrabold tracking-tighter text-lime-400 uppercase leading-none">
+                Cyber<br />Brutalism
               </h1>
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[9px] font-extrabold bg-gradient-to-r from-emerald-500/10 to-green-500/10 text-emerald-400 border border-emerald-500/30 shadow-[0_0_8px_rgba(16,185,129,0.15)] animate-pulse">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-450"></span>
-                GOD MODE ACTIVE
-              </span>
+              <h2 className="text-sm font-bold tracking-widest text-lime-500 uppercase">
+                The future isn't minimal. It's systematic.
+              </h2>
+              <p className="text-zinc-400 text-xs leading-relaxed max-w-lg font-sans">
+                Cyber Brutalism is raw, digital, and unapologetically functional. A new visual language for the machine age.
+              </p>
             </div>
-            <p className="text-xs text-emerald-500/70 font-mono mt-1">
-              Real-time node status, live terminal geolocation tracking, administrative system overrides, and security ledger audit.
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => {
-                const next = !soundEnabled;
-                setSoundEnabled(next);
-                localStorage.setItem("telemetry_sound_enabled", next ? "true" : "false");
-                if (next) playBeep(600, 0.15, "triangle");
-              }}
-              className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-bold shadow-sm transition-all hover:bg-emerald-500/5 active:scale-95 cursor-pointer font-mono ${
-                soundEnabled ? "border-emerald-500 bg-emerald-500/10 text-emerald-300" : "border-emerald-500/30 bg-zinc-955 text-emerald-500/55"
-              }`}
-            >
-              {soundEnabled ? <Volume2 className="h-3.5 w-3.5 animate-pulse" /> : <VolumeX className="h-3.5 w-3.5" />}
-              <span>{soundEnabled ? "[SOUND: ACTIVE]" : "[SOUND: MUTED]"}</span>
-            </button>
-            <button
-              onClick={onRefresh}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-zinc-955 px-3 py-2 text-xs font-bold text-emerald-400 shadow-sm transition-all hover:bg-emerald-500/5 hover:border-emerald-500/50 hover:text-emerald-300 active:scale-95 cursor-pointer font-mono"
-            >
-              <RefreshCw className="h-3.5 w-3.5" />
-              <span>[FORCE_SYNC_NODES]</span>
-            </button>
-            <button
-              onClick={() => onNavigateToTab("billing")}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 py-2 text-xs font-bold text-white transition-all hover:bg-emerald-700 active:scale-95 cursor-pointer shadow-md shadow-emerald-500/10 font-mono"
-            >
-              <Sparkles className="h-3.5 w-3.5 animate-pulse" />
-              <span>[NEW_CHECKOUT]</span>
-            </button>
-          </div>
-        </div>
-
-        {/* METRICS & TELEMETRY SECTION */}
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {/* Glowing Metrics */}
-          <div 
-            onClick={() => onNavigateToTab("revenue")}
-            className="rounded-xl p-5 cursor-pointer group flex flex-col justify-between h-32 text-emerald-400 cyber-panel"
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-500/70 font-mono">[WEEKLY_REVENUE]</p>
-                <h3 className="mt-1 text-2xl font-black font-mono">₹{formatIndianCurrencyShort(stats.weeklySales)}</h3>
-              </div>
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                <DollarSign className="h-5 w-5" />
-              </div>
-            </div>
-            <p className="text-[10px] text-emerald-500/70 font-mono group-hover:text-emerald-400 transition-colors">Open Revenue Analytics Hub &rarr;</p>
-          </div>
-
-          <div 
-            onClick={() => onNavigateToTab("revenue", undefined, { revenueModule: "Weekly Bills" })}
-            className="rounded-xl p-5 cursor-pointer group flex flex-col justify-between h-32 text-emerald-400 cyber-panel"
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-500/70 font-mono">[WEEKLY_BILLS]</p>
-                <h3 className="mt-1 text-2xl font-black font-mono">{stats.weeklyInvoicesCount}</h3>
-              </div>
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                <FileText className="h-5 w-5" />
-              </div>
-            </div>
-            <p className="text-[10px] text-emerald-500/70 font-mono group-hover:text-emerald-400 transition-colors">Invoices generated this week &rarr;</p>
-          </div>
-
-          <div 
-            onClick={() => onNavigateToTab("activities")}
-            className="rounded-xl p-5 cursor-pointer group flex flex-col justify-between h-32 text-emerald-400 cyber-panel"
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-500/70 font-mono">[ONLINE_OPERATORS]</p>
-                <h3 className="mt-1 text-2xl font-black font-mono flex items-center gap-1.5">
-                  <span>{activities.filter(a => {
-                    if (a.logoutTime) return false;
-                    if (!a.lastActiveAt) return false;
-                    return (Date.now() - new Date(a.lastActiveAt).getTime()) < 300000;
-                  }).length} ONLINE</span>
-                  <span className="flex h-2.5 w-2.5 relative">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-400"></span>
-                  </span>
-                </h3>
-              </div>
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                <Activity className="h-5 w-5" />
-              </div>
-            </div>
-            <p className="text-[10px] text-emerald-500/70 font-mono group-hover:text-emerald-400 transition-colors">Track operator details & map &rarr;</p>
-          </div>
-
-          {/* TELEMETRY WIDGET */}
-          <div className="rounded-xl p-4 space-y-2.5 text-emerald-400 cyber-panel">
-            <div className="flex items-center justify-between border-b border-zinc-850 pb-1.5">
-              <span className="text-[9px] font-bold text-emerald-400 tracking-wider uppercase flex items-center gap-1">
-                <Cpu className="h-3 w-3 animate-pulse text-emerald-400" /> [LIVE_NODE_TELEMETRY]
-              </span>
-              <span className="text-[9px] font-bold text-emerald-450 flex items-center gap-1">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span> ONLINE
-              </span>
-            </div>
-            <div className="grid grid-cols-2 gap-x-2 gap-y-1.5 text-[10px] font-mono">
-              <div className="flex justify-between border-b border-zinc-900 pb-1">
-                <span className="text-zinc-550">CPU Load:</span>
-                <span className="text-emerald-400 font-bold">{telemetry.cpu}%</span>
-              </div>
-              <div className="flex justify-between border-b border-zinc-900 pb-1">
-                <span className="text-zinc-550">Node Latency:</span>
-                <span className="text-cyan-400 font-bold">{telemetry.latency}ms</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-zinc-550">Heap Alloc:</span>
-                <span className="text-emerald-400 font-bold">{telemetry.memory}MB</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-zinc-550">Terminals:</span>
-                <span className="text-cyan-400 font-bold">{activities.length}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* WORK IN PROGRESS TRACKER */}
-        <div className="grid gap-3 grid-cols-3 font-mono">
-          <div className="rounded-xl p-4 flex items-center justify-between cursor-pointer cyber-panel" onClick={() => onNavigateToTab("revenue", undefined, { revenueModule: "Work In Progress" })}>
-            <div>
-              <span className="text-[9px] uppercase font-bold text-amber-500/90 font-mono">[STATUS: WIP_QUEUED]</span>
-              <div className="text-base font-black text-amber-500 font-mono mt-0.5">{stats.wipBillsCount} Bills</div>
-            </div>
-            <Clock className="h-5 w-5 text-amber-500/20" />
-          </div>
-          <div className="rounded-xl p-4 flex items-center justify-between cursor-pointer cyber-panel" onClick={() => onNavigateToTab("revenue", undefined, { revenueModule: "Ready For Delivery" })}>
-            <div>
-              <span className="text-[9px] uppercase font-bold text-blue-400/90 font-mono">[STATUS: READY_DISPATCH]</span>
-              <div className="text-base font-black text-blue-400 font-mono mt-0.5">{stats.readyBillsCount} Bills</div>
-            </div>
-            <Truck className="h-5 w-5 text-blue-400/20" />
-          </div>
-          <div className="rounded-xl p-4 flex items-center justify-between cursor-pointer cyber-panel" onClick={() => onNavigateToTab("revenue", undefined, { revenueModule: "Completed Cycles" })}>
-            <div>
-              <span className="text-[9px] uppercase font-bold text-emerald-400/90 font-mono">[STATUS: ARCHIVED_PAID]</span>
-              <div className="text-base font-black text-emerald-450 font-mono mt-0.5">{stats.completedBillsCount} Bills</div>
-            </div>
-            <CheckCircle className="h-5 w-5 text-emerald-500/20" />
-          </div>
-        </div>
-
-        {/* MAIN VISUALIZATION & GEOLOCATION MATRIX */}
-        <div className="grid gap-6 md:grid-cols-3">
-          {/* Revenue Distribution Chart */}
-          <div ref={chartRef} className="md:col-span-2 rounded-xl p-5 flex flex-col justify-between font-mono cyber-panel text-emerald-400">
-            <h3 className="font-bold text-emerald-450 text-sm mb-4 flex items-center justify-between">
-              <span className="flex items-center gap-1.5"><TrendingUp className="h-4.5 w-4.5 text-emerald-400" /> [REVENUE_DISTRIBUTION_LEDGER]</span>
-              <span className="text-[9px] text-emerald-500/70 font-mono">UNIT: INR (₹) • ANALYTICAL_DRILL_DOWN</span>
-            </h3>
-            <div className="h-[280px]">
-              {chartDimensions.width > 0 && (
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={stats.monthlySalesData}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isSuperadmin ? "rgba(204, 255, 0, 0.15)" : "#111827"} />
-                    <XAxis dataKey="month" tickLine={false} axisLine={false} style={{ fontSize: "10px", fill: isSuperadmin ? "#ccff00" : "#34d399" }} />
-                    <YAxis tickLine={false} axisLine={false} style={{ fontSize: "10px", fill: isSuperadmin ? "#ccff00" : "#34d399" }} tickFormatter={(v) => `₹${formatIndianCurrencyShort(v)}`} />
-                    <Tooltip cursor={{ fill: "#111827", opacity: 0.4 }} contentStyle={{ backgroundColor: "#090d10", borderColor: isSuperadmin ? "#ccff00" : "rgba(16,185,129,0.3)", borderRadius: isSuperadmin ? "0px" : "8px", fontSize: "11px", color: isSuperadmin ? "#ccff00" : "#34d399" }} formatter={(value: any) => [`₹${value.toLocaleString()}`, "Gross Revenue"]} />
-                    <Bar dataKey="total" fill={isSuperadmin ? "#ccff00" : "#10b981"} radius={isSuperadmin ? [0, 0, 0, 0] : [4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              )}
+            <div className="flex flex-wrap gap-4 pt-4">
+              <button 
+                onClick={() => onNavigateToTab("revenue")}
+                className="bg-lime-400 text-black px-6 py-3 text-xs font-black uppercase tracking-widest flex items-center gap-2 hover:bg-white transition duration-100"
+              >
+                <span>Explore Work</span>
+                <span className="font-sans text-sm">↗</span>
+              </button>
+              <button 
+                onClick={() => onNavigateToTab("audit")}
+                className="border-2 border-lime-400 text-lime-400 px-6 py-3 text-xs font-bold uppercase tracking-widest flex items-center gap-2 hover:bg-lime-400 hover:text-black transition duration-100"
+              >
+                <span>View Manifesto</span>
+                <span>[ ]</span>
+              </button>
             </div>
           </div>
 
-          {/* Live Geolocation Tracker Map Widget */}
-          <div className="rounded-xl p-5 flex flex-col font-mono text-emerald-400 cyber-panel">
-            <h3 className="font-bold text-emerald-450 text-sm mb-3.5 flex items-center justify-between">
-              <span className="flex items-center gap-1.5"><MapPin className="h-4.5 w-4.5 text-emerald-400 animate-bounce" /> [GPS_NODE_TRACKER_MAP]</span>
-              <span className="text-[9px] text-emerald-500/70 uppercase font-mono">Real-time Location</span>
-            </h3>
-            <div className="flex-1 flex flex-col justify-between space-y-3">
-              <div className={`relative rounded-xl overflow-hidden border border-emerald-500/20 bg-[#06080a] h-48 transition-all ${!activeMapSession ? 'hidden' : ''}`}>
-                <iframe
-                  ref={iframeRef}
-                  title="Live Geolocation Tracker Map"
-                  width="100%"
-                  height="100%"
-                  style={{ border: 0 }}
-                  allowFullScreen
-                  loading="lazy"
-                />
+          {/* Hero Right Column */}
+          <div className="md:col-span-5 relative bg-[#090d10] p-6 flex flex-col justify-between overflow-hidden min-h-[400px] md:min-h-auto">
+            {/* Background Grid Lines Overlay */}
+            <div className="absolute inset-0 bg-grid-line opacity-10 pointer-events-none" />
+            
+            {/* Scanning details overlay */}
+            <div className="flex justify-between items-start z-10 text-[9px] text-lime-500 font-bold uppercase">
+              <div className="animate-pulse flex items-center gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-lime-400 animate-ping" />
+                <span>&gt; RENDERING... 87%</span>
               </div>
+              <div className="text-right">SYS_SCN: ACTIVE</div>
+            </div>
 
-              {activeMapSession ? (
-                <div className="text-[11px] p-2.5 rounded-lg bg-[#06080a] border border-emerald-500/20 space-y-1 transition-colors text-emerald-400">
-                  <div className="flex justify-between items-center text-[10px]">
-                    <span className="text-emerald-500/70">Active Operator:</span>
-                    <strong className="text-emerald-400 font-mono font-bold">@{activeMapSession.username}</strong>
-                  </div>
-                  <div className="flex justify-between items-center text-[10px] pb-1.5 border-b border-emerald-500/20">
-                    <span className="text-emerald-500/70">Terminal Location:</span>
-                    <span className="text-emerald-350 font-semibold text-right max-w-[150px] truncate" title={activeMapSession.locationName}>
-                      {activeMapSession.locationName || "Resolving GPS..."}
-                    </span>
-                  </div>
-                  
-                  {/* Clickable Active Operators selection list */}
-                  <div className="pt-1.5 space-y-1">
-                    <span className="text-[9px] uppercase font-bold text-emerald-500/70 block tracking-wide">[NODE_REGISTRY_GPS]</span>
-                    <div className="flex flex-wrap gap-1 max-h-20 overflow-y-auto pr-1">
-                      {operatorsWithGps.map(uname => {
-                        const isSelected = (selectedGpsUsername === uname) || (!selectedGpsUsername && activeMapSession?.username === uname);
-                        // Check if currently online (active within 5 minutes and no logout)
-                        const isOnline = activities.some(act => 
-                          act.username === uname && 
-                          !act.logoutTime && 
-                          act.lastActiveAt && 
-                          (Date.now() - new Date(act.lastActiveAt).getTime()) < 300000
-                        );
-                        return (
-                          <button
-                            key={uname}
-                            onClick={() => setSelectedGpsUsername(uname)}
-                            className={`px-1.5 py-0.5 rounded text-[9px] font-mono font-bold border transition-all cursor-pointer ${
-                              isSelected
-                                ? "bg-emerald-500/15 border-emerald-500 text-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.2)]"
-                                : "bg-zinc-900 border-emerald-500/25 text-emerald-500/80 hover:text-emerald-300 hover:border-emerald-500/50 hover:bg-emerald-500/5"
-                            }`}
-                          >
-                            <span className="flex items-center gap-1">
-                              <span className={`h-1.5 w-1.5 rounded-full ${isOnline ? "bg-green-500 animate-pulse" : "bg-zinc-500"}`} />
-                              @{uname}
-                            </span>
-                          </button>
-                        );
-                      })}
-                      {operatorsWithGps.length === 0 && (
-                        <span className="text-[9px] text-emerald-500/60 italic">No terminals with GPS tracking.</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex-1 flex flex-col items-center justify-center text-center p-6 border border-dashed border-emerald-500/20 rounded-xl bg-[#06080a] text-emerald-500/70 h-48">
-                  <Globe className="h-8 w-8 mb-2 text-emerald-500/60 animate-spin-slow" />
-                  <h4 className="font-bold text-xs text-emerald-400 mb-1">No GPS Terminals Active</h4>
-                  <p className="text-[10px] text-emerald-500/65 max-w-[180px]">
-                    No active session coordinates detected. Location mapping requires device GPS authorization at login.
-                  </p>
-                </div>
-              )}
+            {/* Wireframe Head Render */}
+            <div className="absolute inset-0 flex items-center justify-center p-8 z-0">
+              <img 
+                src="/cyber_head.png" 
+                alt="Cyber Brutalist Head Scan" 
+                className="max-h-[85%] max-w-[85%] object-contain filter brightness-110 contrast-125 select-none pointer-events-none"
+              />
+            </div>
+
+            {/* Coordinate values overlay */}
+            <div className="flex justify-between items-end z-10 text-[9px] text-lime-500 font-mono tracking-wider pt-24">
+              <div className="space-y-0.5 bg-black/75 p-2 border border-lime-400/20">
+                <div>X_142.9</div>
+                <div>Y_88.3</div>
+                <div>Z_55.6</div>
+              </div>
+              <div className="bg-black/75 p-2 border border-lime-400/20">
+                <span>//SCN_01</span>
+              </div>
             </div>
           </div>
-        </div>
+        </section>
 
-        {/* MASTER SECURITY ACTIONS & SYSTEM AUDIT LEDGER */}
-        <div className="grid gap-6 md:grid-cols-3">
-          {/* Security Audit Trail (2/3 width) */}
-          <div 
-            onClick={() => onNavigateToTab("audit")}
-            className="md:col-span-2 group rounded-xl p-5 flex flex-col h-[380px] cursor-pointer font-mono text-emerald-400 cyber-panel"
-            title="Click card to view full security audit history ledger"
-          >
-            <div className="mb-3.5 flex items-center justify-between">
-              <div>
-                <div className="flex items-center gap-1.5">
-                  <Terminal className="h-4.5 w-4.5 text-emerald-400 animate-pulse group-hover:text-emerald-500 transition-colors" />
-                  <h3 className="font-bold text-emerald-450 text-sm font-sans flex items-center gap-2">
-                    <span>[SECURITY_AUDIT_LEDGER]</span>
-                  </h3>
-                </div>
-                <p className="text-xs text-emerald-500/75 font-mono mt-0.5">SYSTEM_CORE_AUTHORIZATIONS_AND_OVERRIDE_LOGS</p>
-              </div>
-              <span className="text-[10px] text-emerald-400 hover:text-emerald-300 font-bold opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-x-1 group-hover:translate-x-0">
-                [AUDIT_REGISTRY] &rarr;
-              </span>
-            </div>
-            <div className="flex-1 overflow-y-auto space-y-3 pr-1">
-              {limitLogs.map((log) => (
-                <div 
-                  key={log.id} 
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onNavigateToTab("audit", undefined, { auditId: log.id });
-                  }}
-                  className="group/row text-xs border-b border-emerald-500/10 pb-2.5 last:border-0 last:pb-0 hover:bg-emerald-500/5 hover:border-emerald-500/20 p-2 rounded-lg transition-all cursor-pointer relative"
-                  title={`View details of audit: ${log.id}`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-emerald-300 group-hover/row:text-emerald-400 transition-colors">{log.actionType}</span>
-                    <span className="text-[10px] font-mono text-emerald-550">{log.time}</span>
-                  </div>
-                  <div className="flex justify-between items-center mt-1 text-[10px]">
-                    <span className="text-emerald-500/70">Operator: <span className="font-mono text-emerald-400">@{log.userName}</span></span>
-                    <span className="text-emerald-550 font-mono text-[9px]">{log.id}</span>
-                  </div>
-                </div>
-              ))}
-              {limitLogs.length === 0 && (
-                <div className="h-full flex items-center justify-center text-center text-emerald-500/60 font-mono text-xs">
-                  No system security logs captured yet.
-                </div>
-              )}
-            </div>
+        {/* CORE PRINCIPLES /02 */}
+        <section className="border-b-2 border-lime-400">
+          <div className="border-b border-lime-400/30 px-6 py-4 flex justify-between items-center bg-black/45">
+            <span className="text-[10px] font-bold tracking-widest text-lime-500">/02 CORE PRINCIPLES</span>
+            <span className="text-[9px] text-zinc-550">SYSTEMATIC_METADATA_ARRAY</span>
           </div>
-
-          {/* Master Overrides & System Shortcuts (1/3 width) */}
-          <div className="rounded-xl p-5 flex flex-col h-[380px] justify-between text-left font-mono text-emerald-400 cyber-panel">
-            <div>
-              <div className="flex items-center gap-2 border-b border-zinc-900 pb-2.5 mb-4">
-                <Shield className="h-4.5 w-4.5 text-emerald-400" />
-                <div>
-                  <h3 className="font-bold text-sm">[MASTER_OVERRIDE_CONTROLS]</h3>
-                  <span className="text-[8px] font-mono text-emerald-400 tracking-widest uppercase">SYSTEM_CORE_SHUNTS</span>
-                </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 divide-y sm:divide-y-0 lg:divide-x-2 divide-lime-400">
+            {/* Principle 1 */}
+            <div className="p-6 flex flex-col justify-between space-y-6 bg-[#070b0e]/30 hover:bg-lime-400/5 transition duration-150">
+              <div className="flex justify-between items-start">
+                <span className="text-[10px] font-bold text-lime-500 uppercase tracking-widest">FUNCTION OVER FORM</span>
+                <span className="text-zinc-650">+</span>
               </div>
-              <p className="text-[11px] text-emerald-500/70 font-sans leading-relaxed mb-4">
-                Superuser shunts to optimize remote database storage nodes, sync client instances, or dump ledger indexes.
+              <div className="py-2">
+                <svg className="h-8 w-8 text-lime-400 stroke-1" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5M2 7v10M12 12v10M22 7v10" />
+                </svg>
+              </div>
+              <p className="text-[11px] text-zinc-400 leading-normal font-sans">
+                Design is built to serve. Nothing more.
               </p>
             </div>
             
-            <div className="space-y-2.5 flex-1 flex flex-col justify-end">
-              <button
-                onClick={handleVacuumDb}
-                disabled={isVacuuming}
-                className="w-full flex items-center justify-center gap-2 rounded-lg bg-zinc-900 border border-emerald-500/20 hover:bg-emerald-500/5 hover:border-emerald-500/40 text-xs font-bold py-2.5 text-emerald-400 transition-all cursor-pointer disabled:opacity-50 active:scale-97"
-              >
-                <Database className={`h-4 w-4 ${isVacuuming ? "animate-spin" : ""}`} />
-                <span>{isVacuuming ? "Vacuuming Database Indexes..." : "Vacuum Database Indices"}</span>
-              </button>
-
-              <button
-                onClick={handleExportLedgerDump}
-                className="w-full flex items-center justify-center gap-2 rounded-lg bg-zinc-900 border border-emerald-500/20 hover:bg-emerald-500/5 hover:border-emerald-500/40 text-xs font-bold py-2.5 text-emerald-400 transition-all cursor-pointer active:scale-97"
-              >
-                <Download className="h-4 w-4" />
-                <span>Export Ledger JSON Dump</span>
-              </button>
-
-              <button
-                onClick={() => onNavigateToTab("users")}
-                className="w-full flex items-center justify-center gap-2 rounded-lg bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/20 text-xs font-bold py-2.5 text-emerald-400 transition-all cursor-pointer active:scale-97 shadow-[0_0_10px_rgba(16,185,129,0.1)]"
-              >
-                <Users className="h-4 w-4" />
-                <span>Open Personnel Access Matrix</span>
-              </button>
-            </div>
-
-            <div className="border-t border-zinc-900 pt-2.5 mt-4 text-center">
-              <span className="text-[8px] font-mono text-emerald-500/60 tracking-wider uppercase font-mono">Node ID: SUPABASE_MAIN_01</span>
-            </div>
-          </div>
-        </div>
-
-        {/* COMMAND LINE TERMINAL CONSOLE */}
-        <div className="rounded-xl border border-emerald-500/20 bg-zinc-950 p-5 shadow-lg flex flex-col font-mono text-emerald-400 space-y-3">
-          <div className="flex items-center justify-between border-b border-zinc-900/50 pb-2.5">
-            <div className="flex items-center gap-2">
-              <Terminal className="h-4 w-4 text-emerald-400 animate-pulse" />
-              <h3 className="font-bold text-sm">[SYSTEM_SHUNTS_SHELL]</h3>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-[9px] uppercase font-bold text-emerald-500/70 tracking-wider">Console: Ready (AP-SOUTH-1)</span>
-            </div>
-          </div>
-
-          {/* Logs Output area */}
-          <div 
-            ref={terminalLogsRef}
-            className="h-44 overflow-y-auto p-3 rounded-lg bg-[#040608] border border-emerald-950/50 text-[11px] font-mono space-y-1 scrollbar-thin scrollbar-thumb-emerald-900/50 scrollbar-track-transparent"
-          >
-            {shellLogs.map((logLine, idx) => (
-              <div key={idx} className="leading-relaxed min-h-[0.85rem]">
-                {logLine.startsWith("guest@tcf_core:~$") ? (
-                  <span className="text-cyan-400 font-bold">{logLine}</span>
-                ) : logLine.includes("[NODE STATUS REPORT]") || logLine.includes("[SYSTEM INDEX]") || logLine.includes("Available terminal command shunts:") || logLine.includes("[TRASH RETENTION ENGINE]") ? (
-                  <span className="text-emerald-300 font-bold">{logLine}</span>
-                ) : logLine.startsWith("Command not found") || logLine.startsWith("Error:") ? (
-                  <span className="text-red-400">{logLine}</span>
-                ) : (
-                  <span>{logLine}</span>
-                )}
+            {/* Principle 2 */}
+            <div className="p-6 flex flex-col justify-between space-y-6 bg-[#070b0e]/30 hover:bg-lime-400/5 transition duration-150">
+              <div className="flex justify-between items-start">
+                <span className="text-[10px] font-bold text-lime-500 uppercase tracking-widest">SYSTEMS THINKING</span>
+                <span className="text-zinc-650">+</span>
               </div>
-            ))}
+              <div className="py-2">
+                <svg className="h-8 w-8 text-lime-400 stroke-1" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <circle cx="12" cy="12" r="9" />
+                  <circle cx="12" cy="12" r="5" />
+                  <circle cx="12" cy="12" r="1.5" />
+                  <path d="M12 2v20M2 12h20" stroke-dasharray="1 1" />
+                </svg>
+              </div>
+              <p className="text-[11px] text-zinc-400 leading-normal font-sans">
+                Grids. Modules. Data. Everything is connected.
+              </p>
+            </div>
+
+            {/* Principle 3 */}
+            <div className="p-6 flex flex-col justify-between space-y-6 bg-[#070b0e]/30 hover:bg-lime-400/5 transition duration-150">
+              <div className="flex justify-between items-start">
+                <span className="text-[10px] font-bold text-lime-500 uppercase tracking-widest">DIGITAL AESTHETICS</span>
+                <span className="text-zinc-650">+</span>
+              </div>
+              <div className="py-2">
+                <svg className="h-8 w-8 text-lime-400 stroke-1" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path d="M4 6h16M2 10h20M5 14h14M3 18h18" stroke-dasharray="3 3" />
+                  <path d="M8 3v18M16 3v18" stroke-opacity="0.2" />
+                </svg>
+              </div>
+              <p className="text-[11px] text-zinc-400 leading-normal font-sans">
+                Glitch, noise, scanlines, and hardware vibes.
+              </p>
+            </div>
+
+            {/* Principle 4 */}
+            <div className="p-6 flex flex-col justify-between space-y-6 bg-[#070b0e]/30 hover:bg-lime-400/5 transition duration-150">
+              <div className="flex justify-between items-start">
+                <span className="text-[10px] font-bold text-lime-500 uppercase tracking-widest">BOLD CONTRAST</span>
+                <span className="text-zinc-650">+</span>
+              </div>
+              <div className="py-2">
+                <svg className="h-8 w-8 text-lime-400 stroke-1" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path d="M12 2v20M2 12h20M5 5l14 14M19 5L5 19" />
+                </svg>
+              </div>
+              <p className="text-[11px] text-zinc-400 leading-normal font-sans">
+                High contrast. Harsh colors. No soft tones.
+              </p>
+            </div>
+
+            {/* Principle 5 */}
+            <div className="p-6 flex flex-col justify-between space-y-6 bg-[#070b0e]/30 hover:bg-lime-400/5 transition duration-150">
+              <div className="flex justify-between items-start">
+                <span className="text-[10px] font-bold text-lime-500 uppercase tracking-widest">RAW & AUTHENTIC</span>
+                <span className="text-zinc-650">+</span>
+              </div>
+              <div className="py-2">
+                <svg className="h-8 w-8 text-lime-400 stroke-1" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <rect x="2" y="2" width="6" height="6" />
+                  <rect x="9" y="2" width="6" height="6" />
+                  <rect x="16" y="2" width="6" height="6" />
+                  <rect x="2" y="9" width="6" height="6" />
+                  <rect x="16" y="9" width="6" height="6" />
+                  <rect x="2" y="16" width="6" height="6" />
+                  <rect x="9" y="16" width="6" height="6" />
+                  <rect x="16" y="16" width="6" height="6" />
+                </svg>
+              </div>
+              <p className="text-[11px] text-zinc-400 leading-normal font-sans">
+                No fluff. No polish. No compromise.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {/* SELECTED WORK /03 */}
+        <section className="border-b-2 border-lime-400">
+          <div className="border-b border-lime-400/30 px-6 py-4 flex justify-between items-center bg-black/45">
+            <span className="text-[10px] font-bold tracking-widest text-lime-500">/03 SELECTED WORK</span>
+            <span className="text-[9px] text-zinc-550">CLICK_CARD_TO_ROUTE_CONTROL_SYSTEM</span>
+          </div>
+          
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x-2 divide-lime-400">
+            {/* Card 1: Data Portal */}
+            <div 
+              onClick={() => onNavigateToTab("audit")}
+              className="p-6 flex flex-col justify-between h-[360px] cursor-pointer bg-[#0c0f13] hover:bg-lime-400/5 transition duration-150 group"
+            >
+              <div className="relative aspect-video overflow-hidden border border-lime-400/35 bg-black">
+                <img src="/data_portal.png" alt="Data Portal" className="h-full w-full object-cover filter brightness-95 group-hover:scale-105 transition-transform duration-300" />
+              </div>
+              <div className="space-y-1.5 pt-4">
+                <span className="text-[9px] font-bold text-lime-500 uppercase tracking-widest block">[01] SYSTEM_CORE</span>
+                <div className="flex justify-between items-center">
+                  <h4 className="font-extrabold text-sm text-lime-400 uppercase tracking-wider">DATA_PORTAL</h4>
+                  <span className="text-lime-400 font-sans text-xs group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform">↗</span>
+                </div>
+                <p className="text-[10px] text-zinc-500 font-sans">Security audit logs & system actions tracker.</p>
+              </div>
+            </div>
+
+            {/* Card 2: Neural Net */}
+            <div 
+              onClick={() => onNavigateToTab("users")}
+              className="p-6 flex flex-col justify-between h-[360px] cursor-pointer bg-[#0c0f13] hover:bg-lime-400/5 transition duration-150 group"
+            >
+              <div className="relative aspect-video overflow-hidden border border-lime-400/35 bg-black">
+                <img src="/neural_net.png" alt="Neural Net" className="h-full w-full object-cover filter brightness-95 group-hover:scale-105 transition-transform duration-300" />
+              </div>
+              <div className="space-y-1.5 pt-4">
+                <span className="text-[9px] font-bold text-lime-500 uppercase tracking-widest block">[02] STAFF_INDEX</span>
+                <div className="flex justify-between items-center">
+                  <h4 className="font-extrabold text-sm text-lime-400 uppercase tracking-wider">NEURAL_NET</h4>
+                  <span className="text-lime-400 font-sans text-xs group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform">↗</span>
+                </div>
+                <p className="text-[10px] text-zinc-500 font-sans">User personnel registry & access permissions.</p>
+              </div>
+            </div>
+
+            {/* Card 3: Void System */}
+            <div 
+              onClick={() => onNavigateToTab("trash")}
+              className="p-6 flex flex-col justify-between h-[360px] cursor-pointer bg-[#0c0f13] hover:bg-lime-400/5 transition duration-150 group"
+            >
+              <div className="relative aspect-video overflow-hidden border border-lime-400/35 bg-black">
+                <img src="/void_system.png" alt="Void System" className="h-full w-full object-cover filter brightness-95 group-hover:scale-105 transition-transform duration-300" />
+              </div>
+              <div className="space-y-1.5 pt-4">
+                <span className="text-[9px] font-bold text-lime-500 uppercase tracking-widest block">[03] SYSTEM_SHUNTS</span>
+                <div className="flex justify-between items-center">
+                  <h4 className="font-extrabold text-sm text-lime-400 uppercase tracking-wider">VOID_SYSTEM</h4>
+                  <span className="text-lime-400 font-sans text-xs group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform">↗</span>
+                </div>
+                <p className="text-[10px] text-zinc-500 font-sans">Trash manager & soft deletion retention.</p>
+              </div>
+            </div>
+
+            {/* Card 4: Gridline */}
+            <div 
+              onClick={() => onNavigateToTab("revenue")}
+              className="p-6 flex flex-col justify-between h-[360px] cursor-pointer bg-[#0c0f13] hover:bg-lime-400/5 transition duration-150 group"
+            >
+              <div className="relative aspect-video overflow-hidden border border-lime-400/35 bg-black">
+                <img src="/gridline.png" alt="Gridline" className="h-full w-full object-cover filter brightness-95 group-hover:scale-105 transition-transform duration-300" />
+              </div>
+              <div className="space-y-1.5 pt-4">
+                <span className="text-[9px] font-bold text-lime-500 uppercase tracking-widest block">[04] ANALYTICS</span>
+                <div className="flex justify-between items-center">
+                  <h4 className="font-extrabold text-sm text-lime-400 uppercase tracking-wider">GRIDLINE</h4>
+                  <span className="text-lime-400 font-sans text-xs group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform">↗</span>
+                </div>
+                <p className="text-[10px] text-zinc-500 font-sans">Revenue analytics, weekly bills & monthly sales.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* BOTTOM METADATA GRID */}
+        <section className="grid grid-cols-1 lg:grid-cols-12 divide-y lg:divide-y-0 lg:divide-x-2 divide-lime-400 border-b-2 border-lime-400">
+          {/* Join The Resistance /04 */}
+          <div className="lg:col-span-4 p-8 flex flex-col justify-between space-y-6">
+            <div className="text-[10px] font-bold tracking-widest text-lime-500">/04 JOIN THE RESISTANCE</div>
+            <div className="space-y-4">
+              <h3 className="text-2xl font-black uppercase tracking-tight leading-none text-lime-400">
+                Join the<br />resistance
+              </h3>
+              <p className="text-zinc-400 text-xs font-sans leading-relaxed">
+                Cyber Brutalism is more than a style. It's a statement. Let's build the future together.
+              </p>
+            </div>
+            <button 
+              onClick={() => onNavigateToTab("billing")}
+              className="bg-lime-400 text-black px-6 py-2.5 text-xs font-black uppercase tracking-widest flex items-center justify-between hover:bg-white active:scale-[0.98] transition-all cursor-pointer self-start"
+            >
+              <span>Let's Build</span>
+              <span className="font-sans text-xs ml-3">↗</span>
+            </button>
           </div>
 
-          {/* Input Prompt area */}
-          <form 
-            onSubmit={(e) => {
-              e.preventDefault();
-              handleShellCommand();
-            }}
-            className="flex items-center gap-2 bg-[#040608] border border-emerald-500/20 rounded-lg px-3 py-2 focus-within:border-emerald-500/50 transition-colors"
-          >
-            <span className="text-cyan-400 text-xs shrink-0 select-none">guest@tcf_core:~$</span>
-            <input
-              ref={consoleInputRef}
-              type="text"
-              value={shellInput}
-              onChange={(e) => setShellInput(e.target.value)}
-              className="flex-1 bg-transparent border-0 outline-none text-emerald-400 font-mono text-xs focus:ring-0 placeholder-emerald-500/35"
-              placeholder="Type command (e.g. 'help', 'status', 'matrix', 'teleport admin', 'sound')..."
-            />
-            <button 
-              type="submit"
-              className="px-3 py-1 rounded text-[10px] uppercase font-bold border border-emerald-500/30 hover:border-emerald-500/60 bg-emerald-950/20 hover:bg-emerald-500/10 text-emerald-400 transition-all cursor-pointer active:scale-95"
-            >
-              Execute
-            </button>
-          </form>
+          {/* System Status /05 */}
+          <div className="lg:col-span-4 p-8 flex flex-col justify-between space-y-6">
+            <div className="text-[10px] font-bold tracking-widest text-lime-500">/05 SYSTEM STATUS</div>
+            <div className="space-y-3 font-mono text-xs">
+              <div className="flex justify-between items-center border-b border-lime-400/20 pb-1">
+                <span className="text-zinc-550">CPU_USAGE</span>
+                <span className="text-lime-400 font-bold tracking-tighter flex items-center gap-2">
+                  <span className="text-[9px] font-bold">{cpuBar}</span>
+                  <span>{telemetry.cpu}%</span>
+                </span>
+              </div>
+              <div className="flex justify-between items-center border-b border-lime-400/20 pb-1">
+                <span className="text-zinc-550">MEMORY</span>
+                <span className="text-lime-400 font-bold">{telemetry.memory} MB / 16 GB</span>
+              </div>
+              <div className="flex justify-between items-center border-b border-lime-400/20 pb-1">
+                <span className="text-zinc-550">UPTIME</span>
+                <span className="text-lime-400 font-bold">7D 14H 22M</span>
+              </div>
+              <div className="flex justify-between items-center border-b border-lime-400/20 pb-1">
+                <span className="text-zinc-550">NETWORK</span>
+                <span className="text-lime-400 font-bold">SECURE</span>
+              </div>
+            </div>
+            <div className="px-3 py-1.5 border border-lime-400/35 text-[9px] font-black uppercase tracking-wider text-lime-400 flex items-center justify-center gap-1.5 bg-lime-400/5">
+              <span className="h-1.5 w-1.5 rounded-full bg-lime-400 animate-pulse" />
+              <span>All Systems Operational</span>
+            </div>
+          </div>
+
+          {/* Subscribe to Signal /06 */}
+          <div className="lg:col-span-4 p-8 flex flex-col justify-between space-y-6">
+            <div className="text-[10px] font-bold tracking-widest text-lime-500">/06 SUBSCRIBE TO SIGNAL</div>
+            <div className="space-y-4">
+              <h3 className="text-lg font-extrabold uppercase tracking-wide text-lime-400 leading-tight">
+                Subscribe to signal
+              </h3>
+              <p className="text-zinc-400 text-xs font-sans leading-relaxed">
+                Updates on trends, drops, and experiments from the lab.
+              </p>
+            </div>
+            <div className="flex gap-2 w-full">
+              <input 
+                type="email" 
+                placeholder="ENTER EMAIL"
+                className="flex-1 bg-black border border-lime-400 text-lime-400 text-xs px-3 py-2 outline-none placeholder-lime-400/30"
+              />
+              <button className="bg-lime-400 text-black px-4 py-2 text-xs font-black uppercase tracking-wider flex items-center gap-1 hover:bg-white active:scale-95 transition-all">
+                <span>Subscribe</span>
+                <span className="font-sans text-xs">↗</span>
+              </button>
+            </div>
+          </div>
+        </section>
+
+        {/* FOOTER */}
+        <footer className="p-8 md:p-12 bg-black text-lime-400 space-y-12">
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-8">
+            <div className="md:col-span-4 space-y-4">
+              <span className="text-3xl font-black tracking-tighter block">CYBR_</span>
+              <p className="text-[9px] text-zinc-550 font-sans leading-relaxed">
+                © 2026 CYBR STUDIO.<br />ALL RIGHTS RESERVED.
+              </p>
+            </div>
+            
+            {/* Nav links */}
+            <div className="md:col-span-2 space-y-3">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-550">Navigation</div>
+              <ul className="text-xs space-y-2 text-lime-500 font-bold">
+                <li><a href="#work" className="hover:text-white">Work</a></li>
+                <li><a href="#services" className="hover:text-white">Services</a></li>
+                <li><a href="#about" className="hover:text-white">About</a></li>
+                <li><a href="#labs" className="hover:text-white">Labs</a></li>
+                <li><a href="#contact" className="hover:text-white">Contact</a></li>
+              </ul>
+            </div>
+
+            {/* Resources links */}
+            <div className="md:col-span-2 space-y-3">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-550">Resources</div>
+              <ul className="text-xs space-y-2 text-lime-500 font-bold">
+                <li><a href="#manifesto" className="hover:text-white">Manifesto</a></li>
+                <li><a href="#blog" className="hover:text-white">Blog</a></li>
+                <li><a href="#styleguide" className="hover:text-white">Style Guide</a></li>
+                <li><a href="#newsletter" className="hover:text-white">Newsletter</a></li>
+                <li><a href="#careers" className="hover:text-white">Careers</a></li>
+              </ul>
+            </div>
+
+            {/* Socials links */}
+            <div className="md:col-span-2 space-y-3">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-550">Socials</div>
+              <ul className="text-xs space-y-2 text-lime-500 font-bold">
+                <li><a href="#twitter" className="hover:text-white">X(Twitter)</a></li>
+                <li><a href="#discord" className="hover:text-white">Discord</a></li>
+                <li><a href="#github" className="hover:text-white">GitHub</a></li>
+                <li><a href="#behance" className="hover:text-white">Behance</a></li>
+                <li><a href="#youtube" className="hover:text-white">YouTube</a></li>
+              </ul>
+            </div>
+
+            {/* Global Node Map */}
+            <div className="md:col-span-2 space-y-3 text-right">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-550 block">Global Node</div>
+              <div className="text-xs font-bold text-lime-500">LON + NY + TYO + BER</div>
+              <div className="inline-block mt-2 opacity-65 grayscale hover:grayscale-0 transition duration-150">
+                {/* Minimal world radar grid */}
+                <svg className="h-10 w-24 text-lime-400 stroke-1" viewBox="0 0 100 40" fill="none" stroke="currentColor">
+                  <path d="M5 20c25-10 65-10 90 0M5 10c25-5 65-5 90 0M5 30c25 5 65 5 90 0M10 5v30M30 5v30M50 5v30M70 5v30M90 5v30" stroke-dasharray="1 3" />
+                  <circle cx="50" cy="20" r="1.5" fill="#ccff00" />
+                  <circle cx="30" cy="15" r="1.5" fill="#ccff00" />
+                  <circle cx="70" cy="25" r="1.5" fill="#ccff00" />
+                </svg>
+              </div>
+            </div>
+          </div>
+        </footer>
+
+        {/* HAZARD ACCENT BAR */}
+        <div className="cyber-hazard-bar flex items-center justify-center">
+          <span className="bg-black text-[#ccff00] text-[9px] font-black tracking-widest px-4 py-0.5 border border-[#ccff00] select-none">
+            &gt; ACCESS GRANTED_
+          </span>
         </div>
       </div>
-    </div>
-  );
-}
+    );
+  }
 
   // 2. ADMIN DASHBOARD RENDER SECTION
   if (isAdmin) {

@@ -322,7 +322,9 @@ body {
 .theme-cyber-brutalism h1,
 .theme-cyber-brutalism h2,
 .theme-cyber-brutalism h3,
-.theme-cyber-brutalism h4 {
+.theme-cyber-brutalism h4,
+.theme-cyber-brutalism .display-sans {
+  font-family: 'Space Grotesk', 'Inter', sans-serif !important;
   text-transform: uppercase !important;
   letter-spacing: 0.05em !important;
   color: #ccff00 !important;
