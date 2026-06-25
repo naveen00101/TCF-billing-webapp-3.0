@@ -104,21 +104,28 @@ export default function UserActivitiesTab() {
     return datetimeB - datetimeA;
   });
 
-  // Memoize GPS Geolocation map iframe to prevent iframe reload flicker on state changes
-  const mapElement = React.useMemo(() => {
-    if (!mapSessionToDisplay?.latitude || !mapSessionToDisplay?.longitude) return null;
-    return (
-      <iframe
-        title="GPS Geolocation Map"
-        width="100%"
-        height="100%"
-        style={{ border: 0 }}
-        src={`https://maps.google.com/maps?q=${mapSessionToDisplay.latitude},${mapSessionToDisplay.longitude}&hl=en&z=14&output=embed`}
-        allowFullScreen
-        loading="lazy"
-      />
-    );
+  const iframeRef = React.useRef<HTMLIFrameElement>(null);
+  const prevCoordsRef = React.useRef<{lat: number, lon: number} | null>(null);
+
+  React.useEffect(() => {
+    if (!mapSessionToDisplay?.latitude || !mapSessionToDisplay?.longitude) return;
+    const lat = Number(mapSessionToDisplay.latitude);
+    const lon = Number(mapSessionToDisplay.longitude);
+    if (!prevCoordsRef.current) {
+      prevCoordsRef.current = { lat, lon };
+    } else if (prevCoordsRef.current.lat !== lat || prevCoordsRef.current.lon !== lon) {
+      prevCoordsRef.current = { lat, lon };
+      if (iframeRef.current) {
+        iframeRef.current.src = `https://maps.google.com/maps?q=${lat},${lon}&hl=en&z=14&output=embed`;
+      }
+    }
   }, [mapSessionToDisplay?.latitude, mapSessionToDisplay?.longitude]);
+
+  const initialLat = mapSessionToDisplay?.latitude ? Number(mapSessionToDisplay.latitude) : null;
+  const initialLon = mapSessionToDisplay?.longitude ? Number(mapSessionToDisplay.longitude) : null;
+  const initialSrc = (initialLat && initialLon)
+    ? `https://maps.google.com/maps?q=${initialLat},${initialLon}&hl=en&z=14&output=embed`
+    : "";
 
   return (
     <div className="space-y-6">
@@ -530,11 +537,20 @@ export default function UserActivitiesTab() {
                 </div>
 
                 {/* Interactive Map Embed */}
-                {mapSessionToDisplay?.latitude && mapSessionToDisplay?.longitude ? (
-                  <div className="space-y-2">
-                    <div className="relative rounded-xl overflow-hidden border border-default bg-surface shadow-inner h-48 transition-colors">
-                      {mapElement}
-                    </div>
+                <div className="space-y-2">
+                  <div className={`relative rounded-xl overflow-hidden border border-default bg-surface shadow-inner h-48 transition-colors ${!(mapSessionToDisplay?.latitude && mapSessionToDisplay?.longitude) ? 'hidden' : ''}`}>
+                    <iframe
+                      ref={iframeRef}
+                      title="GPS Geolocation Map"
+                      width="100%"
+                      height="100%"
+                      style={{ border: 0 }}
+                      src={initialSrc}
+                      allowFullScreen
+                      loading="lazy"
+                    />
+                  </div>
+                  {mapSessionToDisplay?.latitude && mapSessionToDisplay?.longitude ? (
                     <a
                       href={`https://www.google.com/maps/search/?api=1&query=${mapSessionToDisplay.latitude},${mapSessionToDisplay.longitude}`}
                       target="_blank"
@@ -544,18 +560,18 @@ export default function UserActivitiesTab() {
                       <ExternalLink className="h-3.5 w-3.5" />
                       <span>Open in Google Maps</span>
                     </a>
-                  </div>
-                ) : (
-                  <div className="p-4 rounded-xl border border-amber-200/50 dark:border-amber-900/30 bg-amber-50/40 dark:bg-amber-950/10 text-[11px] text-amber-700 dark:text-amber-400 space-y-2 transition-colors">
-                    <div className="flex items-center gap-1.5 font-bold">
-                      <AlertCircle className="h-4 w-4 text-amber-500" />
-                      <span>GPS Coordinates Missing</span>
+                  ) : (
+                    <div className="p-4 rounded-xl border border-amber-200/50 dark:border-amber-900/30 bg-amber-50/40 dark:bg-amber-950/10 text-[11px] text-amber-700 dark:text-amber-400 space-y-2 transition-colors">
+                      <div className="flex items-center gap-1.5 font-bold">
+                        <AlertCircle className="h-4 w-4 text-amber-500" />
+                        <span>GPS Coordinates Missing</span>
+                      </div>
+                      <p className="font-sans leading-relaxed">
+                        This session doesn't have active GPS coordinates. This can happen if the device denied location permissions or if this is an older historic record logged before GPS integration.
+                      </p>
                     </div>
-                    <p className="font-sans leading-relaxed">
-                      This session doesn't have active GPS coordinates. This can happen if the device denied location permissions or if this is an older historic record logged before GPS integration.
-                    </p>
-                  </div>
-                )}
+                  )}
+                </div>
 
                 {/* Tracked Geolocation History Timeline */}
                 {sortedGpsHistory.length > 0 && (

@@ -19,8 +19,10 @@ import {
   Terminal,
   Cpu,
   MapPin,
-  CheckCircle2
-} from"lucide-react";
+  CheckCircle2,
+  Volume2,
+  VolumeX
+} from "lucide-react";
 import { DashboardStats } from"../types";
 import { SheetsSyncEngine } from"../utils/sheetsSync";
 import { formatIndianCurrencyShort } from"../utils/currencyUtils";
@@ -65,13 +67,192 @@ export default function Dashboard({ stats, onRefresh, onNavigateToTab, userRole 
   const isSuperadmin = userRole === "Superadmin";
   const isManager = userRole === "Manager";
 
-  // Telemetry simulation state for Superadmin God-mode Dashboard
-  const [telemetry, setTelemetry] = useState({
-    cpu: 12.4,
-    memory: 342,
-    latency: 42,
-    network: "CONNECTED",
+  const [soundEnabled, setSoundEnabled] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("telemetry_sound_enabled") === "true";
+    }
+    return false;
   });
+
+  const playBeep = (freq = 800, duration = 0.08, type: OscillatorType = "sine") => {
+    try {
+      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = type;
+      osc.frequency.value = freq;
+      
+      gain.gain.setValueAtTime(0.003, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.03, ctx.currentTime + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + duration);
+      
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + duration);
+    } catch (e) {}
+  };
+
+  const [shellLogs, setShellLogs] = useState<string[]>([
+    "TCF-Core OS [Version 3.0.45]",
+    "(c) 2026 Tenali Central Furniture. All rights reserved.",
+    "System security clearance: SUPERUSER",
+    "Database link: SUPABASE_LIVE_NODE_01 (CONNECTED)",
+    "Type 'help' to display available command vector list.",
+    ""
+  ]);
+  const [shellInput, setShellInput] = useState("");
+  const consoleInputRef = React.useRef<HTMLInputElement>(null);
+  const terminalLogsRef = React.useRef<HTMLDivElement>(null);
+
+  const handleShellCommand = () => {
+    const cmd = shellInput.trim();
+    if (!cmd) return;
+
+    const newLogs = [...shellLogs, `guest@tcf_core:~$ ${cmd}`];
+    if (soundEnabled) playBeep(700, 0.05, "sine");
+
+    const cmdTokens = cmd.split(" ");
+    const cleanCmd = cmdTokens[0].toLowerCase();
+    let response: string[] = [];
+
+    switch (cleanCmd) {
+      case "help":
+        response = [
+          "Available terminal command shunts:",
+          "  help               - Show this interface",
+          "  status             - Read current node telemetry metrics",
+          "  sysinfo            - Print database node system parameters",
+          "  logs               - Dump recent security audit indices",
+          "  optimize           - Execute database indexing shunts (vacuum)",
+          "  operator <name>    - Lock GPS map tracking onto active operator",
+          "  teleport <name>    - Lock GPS map tracking onto active operator",
+          "  sound              - Toggle audio telemetry feedback chime status",
+          "  matrix             - Trigger scrolling digital intrusion shunts",
+          "  trash              - Query soft deleted items and auto-purge status",
+          "  clear              - Clear console display buffer"
+        ];
+        break;
+      case "clear":
+        setShellLogs([]);
+        setShellInput("");
+        return;
+      case "status":
+        response = [
+          `[NODE STATUS REPORT]`,
+          `  CPU Load:      ${telemetry.cpu}%`,
+          `  Heap Alloc:    ${telemetry.memory} MB`,
+          `  Latency:       ${telemetry.latency} ms`,
+          `  Connection:    CONNECTED`,
+          `  Access level:  GOD_MODE`
+        ];
+        break;
+      case "sysinfo":
+        response = [
+          `[SYSTEM INDEX]`,
+          `  Host Node ID:  SUPABASE_MAIN_01`,
+          `  Region:        AP-SOUTH-1`,
+          `  DB Engine:     PostgreSQL 15.6 (Supabase)`,
+          `  Terminal ID:   ${SheetsSyncEngine.getTerminalId()}`,
+          `  Current User:  ${currentUser?.fullName} (@${currentUser?.username})`,
+          `  Active Role:   ${currentUser?.role}`
+        ];
+        break;
+      case "logs":
+        const rawLogs = SheetsSyncEngine.getAuditLogs().slice(0, 3);
+        if (rawLogs.length === 0) {
+          response = ["No security records found in database."];
+        } else {
+          response = ["Recent Audit Traces:"];
+          rawLogs.forEach(l => {
+            response.push(`  [${l.time}] ${l.actionType} by @${l.userName} (${l.id})`);
+          });
+        }
+        break;
+      case "optimize":
+        response = [
+          "Launching database indexing optimization shunt...",
+          "Vacuuming descriptors...",
+          "Rebuilding indexes..."
+        ];
+        if (soundEnabled) {
+          setTimeout(() => playBeep(200, 0.4, "triangle"), 100);
+          setTimeout(() => playBeep(400, 0.4, "triangle"), 300);
+          setTimeout(() => playBeep(800, 0.6, "sine"), 500);
+        }
+        setTimeout(() => {
+          setShellLogs(prev => [
+            ...prev,
+            "Optimization complete. Reclaimed 0.45MB unused row descriptors."
+          ]);
+        }, 1200);
+        break;
+      case "operator":
+      case "teleport":
+        const targetUser = cmdTokens[1];
+        if (!targetUser) {
+          response = ["Error: Please specify operator username (e.g. 'operator admin')."];
+        } else {
+          const liveActs = SheetsSyncEngine.getUserActivities();
+          const found = liveActs.find(act => act.username.toLowerCase() === targetUser.toLowerCase());
+          if (found) {
+            setSelectedGpsUsername(found.username);
+            response = [
+              `Target locked: @${found.username}`,
+              `Resolving telemetry coordinates...`,
+              `Location: ${found.locationName || "Unknown"}`,
+              `Coords: ${found.latitude}, ${found.longitude}`,
+              `Map focus synchronized.`
+            ];
+            if (soundEnabled) {
+              playBeep(450, 0.1, "sine");
+              setTimeout(() => playBeep(900, 0.2, "sine"), 100);
+            }
+          } else {
+            response = [`Error: Operator @${targetUser} not found in telemetry registry.`];
+          }
+        }
+        break;
+      case "sound":
+        const nextSound = !soundEnabled;
+        setSoundEnabled(nextSound);
+        localStorage.setItem("telemetry_sound_enabled", nextSound ? "true" : "false");
+        response = [`Sound output state changed: ${nextSound ? "ACTIVE" : "MUTED"}`];
+        if (nextSound) playBeep(600, 0.15, "triangle");
+        break;
+      case "matrix":
+      case "rain":
+        response = [
+          "01001101 01000001 01010100 01010010 01001001 01011000",
+          "  SYSTEM: INTRUSION_DETECTION_SHUNTS: ACTIVE",
+          "  [x] DECRYPTING ENVELOPE SECTORS...",
+          "  [x] REROUTING SUBNET INJECTORS...",
+          "  [x] VACUUMING TEMPORARY REGISTERS...",
+          "  >> OMNI CORE TELEMETRY RECONCILIATION COMPLETED <<",
+          "  " + Array.from({ length: 4 }, () => Math.random().toString(36).substring(2, 15).toUpperCase()).join(" :: ")
+        ];
+        if (soundEnabled) {
+          playBeep(800, 0.05, "triangle");
+          setTimeout(() => playBeep(600, 0.05, "triangle"), 80);
+          setTimeout(() => playBeep(1000, 0.05, "triangle"), 160);
+        }
+        break;
+      case "trash":
+        const trashItems = SheetsSyncEngine.getInvoices().filter(inv => inv.isSoftDeleted || inv.status === "Deleted");
+        response = [
+          `[TRASH RETENTION ENGINE]`,
+          `  Soft deleted rows: ${trashItems.length}`,
+          `  Retention policy:  ${localStorage.getItem("trash_retention_days") || "Disabled"}`
+        ];
+        break;
+      default:
+        response = [`Command not found: '${cleanCmd}'. Type 'help' for command vector list.`];
+    }
+
+    setShellLogs([...newLogs, ...response, ""]);
+    setShellInput("");
+  };
+
   const [localNotification, setLocalNotification] = useState<string | null>(null);
   const [isVacuuming, setIsVacuuming] = useState(false);
   const [selectedGpsUsername, setSelectedGpsUsername] = useState<string | null>(null);
@@ -90,12 +271,26 @@ export default function Dashboard({ stats, onRefresh, onNavigateToTab, userRole 
         latency: Math.max(10, Math.round(prev.latency + (Math.random() - 0.5) * 6)),
         network: "CONNECTED",
       }));
+      if (soundEnabled) {
+        playBeep(120, 0.01, "sine");
+      }
     }, 3000);
     return () => clearInterval(timer);
-  }, [isSuperadmin]);
+  }, [isSuperadmin, soundEnabled]);
+
+  // Auto-scroll terminal logs to bottom
+  useEffect(() => {
+    if (terminalLogsRef.current) {
+      terminalLogsRef.current.scrollTop = terminalLogsRef.current.scrollHeight;
+    }
+  }, [shellLogs]);
 
   const handleVacuumDb = () => {
     setIsVacuuming(true);
+    if (soundEnabled) {
+      playBeep(350, 0.15, "triangle");
+      setTimeout(() => playBeep(700, 0.3, "sine"), 200);
+    }
     setTimeout(() => {
       setIsVacuuming(false);
       triggerLocalNotification("Supabase database indices optimized & vacuumed. Reclaimed 0.45MB unused row descriptors.");
@@ -103,6 +298,7 @@ export default function Dashboard({ stats, onRefresh, onNavigateToTab, userRole 
   };
 
   const handleExportLedgerDump = () => {
+    if (soundEnabled) playBeep(900, 0.12, "sine");
     const logs = SheetsSyncEngine.getAuditLogs();
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(logs, null, 2));
     const downloadAnchor = document.createElement("a");
@@ -113,7 +309,40 @@ export default function Dashboard({ stats, onRefresh, onNavigateToTab, userRole 
     downloadAnchor.remove();
     triggerLocalNotification("System cryptographic audit ledger exported successfully.");
   };
- const isEmployee = userRole ==="Employee";
+  const activities = SheetsSyncEngine.getUserActivities();
+  const limitLogs = SheetsSyncEngine.getAuditLogs().slice(0, 5);
+
+  const operatorsWithGps = Array.from(new Set(
+    activities
+      .filter(act => act.latitude && act.longitude)
+      .map(act => act.username)
+  ));
+
+  let activeMapSession: any = null;
+  if (selectedGpsUsername) {
+    activeMapSession = activities.find(act => act.username === selectedGpsUsername && act.latitude && act.longitude);
+  }
+  if (!activeMapSession) {
+    activeMapSession = activities.find(act => act.latitude && act.longitude);
+  }
+
+  const iframeRef = React.useRef<HTMLIFrameElement>(null);
+  const prevCoordsRef = React.useRef<{lat: number, lon: number} | null>(null);
+
+  React.useEffect(() => {
+    if (!isSuperadmin) return;
+    if (!activeMapSession?.latitude || !activeMapSession?.longitude) return;
+    const lat = Number(activeMapSession.latitude);
+    const lon = Number(activeMapSession.longitude);
+    if (!prevCoordsRef.current || prevCoordsRef.current.lat !== lat || prevCoordsRef.current.lon !== lon) {
+      prevCoordsRef.current = { lat, lon };
+      if (iframeRef.current) {
+        iframeRef.current.src = `https://maps.google.com/maps?q=${lat},${lon}&hl=en&z=13&output=embed`;
+      }
+    }
+  }, [activeMapSession?.latitude, activeMapSession?.longitude, isSuperadmin]);
+
+  const isEmployee = userRole ==="Employee";
 
  // Shared invoices getter
  const allInvoices = SheetsSyncEngine.getInvoices().filter(inv => !inv.isSoftDeleted && inv.status !=="Deleted");
@@ -140,45 +369,58 @@ export default function Dashboard({ stats, onRefresh, onNavigateToTab, userRole 
 
   // 1. SUPERADMIN "GOD-MODE" COMMAND CENTER
   if (isSuperadmin) {
-    const limitLogs = SheetsSyncEngine.getAuditLogs().slice(0, 5);
-    const activities = SheetsSyncEngine.getUserActivities();
-    
-    // Find all unique usernames that have at least one session with coordinates
-    const operatorsWithGps = Array.from(new Set(
-      activities
-        .filter(act => act.latitude && act.longitude)
-        .map(act => act.username)
-    ));
-
-    // Determine which session to show on the map:
-    // If selectedGpsUsername is set, find their latest session with coordinates
-    // Otherwise, default to the latest overall active session with coordinates
-    let activeMapSession = null;
-    if (selectedGpsUsername) {
-      activeMapSession = activities.find(act => act.username === selectedGpsUsername && act.latitude && act.longitude);
-    }
-    if (!activeMapSession) {
-      activeMapSession = activities.find(act => act.latitude && act.longitude);
-    }
-
-    // Memoize GPS Geolocation map iframe to prevent iframe reload flicker on state changes
-    const mapElement = React.useMemo(() => {
-      if (!activeMapSession?.latitude || !activeMapSession?.longitude) return null;
-      return (
-        <iframe
-          title="Live Geolocation Tracker Map"
-          width="100%"
-          height="100%"
-          style={{ border: 0 }}
-          src={`https://maps.google.com/maps?q=${activeMapSession.latitude},${activeMapSession.longitude}&hl=en&z=13&output=embed`}
-          allowFullScreen
-          loading="lazy"
-        />
-      );
-    }, [activeMapSession?.latitude, activeMapSession?.longitude]);
-
     return (
-      <div className="space-y-6 text-left font-mono text-emerald-400">
+      <div className="crt-overlay relative min-h-screen p-1">
+        <div className="crt-scanline" />
+        <style dangerouslySetInnerHTML={{__html: `
+          @keyframes scanline-anim {
+            0% { transform: translateY(-100%); }
+            100% { transform: translateY(100%); }
+          }
+          .crt-overlay {
+            position: relative;
+            overflow: hidden;
+            background-color: #06090c;
+            background-image: 
+              linear-gradient(rgba(16, 185, 129, 0.02) 1px, transparent 1px),
+              linear-gradient(90deg, rgba(16, 185, 129, 0.02) 1px, transparent 1px);
+            background-size: 24px 24px;
+          }
+          .crt-overlay::after {
+            content: " ";
+            display: block;
+            position: absolute;
+            top: 0; left: 0; bottom: 0; right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.3) 50%), linear-gradient(90deg, rgba(16, 185, 129, 0.04), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.04));
+            z-index: 99;
+            background-size: 100% 3px, 6px 100%;
+            pointer-events: none;
+          }
+          .crt-scanline {
+            position: absolute;
+            top: 0; left: 0; right: 0; height: 100%;
+            background: linear-gradient(to bottom, rgba(16, 185, 129, 0), rgba(16, 185, 129, 0.05) 10%, rgba(16, 185, 129, 0) 20%);
+            animation: scanline-anim 12s linear infinite;
+            z-index: 100;
+            pointer-events: none;
+          }
+          .glow-text-green {
+            text-shadow: 0 0 8px rgba(16, 185, 129, 0.8);
+          }
+          .cyber-panel {
+            background: rgba(9, 13, 16, 0.85);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(16, 185, 129, 0.15);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+          }
+          .cyber-panel:hover {
+            border-color: rgba(16, 185, 129, 0.5);
+            box-shadow: 0 0 20px rgba(16, 185, 129, 0.25);
+            transform: translateY(-2px);
+          }
+        `}} />
+        <div className="space-y-6 text-left font-mono text-emerald-400">
         {/* Local Toast Slideout for Superadmin Quick Actions */}
         {localNotification && (
           <div className="fixed top-4 right-4 z-[9999] flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold text-white bg-emerald-600 border border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.25)] animate-in slide-in-from-top-6 duration-300">
@@ -205,6 +447,20 @@ export default function Dashboard({ stats, onRefresh, onNavigateToTab, userRole 
           </div>
           <div className="flex items-center gap-2">
             <button
+              onClick={() => {
+                const next = !soundEnabled;
+                setSoundEnabled(next);
+                localStorage.setItem("telemetry_sound_enabled", next ? "true" : "false");
+                if (next) playBeep(600, 0.15, "triangle");
+              }}
+              className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-bold shadow-sm transition-all hover:bg-emerald-500/5 active:scale-95 cursor-pointer font-mono ${
+                soundEnabled ? "border-emerald-500 bg-emerald-500/10 text-emerald-300" : "border-emerald-500/30 bg-zinc-955 text-emerald-500/55"
+              }`}
+            >
+              {soundEnabled ? <Volume2 className="h-3.5 w-3.5 animate-pulse" /> : <VolumeX className="h-3.5 w-3.5" />}
+              <span>{soundEnabled ? "[SOUND: ACTIVE]" : "[SOUND: MUTED]"}</span>
+            </button>
+            <button
               onClick={onRefresh}
               className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-zinc-955 px-3 py-2 text-xs font-bold text-emerald-400 shadow-sm transition-all hover:bg-emerald-500/5 hover:border-emerald-500/50 hover:text-emerald-300 active:scale-95 cursor-pointer font-mono"
             >
@@ -226,7 +482,7 @@ export default function Dashboard({ stats, onRefresh, onNavigateToTab, userRole 
           {/* Glowing Metrics */}
           <div 
             onClick={() => onNavigateToTab("revenue")}
-            className="rounded-xl p-5 shadow-lg bg-zinc-950 border border-emerald-500/20 text-emerald-400 transition-all hover:shadow-[0_0_15px_rgba(16,185,129,0.15)] hover:scale-[1.02] duration-155 cursor-pointer group flex flex-col justify-between h-32 hover:border-emerald-500/50"
+            className="rounded-xl p-5 cursor-pointer group flex flex-col justify-between h-32 text-emerald-400 cyber-panel"
           >
             <div className="flex items-center justify-between">
               <div>
@@ -242,7 +498,7 @@ export default function Dashboard({ stats, onRefresh, onNavigateToTab, userRole 
 
           <div 
             onClick={() => onNavigateToTab("revenue", undefined, { revenueModule: "Weekly Bills" })}
-            className="rounded-xl p-5 shadow-lg bg-zinc-950 border border-emerald-500/20 text-emerald-400 transition-all hover:shadow-[0_0_15px_rgba(16,185,129,0.15)] hover:scale-[1.02] duration-155 cursor-pointer group flex flex-col justify-between h-32 hover:border-emerald-500/50"
+            className="rounded-xl p-5 cursor-pointer group flex flex-col justify-between h-32 text-emerald-400 cyber-panel"
           >
             <div className="flex items-center justify-between">
               <div>
@@ -258,7 +514,7 @@ export default function Dashboard({ stats, onRefresh, onNavigateToTab, userRole 
 
           <div 
             onClick={() => onNavigateToTab("activities")}
-            className="rounded-xl p-5 shadow-lg bg-zinc-950 border border-emerald-500/20 text-emerald-400 transition-all hover:shadow-[0_0_15px_rgba(16,185,129,0.15)] hover:scale-[1.02] duration-155 cursor-pointer group flex flex-col justify-between h-32 hover:border-emerald-500/50"
+            className="rounded-xl p-5 cursor-pointer group flex flex-col justify-between h-32 text-emerald-400 cyber-panel"
           >
             <div className="flex items-center justify-between">
               <div>
@@ -283,7 +539,7 @@ export default function Dashboard({ stats, onRefresh, onNavigateToTab, userRole 
           </div>
 
           {/* TELEMETRY WIDGET */}
-          <div className="rounded-xl border border-emerald-500/20 bg-zinc-950 text-emerald-400 p-4 shadow-lg space-y-2.5 transition-colors duration-200 hover:border-emerald-500/40">
+          <div className="rounded-xl p-4 space-y-2.5 text-emerald-400 cyber-panel">
             <div className="flex items-center justify-between border-b border-zinc-850 pb-1.5">
               <span className="text-[9px] font-bold text-emerald-400 tracking-wider uppercase flex items-center gap-1">
                 <Cpu className="h-3 w-3 animate-pulse text-emerald-400" /> [LIVE_NODE_TELEMETRY]
@@ -315,21 +571,21 @@ export default function Dashboard({ stats, onRefresh, onNavigateToTab, userRole 
 
         {/* WORK IN PROGRESS TRACKER */}
         <div className="grid gap-3 grid-cols-3 font-mono">
-          <div className="rounded-xl border border-emerald-500/15 bg-zinc-950 p-4 flex items-center justify-between shadow-sm hover:border-emerald-500/40 transition duration-150 cursor-pointer" onClick={() => onNavigateToTab("revenue", undefined, { revenueModule: "Work In Progress" })}>
+          <div className="rounded-xl p-4 flex items-center justify-between cursor-pointer cyber-panel" onClick={() => onNavigateToTab("revenue", undefined, { revenueModule: "Work In Progress" })}>
             <div>
               <span className="text-[9px] uppercase font-bold text-amber-500/90 font-mono">[STATUS: WIP_QUEUED]</span>
               <div className="text-base font-black text-amber-500 font-mono mt-0.5">{stats.wipBillsCount} Bills</div>
             </div>
             <Clock className="h-5 w-5 text-amber-500/20" />
           </div>
-          <div className="rounded-xl border border-emerald-500/15 bg-zinc-950 p-4 flex items-center justify-between shadow-sm hover:border-emerald-500/40 transition duration-150 cursor-pointer" onClick={() => onNavigateToTab("revenue", undefined, { revenueModule: "Ready For Delivery" })}>
+          <div className="rounded-xl p-4 flex items-center justify-between cursor-pointer cyber-panel" onClick={() => onNavigateToTab("revenue", undefined, { revenueModule: "Ready For Delivery" })}>
             <div>
               <span className="text-[9px] uppercase font-bold text-blue-400/90 font-mono">[STATUS: READY_DISPATCH]</span>
               <div className="text-base font-black text-blue-400 font-mono mt-0.5">{stats.readyBillsCount} Bills</div>
             </div>
             <Truck className="h-5 w-5 text-blue-400/20" />
           </div>
-          <div className="rounded-xl border border-emerald-500/15 bg-zinc-950 p-4 flex items-center justify-between shadow-sm hover:border-emerald-500/40 transition duration-150 cursor-pointer" onClick={() => onNavigateToTab("revenue", undefined, { revenueModule: "Completed Cycles" })}>
+          <div className="rounded-xl p-4 flex items-center justify-between cursor-pointer cyber-panel" onClick={() => onNavigateToTab("revenue", undefined, { revenueModule: "Completed Cycles" })}>
             <div>
               <span className="text-[9px] uppercase font-bold text-emerald-400/90 font-mono">[STATUS: ARCHIVED_PAID]</span>
               <div className="text-base font-black text-emerald-450 font-mono mt-0.5">{stats.completedBillsCount} Bills</div>
@@ -341,7 +597,7 @@ export default function Dashboard({ stats, onRefresh, onNavigateToTab, userRole 
         {/* MAIN VISUALIZATION & GEOLOCATION MATRIX */}
         <div className="grid gap-6 md:grid-cols-3">
           {/* Revenue Distribution Chart */}
-          <div ref={chartRef} className="md:col-span-2 rounded-xl border border-emerald-500/20 bg-zinc-950 p-5 shadow-sm flex flex-col justify-between font-mono">
+          <div ref={chartRef} className="md:col-span-2 rounded-xl p-5 flex flex-col justify-between font-mono cyber-panel text-emerald-400">
             <h3 className="font-bold text-emerald-450 text-sm mb-4 flex items-center justify-between">
               <span className="flex items-center gap-1.5"><TrendingUp className="h-4.5 w-4.5 text-emerald-400" /> [REVENUE_DISTRIBUTION_LEDGER]</span>
               <span className="text-[9px] text-emerald-500/70 font-mono">UNIT: INR (₹) • ANALYTICAL_DRILL_DOWN</span>
@@ -362,16 +618,25 @@ export default function Dashboard({ stats, onRefresh, onNavigateToTab, userRole 
           </div>
 
           {/* Live Geolocation Tracker Map Widget */}
-          <div className="rounded-xl border border-emerald-500/20 bg-zinc-950 p-5 shadow-sm flex flex-col font-mono text-emerald-400">
+          <div className="rounded-xl p-5 flex flex-col font-mono text-emerald-400 cyber-panel">
             <h3 className="font-bold text-emerald-450 text-sm mb-3.5 flex items-center justify-between">
               <span className="flex items-center gap-1.5"><MapPin className="h-4.5 w-4.5 text-emerald-400 animate-bounce" /> [GPS_NODE_TRACKER_MAP]</span>
               <span className="text-[9px] text-emerald-500/70 uppercase font-mono">Real-time Location</span>
             </h3>
-            {activeMapSession ? (
-              <div className="flex-1 flex flex-col justify-between space-y-3">
-                <div className="relative rounded-xl overflow-hidden border border-emerald-500/20 bg-surface h-48">
-                  {mapElement}
-                </div>
+            <div className="flex-1 flex flex-col justify-between space-y-3">
+              <div className={`relative rounded-xl overflow-hidden border border-emerald-500/20 bg-[#06080a] h-48 transition-all ${!activeMapSession ? 'hidden' : ''}`}>
+                <iframe
+                  ref={iframeRef}
+                  title="Live Geolocation Tracker Map"
+                  width="100%"
+                  height="100%"
+                  style={{ border: 0 }}
+                  allowFullScreen
+                  loading="lazy"
+                />
+              </div>
+
+              {activeMapSession ? (
                 <div className="text-[11px] p-2.5 rounded-lg bg-[#06080a] border border-emerald-500/20 space-y-1 transition-colors text-emerald-400">
                   <div className="flex justify-between items-center text-[10px]">
                     <span className="text-emerald-500/70">Active Operator:</span>
@@ -420,16 +685,16 @@ export default function Dashboard({ stats, onRefresh, onNavigateToTab, userRole 
                     </div>
                   </div>
                 </div>
-              </div>
-            ) : (
-              <div className="flex-1 flex flex-col items-center justify-center text-center p-6 border border-dashed border-emerald-500/20 rounded-xl bg-surface/50 text-emerald-500/70">
-                <Globe className="h-8 w-8 mb-2 text-emerald-500/60 animate-spin-slow" />
-                <h4 className="font-bold text-xs text-emerald-400 mb-1">No GPS Terminals Active</h4>
-                <p className="text-[10px] text-emerald-500/65 max-w-[180px]">
-                  No active session coordinates detected. Location mapping requires device GPS authorization at login.
-                </p>
-              </div>
-            )}
+              ) : (
+                <div className="flex-1 flex flex-col items-center justify-center text-center p-6 border border-dashed border-emerald-500/20 rounded-xl bg-[#06080a] text-emerald-500/70 h-48">
+                  <Globe className="h-8 w-8 mb-2 text-emerald-500/60 animate-spin-slow" />
+                  <h4 className="font-bold text-xs text-emerald-400 mb-1">No GPS Terminals Active</h4>
+                  <p className="text-[10px] text-emerald-500/65 max-w-[180px]">
+                    No active session coordinates detected. Location mapping requires device GPS authorization at login.
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -438,7 +703,7 @@ export default function Dashboard({ stats, onRefresh, onNavigateToTab, userRole 
           {/* Security Audit Trail (2/3 width) */}
           <div 
             onClick={() => onNavigateToTab("audit")}
-            className="md:col-span-2 group rounded-xl border border-emerald-500/20 bg-zinc-950 p-5 shadow-sm flex flex-col h-[380px] cursor-pointer hover:border-emerald-500/50 hover:shadow-[0_0_15px_rgba(16,185,129,0.15)] transition-all duration-300 font-mono text-emerald-400"
+            className="md:col-span-2 group rounded-xl p-5 flex flex-col h-[380px] cursor-pointer font-mono text-emerald-400 cyber-panel"
             title="Click card to view full security audit history ledger"
           >
             <div className="mb-3.5 flex items-center justify-between">
@@ -485,7 +750,7 @@ export default function Dashboard({ stats, onRefresh, onNavigateToTab, userRole 
           </div>
 
           {/* Master Overrides & System Shortcuts (1/3 width) */}
-          <div className="rounded-xl border border-emerald-500/25 bg-zinc-950 text-emerald-400 p-5 shadow-lg flex flex-col h-[380px] justify-between text-left font-mono">
+          <div className="rounded-xl p-5 flex flex-col h-[380px] justify-between text-left font-mono text-emerald-400 cyber-panel">
             <div>
               <div className="flex items-center gap-2 border-b border-zinc-900 pb-2.5 mb-4">
                 <Shield className="h-4.5 w-4.5 text-emerald-400" />
@@ -531,9 +796,69 @@ export default function Dashboard({ stats, onRefresh, onNavigateToTab, userRole 
             </div>
           </div>
         </div>
+
+        {/* COMMAND LINE TERMINAL CONSOLE */}
+        <div className="rounded-xl border border-emerald-500/20 bg-zinc-950 p-5 shadow-lg flex flex-col font-mono text-emerald-400 space-y-3">
+          <div className="flex items-center justify-between border-b border-zinc-900/50 pb-2.5">
+            <div className="flex items-center gap-2">
+              <Terminal className="h-4 w-4 text-emerald-400 animate-pulse" />
+              <h3 className="font-bold text-sm">[SYSTEM_SHUNTS_SHELL]</h3>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="text-[9px] uppercase font-bold text-emerald-500/70 tracking-wider">Console: Ready (AP-SOUTH-1)</span>
+            </div>
+          </div>
+
+          {/* Logs Output area */}
+          <div 
+            ref={terminalLogsRef}
+            className="h-44 overflow-y-auto p-3 rounded-lg bg-[#040608] border border-emerald-950/50 text-[11px] font-mono space-y-1 scrollbar-thin scrollbar-thumb-emerald-900/50 scrollbar-track-transparent"
+          >
+            {shellLogs.map((logLine, idx) => (
+              <div key={idx} className="leading-relaxed min-h-[0.85rem]">
+                {logLine.startsWith("guest@tcf_core:~$") ? (
+                  <span className="text-cyan-400 font-bold">{logLine}</span>
+                ) : logLine.includes("[NODE STATUS REPORT]") || logLine.includes("[SYSTEM INDEX]") || logLine.includes("Available terminal command shunts:") || logLine.includes("[TRASH RETENTION ENGINE]") ? (
+                  <span className="text-emerald-300 font-bold">{logLine}</span>
+                ) : logLine.startsWith("Command not found") || logLine.startsWith("Error:") ? (
+                  <span className="text-red-400">{logLine}</span>
+                ) : (
+                  <span>{logLine}</span>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Input Prompt area */}
+          <form 
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleShellCommand();
+            }}
+            className="flex items-center gap-2 bg-[#040608] border border-emerald-500/20 rounded-lg px-3 py-2 focus-within:border-emerald-500/50 transition-colors"
+          >
+            <span className="text-cyan-400 text-xs shrink-0 select-none">guest@tcf_core:~$</span>
+            <input
+              ref={consoleInputRef}
+              type="text"
+              value={shellInput}
+              onChange={(e) => setShellInput(e.target.value)}
+              className="flex-1 bg-transparent border-0 outline-none text-emerald-400 font-mono text-xs focus:ring-0 placeholder-emerald-500/35"
+              placeholder="Type command (e.g. 'help', 'status', 'matrix', 'teleport admin', 'sound')..."
+            />
+            <button 
+              type="submit"
+              className="px-3 py-1 rounded text-[10px] uppercase font-bold border border-emerald-500/30 hover:border-emerald-500/60 bg-emerald-950/20 hover:bg-emerald-500/10 text-emerald-400 transition-all cursor-pointer active:scale-95"
+            >
+              Execute
+            </button>
+          </form>
+        </div>
       </div>
-    );
-  }
+    </div>
+  );
+}
 
   // 2. ADMIN DASHBOARD RENDER SECTION
   if (isAdmin) {
