@@ -24,6 +24,7 @@ export default function UserActivitiesTab() {
   const activities = SheetsSyncEngine.getUserActivities();
   const [selectedSession, setSelectedSession] = useState<UserActivity | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [activeFilter, setActiveFilter] = useState<'all' | 'online' | 'unique'>('all');
 
   // Compute stats
   const totalLoggedInSessions = activities.length;
@@ -45,8 +46,33 @@ export default function UserActivitiesTab() {
   // Unique users active count
   const activeUsernames = Array.from(new Set(activities.map(a => a.username)));
 
+  // Apply active filters (Online or Unique latest logs)
+  let displayedActivities = [...activities];
+  if (activeFilter === 'online') {
+    displayedActivities = displayedActivities.filter(act => {
+      if (act.logoutTime) return false;
+      if (!act.lastActiveAt) return false;
+      const lastActiveTime = new Date(act.lastActiveAt).getTime();
+      return (now - lastActiveTime) < 300000;
+    });
+  } else if (activeFilter === 'unique') {
+    // Sort activities descending by login timestamp to ensure the first seen is the latest
+    const sorted = [...displayedActivities].sort((a, b) => {
+      const datetimeA = new Date(`${a.loginDate}T${a.loginTime}`).getTime() || 0;
+      const datetimeB = new Date(`${b.loginDate}T${b.loginTime}`).getTime() || 0;
+      return datetimeB - datetimeA;
+    });
+    const seen = new Set<string>();
+    displayedActivities = sorted.filter(act => {
+      const usernameKey = act.username.toLowerCase();
+      if (seen.has(usernameKey)) return false;
+      seen.add(usernameKey);
+      return true;
+    });
+  }
+
   // Filter activities based on search query
-  const filteredActivities = activities.filter(act => 
+  const filteredActivities = displayedActivities.filter(act => 
     act.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
     act.ipAddress.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (act.locationName || "").toLowerCase().includes(searchQuery.toLowerCase())
@@ -57,8 +83,24 @@ export default function UserActivitiesTab() {
     ? activities.find(a => a.id === selectedSession.id) || selectedSession 
     : null;
 
+  // Memoize GPS Geolocation map iframe to prevent iframe reload flicker on state changes
+  const mapElement = React.useMemo(() => {
+    if (!currentSelected?.latitude || !currentSelected?.longitude) return null;
+    return (
+      <iframe
+        title="GPS Geolocation Map"
+        width="100%"
+        height="100%"
+        style={{ border: 0 }}
+        src={`https://maps.google.com/maps?q=${currentSelected.latitude},${currentSelected.longitude}&hl=en&z=14&output=embed`}
+        allowFullScreen
+        loading="lazy"
+      />
+    );
+  }, [currentSelected?.latitude, currentSelected?.longitude]);
+
   return (
-    <div className="space-y-6 animate-in fade-in duration-300">
+    <div className="space-y-6">
       
       {/* HEADER SECTION */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-default pb-4 transition-colors">
@@ -76,16 +118,41 @@ export default function UserActivitiesTab() {
       {/* METRIC GRIDS */}
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         
-        <div className="rounded-xl border border-default bg-card p-5 shadow-sm space-y-2 transition-colors">
+        {/* Card 1: Terminal Hours Worked (Clickable: resets filters) */}
+        <div 
+          onClick={() => setActiveFilter('all')}
+          className={`rounded-xl border p-5 shadow-sm space-y-2 transition-all duration-200 cursor-pointer hover:scale-[1.02] hover:shadow-md ${
+            activeFilter === 'all' 
+              ? 'border-blue-500/80 dark:border-blue-400/70 ring-2 ring-blue-500/10 bg-blue-500/5' 
+              : 'border-default bg-card hover:border-blue-500/40'
+          }`}
+          title="Show all recorded sessions"
+        >
           <div className="flex items-center justify-between text-xs font-bold text-muted uppercase tracking-widest">
             <span>Terminal Hours Worked</span>
             <Clock className="h-4.5 w-4.5 text-blue-500 dark:text-blue-400" />
           </div>
-          <h3 className="text-2xl font-bold text-primary font-mono">{totalHoursWorked} hrs</h3>
+          <div className="flex items-baseline justify-between">
+            <h3 className="text-2xl font-bold text-primary font-mono">{totalHoursWorked} hrs</h3>
+            {activeFilter === 'all' && (
+              <span className="text-[9px] font-bold text-blue-500 dark:text-blue-400 px-1.5 py-0.5 rounded bg-blue-500/10 border border-blue-500/20 uppercase tracking-wider">
+                Default
+              </span>
+            )}
+          </div>
           <p className="text-[11px] text-muted dark:text-muted">Aggregated from login durations</p>
         </div>
 
-        <div className="rounded-xl border border-default bg-card p-5 shadow-sm space-y-2 transition-colors">
+        {/* Card 2: Operators Online Now (Clickable: filters online operators) */}
+        <div 
+          onClick={() => setActiveFilter('online')}
+          className={`rounded-xl border p-5 shadow-sm space-y-2 transition-all duration-200 cursor-pointer hover:scale-[1.02] hover:shadow-md ${
+            activeFilter === 'online' 
+              ? 'border-green-500/80 dark:border-green-400/70 ring-2 ring-green-500/10 bg-green-500/5' 
+              : 'border-default bg-card hover:border-green-500/40'
+          }`}
+          title="Filter to show online operators only"
+        >
           <div className="flex items-center justify-between text-xs font-bold text-muted uppercase tracking-widest">
             <span>Operators Online Now</span>
             <span className="flex h-2 w-2 relative">
@@ -93,47 +160,110 @@ export default function UserActivitiesTab() {
               <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
             </span>
           </div>
-          <h3 className="text-2xl font-bold text-green-500 font-mono">{totalOnlineCount} Active</h3>
+          <div className="flex items-baseline justify-between">
+            <h3 className="text-2xl font-bold text-green-500 font-mono">{totalOnlineCount} Active</h3>
+            {activeFilter === 'online' && (
+              <span className="text-[9px] font-bold text-green-500 px-1.5 py-0.5 rounded bg-green-500/10 border border-green-500/20 uppercase tracking-wider">
+                Active Filter
+              </span>
+            )}
+          </div>
           <p className="text-[11px] text-muted dark:text-muted font-sans">Active browser pings (1m intervals)</p>
         </div>
 
-        <div className="rounded-xl border border-default bg-card p-5 shadow-sm space-y-2 transition-colors">
+        {/* Card 3: Total Auth Sessions (Clickable: resets filters) */}
+        <div 
+          onClick={() => setActiveFilter('all')}
+          className={`rounded-xl border p-5 shadow-sm space-y-2 transition-all duration-200 cursor-pointer hover:scale-[1.02] hover:shadow-md ${
+            activeFilter === 'all' 
+              ? 'border-blue-500/80 dark:border-blue-400/70 ring-2 ring-blue-500/10 bg-blue-500/5' 
+              : 'border-default bg-card hover:border-blue-500/40'
+          }`}
+          title="Show all recorded sessions"
+        >
           <div className="flex items-center justify-between text-xs font-bold text-muted uppercase tracking-widest">
             <span>Total Auth Sessions</span>
             <Shield className="h-4.5 w-4.5 text-emerald-500" />
           </div>
-          <h3 className="text-2xl font-bold text-primary font-mono">{totalLoggedInSessions}</h3>
+          <div className="flex items-baseline justify-between">
+            <h3 className="text-2xl font-bold text-primary font-mono">{totalLoggedInSessions}</h3>
+            {activeFilter === 'all' && (
+              <span className="text-[9px] font-bold text-blue-500 dark:text-blue-400 px-1.5 py-0.5 rounded bg-blue-500/10 border border-blue-500/20 uppercase tracking-wider">
+                Default
+              </span>
+            )}
+          </div>
           <p className="text-[11px] text-muted dark:text-muted font-sans font-mono">Recorded console entries</p>
         </div>
 
-        <div className="rounded-xl border border-default bg-card p-5 shadow-sm space-y-2 transition-colors">
+        {/* Card 4: Unique Officers Active (Clickable: filters unique operators) */}
+        <div 
+          onClick={() => setActiveFilter('unique')}
+          className={`rounded-xl border p-5 shadow-sm space-y-2 transition-all duration-200 cursor-pointer hover:scale-[1.02] hover:shadow-md ${
+            activeFilter === 'unique' 
+              ? 'border-purple-500/80 dark:border-purple-400/70 ring-2 ring-purple-500/10 bg-purple-500/5' 
+              : 'border-default bg-card hover:border-purple-500/40'
+          }`}
+          title="Filter to show unique active operators only"
+        >
           <div className="flex items-center justify-between text-xs font-bold text-muted uppercase tracking-widest">
             <span>Unique Officers Active</span>
             <Globe className="h-4.5 w-4.5 text-purple-500" />
           </div>
-          <h3 className="text-2xl font-bold text-primary font-mono">{activeUsernames.length} Operators</h3>
+          <div className="flex items-baseline justify-between">
+            <h3 className="text-2xl font-bold text-primary font-mono">{activeUsernames.length} Operators</h3>
+            {activeFilter === 'unique' && (
+              <span className="text-[9px] font-bold text-purple-500 dark:text-purple-400 px-1.5 py-0.5 rounded bg-purple-500/10 border border-purple-500/20 uppercase tracking-wider">
+                Active Filter
+              </span>
+            )}
+          </div>
           <p className="text-[11px] text-muted dark:text-muted font-sans">Registered staff credentials used</p>
         </div>
 
       </div>
 
       {/* SEARCH AND FILTER BAR */}
-      <div className="flex items-center gap-2 max-w-md bg-card rounded-lg border border-default px-3 py-1.5 text-xs text-primary shadow-sm transition-colors">
-        <Search className="h-4 w-4 text-muted shrink-0" />
-        <input
-          type="text"
-          placeholder="Filter by operator name, IP, or location..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full bg-transparent border-none outline-none text-xs text-primary placeholder-muted"
-        />
-        {searchQuery && (
-          <button 
-            onClick={() => setSearchQuery("")}
-            className="text-muted hover:text-primary transition-colors cursor-pointer"
-          >
-            <X className="h-3.5 w-3.5" />
-          </button>
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+        <div className="flex items-center gap-2 max-w-md flex-1 bg-card rounded-lg border border-default px-3 py-1.5 text-xs text-primary shadow-sm transition-colors">
+          <Search className="h-4 w-4 text-muted shrink-0" />
+          <input
+            type="text"
+            placeholder="Filter by operator name, IP, or location..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full bg-transparent border-none outline-none text-xs text-primary placeholder-muted"
+          />
+          {searchQuery && (
+            <button 
+              onClick={() => setSearchQuery("")}
+              className="text-muted hover:text-primary transition-colors cursor-pointer"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+
+        {activeFilter !== 'all' && (
+          <div className="flex items-center gap-2 self-start sm:self-auto">
+            <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border transition-colors ${
+              activeFilter === 'online'
+                ? 'bg-green-500/10 text-green-500 border-green-500/20'
+                : 'bg-purple-500/10 text-purple-500 border-purple-500/20'
+            }`}>
+              <span className={`h-1.5 w-1.5 rounded-full ${
+                activeFilter === 'online' ? 'bg-green-500 animate-pulse' : 'bg-purple-500'
+              }`} />
+              <span>Showing: {activeFilter === 'online' ? 'Online Operators Only' : 'Unique Active Officers'}</span>
+              <button 
+                onClick={() => setActiveFilter('all')}
+                className="ml-1 hover:text-primary transition-colors cursor-pointer opacity-70 hover:opacity-100"
+                title="Clear filter"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </span>
+          </div>
         )}
       </div>
 
@@ -382,15 +512,7 @@ export default function UserActivitiesTab() {
                 {currentSelected.latitude && currentSelected.longitude ? (
                   <div className="space-y-2">
                     <div className="relative rounded-xl overflow-hidden border border-default bg-surface shadow-inner h-48 transition-colors">
-                      <iframe
-                        title="GPS Geolocation Map"
-                        width="100%"
-                        height="100%"
-                        style={{ border: 0 }}
-                        src={`https://maps.google.com/maps?q=${currentSelected.latitude},${currentSelected.longitude}&hl=en&z=14&output=embed`}
-                        allowFullScreen
-                        loading="lazy"
-                      />
+                      {mapElement}
                     </div>
                     <a
                       href={`https://www.google.com/maps/search/?api=1&query=${currentSelected.latitude},${currentSelected.longitude}`}

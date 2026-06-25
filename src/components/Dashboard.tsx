@@ -146,7 +146,7 @@ export default function Dashboard({ stats, onRefresh, onNavigateToTab, userRole 
     const activeMapSession = activities.find(act => act.latitude && act.longitude);
     
     return (
-      <div className="space-y-6 animate-in fade-in duration-300 text-left font-sans">
+      <div className="space-y-6 text-left font-sans">
         {/* Local Toast Slideout for Superadmin Quick Actions */}
         {localNotification && (
           <div className="fixed top-4 right-4 z-[9999] flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold text-white bg-purple-600 shadow-2xl animate-in slide-in-from-top-6 duration-300">
@@ -479,11 +479,11 @@ export default function Dashboard({ stats, onRefresh, onNavigateToTab, userRole 
   if (isAdmin) {
  const limitLogs = SheetsSyncEngine.getAuditLogs().slice(0, 5);
  return (
- <div className="space-y-6 animate-in fade-in duration-300">
+ <div className="space-y-6">
  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
  <div>
  <h1 className="text-2xl font-bold tracking-tight text-primary font-sans">Corporate Intelligence Console</h1>
- <p className="text-sm text-secondary font-sans animate-in fade-in duration-500">
+ <p className="text-sm text-secondary font-sans">
  Complete admin metrics, monthly sales trend visualizations, and live security operations ledger logs.
  </p>
  </div>
@@ -799,11 +799,11 @@ export default function Dashboard({ stats, onRefresh, onNavigateToTab, userRole 
  }).sort((a, b) => b.revenue - a.revenue);
 
  return (
- <div className="space-y-6 animate-in fade-in duration-300">
+ <div className="space-y-6">
  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
  <div>
  <h1 className="text-2xl font-bold tracking-tight text-primary font-sans">Store Operational Dashboard</h1>
- <p className="text-sm text-secondary font-sans animate-in fade-in duration-500">
+ <p className="text-sm text-secondary font-sans">
  Interactive store-level fulfillment tracking, delivery status logs, and real-time sales team rankings.
  </p>
  </div>
@@ -1047,11 +1047,11 @@ export default function Dashboard({ stats, onRefresh, onNavigateToTab, userRole 
  }, []).slice(0, 5);
 
  return (
- <div className="space-y-6 animate-in fade-in duration-300">
+ <div className="space-y-6">
  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
  <div>
  <h1 className="text-2xl font-bold tracking-tight text-primary font-sans">Representative Workspace</h1>
- <p className="text-sm text-secondary font-sans animate-in fade-in duration-500">
+ <p className="text-sm text-secondary font-sans">
  Welcome back, {currentUser?.fullName}. Action assignments registry, pending dispatches, and quick clients index.
  </p>
  </div>
