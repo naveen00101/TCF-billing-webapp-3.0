@@ -74,6 +74,14 @@ export default function Dashboard({ stats, onRefresh, onNavigateToTab, userRole 
     return false;
   });
 
+  // Telemetry simulation state for Superadmin God-mode Dashboard
+  const [telemetry, setTelemetry] = useState({
+    cpu: 12.4,
+    memory: 342,
+    latency: 42,
+    network: "CONNECTED",
+  });
+
   const playBeep = (freq = 800, duration = 0.08, type: OscillatorType = "sine") => {
     try {
       const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
