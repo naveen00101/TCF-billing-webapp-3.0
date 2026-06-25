@@ -1395,6 +1395,27 @@ export class SheetsSyncEngine {
     }
   }
 
+  public static async clearAuditLogs(): Promise<void> {
+    this.memoryCache["billing_audit_logs"] = [];
+    this.saveAuditLogs([]);
+    
+    if (supabase) {
+      this.updateSyncStatus("syncing");
+      try {
+        const { error } = await supabase.from("audit_logs").delete().neq("id", "root");
+        if (error) throw error;
+        this.updateSyncStatus("success");
+      } catch (err: any) {
+        console.error("[SyncEngine] Failed to clear audit logs in Supabase:", err);
+        this.updateSyncStatus("error", err.message || "Failed to clear audits");
+        throw err;
+      }
+    }
+    
+    // Add a single audit log entry recording that the trail was purged
+    this.addAuditLog("Purge Audit Ledger", "Superadmin", "Audit logs cleared from database.", "Success");
+  }
+
   // User Sessions Activity
   public static getUserActivities(): UserActivity[] {
     return this.getStorageItem<UserActivity[]>("billing_user_activities", DEFAULT_ACTIVITIES);

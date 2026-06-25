@@ -23,7 +23,8 @@ import {
   Volume2,
   VolumeX,
   Package,
-  Server
+  Server,
+  Trash2
 } from "lucide-react";
 import { DashboardStats } from"../types";
 import { SheetsSyncEngine } from"../utils/sheetsSync";
@@ -101,6 +102,7 @@ export default function Dashboard({ stats, onRefresh, onNavigateToTab, userRole 
   });
 
   const [isVacuuming, setIsVacuuming] = useState(false);
+  const [isPurgingAudits, setIsPurgingAudits] = useState(false);
   const [selectedGpsUsername, setSelectedGpsUsername] = useState<string | null>(null);
   const [localNotification, setLocalNotification] = useState<string | null>(null);
 
@@ -215,9 +217,33 @@ export default function Dashboard({ stats, onRefresh, onNavigateToTab, userRole 
           "  optimize / vacuum  - Rebuild indexes and vacuum database shunts",
           "  operator <name>    - Target live map focus onto specific username",
           "  sound              - Toggle audio telemetry feedback chime",
+          "  purge audit        - Purges all system security audit trail logs",
           "  matrix             - Trigger metric cascade visual shunts",
           "  clear              - Flush terminal log buffer"
         ];
+        break;
+      case "purge":
+        const target = cmdTokens[1];
+        if (target === "audit" || target === "audits") {
+          response = [
+            "Initiating cryptographic purge of security audit trail...",
+            "Wiping database rows from table 'audit_logs'...",
+          ];
+          SheetsSyncEngine.clearAuditLogs().then(() => {
+            setShellLogs(prev => [
+              ...prev,
+              "Audit ledger purged successfully. Initialized fresh record."
+            ]);
+            triggerLocalNotification("Audit trail logs successfully purged.");
+          }).catch(err => {
+            setShellLogs(prev => [
+              ...prev,
+              `Error: Failed to purge audit ledger: ${err.message}`
+            ]);
+          });
+        } else {
+          response = ["Error: Specify what to purge. Available shunts: 'purge audit'"];
+        }
         break;
       case "clear":
         setShellLogs([]);
@@ -347,6 +373,25 @@ export default function Dashboard({ stats, onRefresh, onNavigateToTab, userRole 
       setIsVacuuming(false);
       triggerLocalNotification("Supabase database indices optimized & vacuumed. Reclaimed 0.45MB unused row descriptors.");
     }, 1500);
+  };
+
+  const handleClearAuditLogs = () => {
+    const confirmClear = window.confirm("Are you sure you want to permanently purge all security audit trail logs from the database?");
+    if (!confirmClear) return;
+    
+    setIsPurgingAudits(true);
+    if (soundEnabled) {
+      playBeep(250, 0.2, "triangle");
+      setTimeout(() => playBeep(120, 0.4, "triangle"), 150);
+    }
+    
+    SheetsSyncEngine.clearAuditLogs().then(() => {
+      setIsPurgingAudits(false);
+      triggerLocalNotification("Security audit trail database has been purged.");
+    }).catch(err => {
+      setIsPurgingAudits(false);
+      alert(`Failed to purge audit logs: ${err.message}`);
+    });
   };
 
   const handleExportLedgerDump = () => {
@@ -833,13 +878,23 @@ export default function Dashboard({ stats, onRefresh, onNavigateToTab, userRole 
                   <p className="text-[11px] text-muted font-sans">Interactive system trace ledger</p>
                 </div>
               </div>
-              <button
-                onClick={handleExportLedgerDump}
-                className="p-1 rounded hover:bg-surface text-secondary hover:text-primary transition"
-                title="Download Ledger Dump"
-              >
-                <Download className="h-4 w-4" />
-              </button>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={handleClearAuditLogs}
+                  disabled={isPurgingAudits}
+                  className="p-1.5 rounded-lg hover:bg-red-500/10 text-red-500 hover:text-red-600 transition disabled:opacity-50 cursor-pointer"
+                  title="Purge Security Audit Ledger"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={handleExportLedgerDump}
+                  className="p-1.5 rounded-lg hover:bg-surface text-secondary hover:text-primary transition cursor-pointer"
+                  title="Download Ledger Dump"
+                >
+                  <Download className="h-4 w-4" />
+                </button>
+              </div>
             </div>
 
             <div className="flex-1 overflow-y-auto pr-1 relative scrollbar-thin min-h-[220px]">
