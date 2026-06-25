@@ -71,6 +71,13 @@ export default function App() {
     preloadPDFLogo();
   }, []);
 
+  // Update browser document title based on Superadmin role
+  useEffect(() => {
+    if (isDbLoaded) {
+      document.title = userRole === "Superadmin" ? "Omni Telematrix" : "TCF Smart Billing";
+    }
+  }, [userRole, isDbLoaded]);
+
   const [liveTime, setLiveTime] = useState(() => new Date().toLocaleTimeString('en-GB', { hour12: false }));
   useEffect(() => {
     const t = setInterval(() => {
@@ -606,10 +613,16 @@ export default function App() {
  <header className="flex items-center justify-between bg-card px-4 py-3 lg:hidden shadow-sm border-b border-default/80 sticky top-0 z-40 transition-colors">
  <div className="flex items-center gap-2">
  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 text-white font-bold text-xs overflow-hidden shrink-0">
- <img src={SYSTEM_LOGO} alt="Logo" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
+   {userRole === "Superadmin" ? (
+     <Activity className="h-4.5 w-4.5 text-white animate-pulse" />
+   ) : (
+     <img src={SYSTEM_LOGO} alt="Logo" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
+   )}
  </div>
  <div>
- <span className="font-bold text-sm text-primary dark:text-primary tracking-tight leading-none block">{company?.shortName ||"TCF Smart Billing"}</span>
+ <span className="font-bold text-sm text-primary dark:text-primary tracking-tight leading-none block">
+   {userRole === "Superadmin" ? "Omni Telematrix" : (company?.shortName || "TCF Smart Billing")}
+ </span>
  <span className="text-[10px] text-muted dark:text-muted block font-mono">@{currentUser.username} ({currentUser.role})</span>
  </div>
  </div>
@@ -659,11 +672,19 @@ export default function App() {
  <div className="p-6 border-b border-zinc-905 flex items-center justify-between">
  <div className="flex items-center gap-2.5 min-w-0">
  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600 text-white shadow-md shadow-blue-500/20 font-bold text-sm overflow-hidden shrink-0">
- <img src={SYSTEM_LOGO} alt="Logo" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
+   {userRole === "Superadmin" ? (
+     <Activity className="h-5 w-5 text-white animate-pulse" />
+   ) : (
+     <img src={SYSTEM_LOGO} alt="Logo" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
+   )}
  </div>
  <div className="min-w-0 flex-1">
- <h2 className="font-extrabold text-sm text-primary tracking-tight leading-none truncate">{company?.shortName ||"TCF Smart Billing"}</h2>
- <span className="text-[10px] text-muted font-medium font-sans block truncate mt-1">v{company?.gstNumber ?"Corporate" :"Standard"} Manager</span>
+ <h2 className="font-extrabold text-sm text-primary tracking-tight leading-none truncate">
+   {userRole === "Superadmin" ? "Omni Telematrix" : (company?.shortName || "TCF Smart Billing")}
+ </h2>
+ <span className="text-[10px] text-muted font-medium font-sans block truncate mt-1">
+   {userRole === "Superadmin" ? "v2.2.0 • Telemetry Node" : `v${company?.gstNumber ? "Corporate" : "Standard"} Manager`}
+ </span>
  </div>
  </div>
  </div>
@@ -910,12 +931,12 @@ export default function App() {
  <header className="hidden lg:flex items-center justify-between border-b border-default pb-4 transition-colors">
  <div>
  <div className="flex items-center gap-1.5 text-[11px] font-mono font-bold text-muted uppercase tracking-widest">
- <span>Console Gateway</span>
+ <span>{userRole === "Superadmin" ? "Omni Telematrix" : "Console Gateway"}</span>
  <span>/</span>
  <span className="text-blue-500">{activeTab}</span>
  </div>
  <h1 className="text-xl font-display font-extrabold text-primary capitalize tracking-tight mt-1">
- {activeTab ==="dashboard" ?"Operational Intelligence" : 
+ {activeTab ==="dashboard" ? (userRole === "Superadmin" ? "Omni Telematrix" : "Operational Intelligence") : 
  activeTab ==="billing" ?"Smart POS Checkout" : 
  activeTab ==="products" ?"Enterprise Directory" : 
  activeTab ==="customers" ?"Client Registry" : 

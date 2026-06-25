@@ -21,7 +21,9 @@ import {
   MapPin,
   CheckCircle2,
   Volume2,
-  VolumeX
+  VolumeX,
+  Package,
+  Server
 } from "lucide-react";
 import { DashboardStats } from"../types";
 import { SheetsSyncEngine } from"../utils/sheetsSync";
@@ -90,6 +92,14 @@ export default function Dashboard({ stats, onRefresh, onNavigateToTab, userRole 
     network: "CONNECTED",
   });
 
+  const [backendPerf, setBackendPerf] = useState({
+    latency: 42,
+    activeConnections: 3,
+    idleConnections: 12,
+    txRate: 1.2,
+    cacheHitRate: 98.4,
+  });
+
   const [isVacuuming, setIsVacuuming] = useState(false);
   const [selectedGpsUsername, setSelectedGpsUsername] = useState<string | null>(null);
   const [localNotification, setLocalNotification] = useState<string | null>(null);
@@ -127,6 +137,13 @@ export default function Dashboard({ stats, onRefresh, onNavigateToTab, userRole 
         latency: Math.max(10, Math.round(prev.latency + (Math.random() - 0.5) * 6)),
         network: "CONNECTED",
       }));
+      setBackendPerf(prev => ({
+        latency: Math.max(15, Math.round(prev.latency + (Math.random() - 0.5) * 6)),
+        activeConnections: Math.max(1, Math.min(15, Math.round(prev.activeConnections + (Math.random() - 0.5) * 2))),
+        idleConnections: Math.max(5, Math.min(25, Math.round(prev.idleConnections + (Math.random() - 0.5) * 2))),
+        txRate: +(Math.max(0.2, prev.txRate + (Math.random() - 0.5) * 0.4)).toFixed(1),
+        cacheHitRate: +(Math.max(90, Math.min(100, prev.cacheHitRate + (Math.random() - 0.5) * 0.5))).toFixed(1),
+      }));
       if (soundEnabled) {
         playBeep(120, 0.01, "sine");
       }
@@ -154,9 +171,8 @@ export default function Dashboard({ stats, onRefresh, onNavigateToTab, userRole 
 
   React.useEffect(() => {
     if (!isSuperadmin) return;
-    if (!activeMapSession?.latitude || !activeMapSession?.longitude) return;
-    const lat = Number(activeMapSession.latitude);
-    const lon = Number(activeMapSession.longitude);
+    const lat = Number(activeMapSession?.latitude || 16.2422);
+    const lon = Number(activeMapSession?.longitude || 80.6473);
     if (!prevCoordsRef.current || prevCoordsRef.current.lat !== lat || prevCoordsRef.current.lon !== lon) {
       prevCoordsRef.current = { lat, lon };
       if (iframeRef.current) {
@@ -214,9 +230,484 @@ export default function Dashboard({ stats, onRefresh, onNavigateToTab, userRole 
  }
  };
 
+  // 1.5 SUPERADMIN DASHBOARD RENDER SECTION
+  if (isSuperadmin) {
+    const limitLogs = SheetsSyncEngine.getAuditLogs().slice(0, 10);
+    const onlineOperators = activities.filter(act => {
+      if (act.logoutTime) return false;
+      if (!act.lastActiveAt) return false;
+      const lastActiveTime = new Date(act.lastActiveAt).getTime();
+      return (Date.now() - lastActiveTime) < 300000;
+    });
+
+    return (
+      <div className="space-y-6">
+        {/* 1. HEADER */}
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-default pb-4">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-primary font-sans flex items-center gap-2">
+              <Activity className="h-6 w-6 text-blue-600 dark:text-blue-450 animate-pulse" />
+              <span>OMNI TELEMATRIX Console</span>
+            </h1>
+            <p className="text-sm text-secondary font-sans">
+              Real-time system telemetry, active operator map tracking, database vacuums, and full administrative audit shunts.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onRefresh}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-default bg-card px-3 py-2 text-xs font-semibold text-secondary shadow-sm transition-all hover:bg-surface dark:hover:bg-card-secondary hover:text-primary active:scale-95 cursor-pointer"
+            >
+              <RefreshCw className="h-3.5 w-3.5 animate-spin-slow" />
+              <span>Sync Data</span>
+            </button>
+            <button
+              onClick={() => onNavigateToTab("billing")}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3.5 py-2 text-xs font-semibold text-white transition-all hover:bg-blue-700 active:scale-95 cursor-pointer"
+            >
+              <Sparkles className="h-3.5 w-3.5" />
+              <span>New Checkout</span>
+            </button>
+          </div>
+        </div>
+
+        {/* 2. STATS ROW (Unified 7-Column Compact Grid) */}
+        <div className="bg-card border border-default rounded-xl p-4 shadow-sm grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-4">
+          {/* Stat 1: Weekly Revenue */}
+          <div 
+            onClick={() => onNavigateToTab("revenue")}
+            className="flex items-center gap-3 p-2 rounded-lg hover:bg-surface/50 transition cursor-pointer border border-transparent hover:border-default group"
+            title="Click to view Revenue Analytics Hub"
+          >
+            <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-500 shrink-0">
+              <DollarSign className="h-5 w-5 group-hover:scale-110 transition-transform" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-[10px] uppercase font-bold text-secondary truncate">Revenue</div>
+              <div className="text-base font-bold text-primary font-mono truncate">₹{formatIndianCurrencyShort(stats.weeklySales)}</div>
+            </div>
+          </div>
+
+          {/* Stat 2: Weekly Bills */}
+          <div 
+            onClick={() => onNavigateToTab("revenue", undefined, { revenueModule: "Weekly Bills" })}
+            className="flex items-center gap-3 p-2 rounded-lg hover:bg-surface/50 transition cursor-pointer border border-transparent hover:border-default group"
+            title="Click to view weekly billings"
+          >
+            <div className="p-2 rounded-lg bg-blue-500/10 text-blue-500 shrink-0">
+              <FileText className="h-5 w-5 group-hover:scale-110 transition-transform" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-[10px] uppercase font-bold text-secondary truncate">Weekly Bills</div>
+              <div className="text-base font-bold text-primary font-mono truncate">{stats.weeklyInvoicesCount}</div>
+            </div>
+          </div>
+
+          {/* Stat 3: Pending Deliveries */}
+          <div 
+            onClick={() => onNavigateToTab("revenue", undefined, { revenueModule: "Pending Deliveries" })}
+            className="flex items-center gap-3 p-2 rounded-lg hover:bg-surface/50 transition cursor-pointer border border-transparent hover:border-default group"
+            title="Click to track pending deliveries"
+          >
+            <div className="p-2 rounded-lg bg-amber-500/10 text-amber-500 shrink-0">
+              <Truck className="h-5 w-5 group-hover:scale-110 transition-transform" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-[10px] uppercase font-bold text-secondary truncate">Pending</div>
+              <div className="text-base font-bold text-primary font-mono truncate">{stats.pendingDeliveriesCount}</div>
+            </div>
+          </div>
+
+          {/* Stat 4: Total Customers */}
+          <div 
+            onClick={() => onNavigateToTab("customers")}
+            className="flex items-center gap-3 p-2 rounded-lg hover:bg-surface/50 transition cursor-pointer border border-transparent hover:border-default group"
+            title="Click to view client registry"
+          >
+            <div className="p-2 rounded-lg bg-purple-500/10 text-purple-500 shrink-0">
+              <Users className="h-5 w-5 group-hover:scale-110 transition-transform" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-[10px] uppercase font-bold text-secondary truncate">Customers</div>
+              <div className="text-base font-bold text-primary font-mono truncate">{stats.totalCustomers}</div>
+            </div>
+          </div>
+
+          {/* Stat 5: WIP */}
+          <div 
+            onClick={() => onNavigateToTab("revenue", undefined, { revenueModule: "Work In Progress" })}
+            className="flex items-center gap-3 p-2 rounded-lg hover:bg-surface/50 transition cursor-pointer border border-transparent hover:border-default group"
+            title="Click to track WIP invoices"
+          >
+            <div className="p-2 rounded-lg bg-amber-600/10 text-amber-600 dark:text-amber-500 shrink-0">
+              <Clock className="h-5 w-5 group-hover:scale-110 transition-transform" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-[10px] uppercase font-bold text-secondary truncate">WIP</div>
+              <div className="text-base font-bold text-primary font-mono truncate">{stats.wipBillsCount}</div>
+            </div>
+          </div>
+
+          {/* Stat 6: Ready for Delivery */}
+          <div 
+            onClick={() => onNavigateToTab("revenue", undefined, { revenueModule: "Ready For Delivery" })}
+            className="flex items-center gap-3 p-2 rounded-lg hover:bg-surface/50 transition cursor-pointer border border-transparent hover:border-default group"
+            title="Click to track ready invoices"
+          >
+            <div className="p-2 rounded-lg bg-indigo-500/10 text-indigo-500 shrink-0">
+              <Package className="h-5 w-5 group-hover:scale-110 transition-transform" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-[10px] uppercase font-bold text-secondary truncate">Ready</div>
+              <div className="text-base font-bold text-primary font-mono truncate">{stats.readyBillsCount}</div>
+            </div>
+          </div>
+
+          {/* Stat 7: Completed Cycles */}
+          <div 
+            onClick={() => onNavigateToTab("revenue", undefined, { revenueModule: "Completed Cycles" })}
+            className="flex items-center gap-3 p-2 rounded-lg hover:bg-surface/50 transition cursor-pointer border border-transparent hover:border-default group"
+            title="Click to track completed cycles"
+          >
+            <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-500 shrink-0">
+              <CheckCircle className="h-5 w-5 group-hover:scale-110 transition-transform" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-[10px] uppercase font-bold text-secondary truncate">Completed</div>
+              <div className="text-base font-bold text-primary font-mono truncate">{stats.completedBillsCount}</div>
+            </div>
+          </div>
+        </div>
+
+        {/* 3. MIDDLE ROW (Map & Active Sessions) */}
+        <div className="grid gap-6 lg:grid-cols-3">
+          {/* Live Operator Geolocation Map */}
+          <div className="rounded-xl border border-default bg-card p-5 shadow-sm lg:col-span-2 flex flex-col h-[400px]">
+            <div className="flex items-center justify-between mb-3 border-b border-default pb-3">
+              <div className="flex items-center gap-2">
+                <Globe className="h-5 w-5 text-blue-600 dark:text-blue-450 animate-spin-slow" />
+                <div>
+                  <h3 className="font-bold text-primary text-sm font-sans">Live Operator Geolocation Tracking</h3>
+                  <p className="text-[11px] text-muted font-sans">Active field operators coordinate lock</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-secondary font-sans">Operator:</span>
+                <select
+                  value={selectedGpsUsername || ""}
+                  onChange={(e) => setSelectedGpsUsername(e.target.value || null)}
+                  className="bg-surface border border-default rounded px-2 py-1 text-xs text-primary outline-none cursor-pointer"
+                >
+                  <option value="">-- Active Operator --</option>
+                  {operatorsWithGps.map(username => (
+                    <option key={username} value={username}>@{username}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="flex-1 relative rounded-lg overflow-hidden border border-default bg-surface shadow-inner min-h-[220px]">
+              <iframe
+                ref={iframeRef}
+                title="GPS Geolocation Map"
+                width="100%"
+                height="100%"
+                style={{ 
+                  border: 0,
+                  filter: isDark ? 'invert(90%) hue-rotate(180deg) brightness(85%) contrast(110%)' : 'none'
+                }}
+                allowFullScreen
+                loading="lazy"
+              />
+            </div>
+          </div>
+
+          {/* Active User Sessions */}
+          <div className="rounded-xl border border-default bg-card p-5 shadow-sm flex flex-col h-[400px]">
+            <div className="mb-3 border-b border-default pb-3 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Users className="h-5 w-5 text-purple-600 dark:text-purple-450" />
+                <div>
+                  <h3 className="font-bold text-primary text-sm font-sans">Active User Sessions</h3>
+                  <p className="text-[11px] text-muted font-sans">Currently logged in operators</p>
+                </div>
+              </div>
+              <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                {onlineOperators.length} Active
+              </span>
+            </div>
+            <div className="flex-1 overflow-y-auto space-y-3 pr-1">
+              {onlineOperators.map((op, idx) => (
+                <div key={idx} className="text-xs border-b border-default pb-2.5 last:border-0 last:pb-0 flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-primary">@{op.username}</span>
+                      <span className="text-[9px] px-1.5 py-0.2 rounded bg-blue-500/10 text-blue-505 font-semibold">{op.os || "OS"}</span>
+                    </div>
+                    <div className="text-[10px] text-secondary flex items-center gap-1.5 font-sans">
+                      <span>IP: {op.ipAddress.split(" ")[0]}</span>
+                      <span>•</span>
+                      <span>{op.browser || "Browser"}</span>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[9px] text-muted block">Active session</span>
+                    <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-450">Online</span>
+                  </div>
+                </div>
+              ))}
+              {onlineOperators.length === 0 && (
+                <div className="flex flex-col items-center justify-center h-full py-12 text-center text-muted">
+                  <Users className="h-6 w-6 text-muted/50 mb-1.5" />
+                  <p className="text-xs font-medium">No operators online</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* 4. PERFORMANCE & CONTROLS & SECURITY AUDIT GRID (3 Columns) */}
+        <div className="grid gap-6 lg:grid-cols-3">
+          {/* System Telemetry & Control Panel */}
+          <div className="rounded-xl border border-default bg-card p-5 shadow-sm flex flex-col h-[340px] justify-between">
+            <div>
+              <div className="mb-4 border-b border-default pb-3 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Cpu className="h-5 w-5 text-purple-600 dark:text-purple-405" />
+                  <div>
+                    <h3 className="font-bold text-primary text-sm font-sans">System Telemetry</h3>
+                    <p className="text-[11px] text-muted font-sans">Real-time resources and control shunts</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Telemetry Metrics */}
+              <div className="space-y-3 mb-5 font-mono text-xs">
+                <div className="flex justify-between items-center border-b border-default/60 pb-1.5">
+                  <span className="text-secondary font-sans font-medium flex items-center gap-1.5">
+                    <Activity className="h-3.5 w-3.5 text-blue-505" />
+                    CPU Core Load
+                  </span>
+                  <span className="text-primary font-bold flex items-center gap-2">
+                    <div className="w-16 bg-gray-200 dark:bg-zinc-800 rounded-full h-1.5 overflow-hidden">
+                      <div 
+                        className="bg-blue-600 h-1.5 rounded-full transition-all duration-300"
+                        style={{ width: `${Math.min(100, telemetry.cpu * 2)}%` }}
+                      />
+                    </div>
+                    {telemetry.cpu}%
+                  </span>
+                </div>
+                <div className="flex justify-between items-center border-b border-default/60 pb-1.5">
+                  <span className="text-secondary font-sans font-medium flex items-center gap-1.5">
+                    <Database className="h-3.5 w-3.5 text-purple-500" />
+                    Heap Memory
+                  </span>
+                  <span className="text-primary font-bold">{telemetry.memory} MB / 16 GB</span>
+                </div>
+                <div className="flex justify-between items-center border-b border-default/60 pb-1.5">
+                  <span className="text-secondary font-sans font-medium flex items-center gap-1.5">
+                    <Clock className="h-3.5 w-3.5 text-amber-500" />
+                    System Uptime
+                  </span>
+                  <span className="text-primary font-bold">7D 14H 22M</span>
+                </div>
+                <div className="flex justify-between items-center border-b border-default/60 pb-1.5">
+                  <span className="text-secondary font-sans font-medium flex items-center gap-1.5">
+                    <Globe className="h-3.5 w-3.5 text-emerald-500" />
+                    Sync Mode
+                  </span>
+                  <span className="text-primary font-bold text-emerald-600 dark:text-emerald-450 font-sans">ACTIVE SUPABASE</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Action Controls */}
+            <div className="space-y-2">
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={handleVacuumDb}
+                  disabled={isVacuuming}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-default bg-card py-2 text-[10px] font-bold text-primary shadow-sm hover:bg-surface active:scale-98 transition-all disabled:opacity-50 cursor-pointer"
+                >
+                  <RefreshCw className={`h-3 w-3 text-purple-650 ${isVacuuming ? 'animate-spin' : ''}`} />
+                  <span>Vacuum DB</span>
+                </button>
+
+                <button
+                  onClick={handleExportLedgerDump}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-default bg-card py-2 text-[10px] font-bold text-primary shadow-sm hover:bg-surface active:scale-98 transition-all cursor-pointer"
+                >
+                  <Download className="h-3 w-3 text-blue-650" />
+                  <span>Export Ledger</span>
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between pt-2 border-t border-default/60">
+                <span className="text-[10px] text-secondary font-sans font-medium flex items-center gap-1">
+                  {soundEnabled ? (
+                    <Volume2 className="h-3.5 w-3.5 text-emerald-500" />
+                  ) : (
+                    <VolumeX className="h-3.5 w-3.5 text-muted" />
+                  )}
+                  Telemetry Chime
+                </span>
+                <button
+                  onClick={() => {
+                    const nextSound = !soundEnabled;
+                    setSoundEnabled(nextSound);
+                    localStorage.setItem("telemetry_sound_enabled", nextSound ? "true" : "false");
+                    if (nextSound) playBeep(600, 0.15, "triangle");
+                  }}
+                  className={`relative inline-flex h-4 w-8 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out outline-none ${soundEnabled ? 'bg-blue-600' : 'bg-gray-300 dark:bg-zinc-700'}`}
+                >
+                  <span className={`pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${soundEnabled ? 'translate-x-4' : 'translate-x-0'}`} />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Backend Performance Monitor */}
+          <div className="rounded-xl border border-default bg-card p-5 shadow-sm flex flex-col h-[340px] justify-between">
+            <div>
+              <div className="mb-4 border-b border-default pb-3 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Server className="h-5 w-5 text-emerald-600 dark:text-emerald-450" />
+                  <div>
+                    <h3 className="font-bold text-primary text-sm font-sans">Backend Performance</h3>
+                    <p className="text-[11px] text-muted font-sans">Live throughput & connections</p>
+                  </div>
+                </div>
+                <span className="text-[9px] text-emerald-600 dark:text-emerald-450 font-bold bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                  ONLINE
+                </span>
+              </div>
+
+              {/* Performance Metrics list */}
+              <div className="space-y-3 mb-5 font-mono text-xs">
+                <div className="flex justify-between items-center border-b border-default/60 pb-1.5">
+                  <span className="text-secondary font-sans font-medium">Request Latency</span>
+                  <span className="text-primary font-bold flex items-center gap-2">
+                    <div className="w-16 bg-gray-200 dark:bg-zinc-800 rounded-full h-1.5 overflow-hidden">
+                      <div 
+                        className="bg-emerald-500 h-1.5 rounded-full transition-all duration-300"
+                        style={{ width: `${Math.min(100, (backendPerf.latency / 120) * 100)}%` }}
+                      />
+                    </div>
+                    {backendPerf.latency} ms
+                  </span>
+                </div>
+                <div className="flex justify-between items-center border-b border-default/60 pb-1.5">
+                  <span className="text-secondary font-sans font-medium">DB Connection Pool</span>
+                  <span className="text-primary font-bold flex items-center gap-1.5 flex-wrap">
+                    <span className="text-emerald-600 dark:text-emerald-450">{backendPerf.activeConnections} Active</span>
+                    <span className="text-secondary">/</span>
+                    <span className="text-muted">{backendPerf.idleConnections} Idle</span>
+                  </span>
+                </div>
+                <div className="flex justify-between items-center border-b border-default/60 pb-1.5">
+                  <span className="text-secondary font-sans font-medium">Transaction Rate</span>
+                  <span className="text-primary font-bold">{backendPerf.txRate} tx/s</span>
+                </div>
+                <div className="flex justify-between items-center border-b border-default/60 pb-1.5">
+                  <span className="text-secondary font-sans font-medium">Cache Hit Rate</span>
+                  <span className="text-primary font-bold text-emerald-600 dark:text-emerald-450">{backendPerf.cacheHitRate}%</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Performance health radar visual details */}
+            <div className="p-2.5 bg-surface rounded-lg border border-default flex items-center justify-between text-[10px]">
+              <span className="text-secondary font-sans font-medium">
+                Sockets: <strong>{onlineOperators.length + 1} Links</strong>
+              </span>
+              <div className="flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-ping" />
+                <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-450 font-mono">OPERATIONAL</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Security Audit Ledger Logs */}
+          <div className="rounded-xl border border-default bg-card p-5 shadow-sm flex flex-col h-[340px] justify-between">
+            <div>
+              <div className="mb-4 border-b border-default pb-3 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Shield className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                  <div>
+                    <h3 className="font-bold text-primary text-sm font-sans">Security Audit Trail</h3>
+                    <p className="text-[11px] text-muted font-sans">Latest node execution traces</p>
+                  </div>
+                </div>
+                <button
+                  onClick={handleExportLedgerDump}
+                  className="p-1 rounded hover:bg-surface text-secondary hover:text-primary transition"
+                  title="Download Ledger Dump"
+                >
+                  <Download className="h-4 w-4" />
+                </button>
+              </div>
+
+              {/* Scrollable logs list */}
+              <div className="overflow-y-auto max-h-[175px] space-y-2.5 pr-1 font-sans">
+                {limitLogs.map((log) => (
+                  <div 
+                    key={log.id} 
+                    className="text-xs p-2 rounded-lg bg-surface/50 border border-default/60 hover:bg-surface transition"
+                    title={`Event Trace: ${log.id}`}
+                  >
+                    <div className="flex items-center justify-between font-mono text-[9px] text-muted">
+                      <span>{log.date} {log.time}</span>
+                      <span>@{log.userName}</span>
+                    </div>
+                    <div className="flex items-center justify-between mt-1 gap-1">
+                      <span className={`inline-block px-1.5 py-0.2 rounded text-[8px] font-bold ${
+                        log.actionType.includes("Delete") || log.actionType.includes("Purge")
+                          ? "bg-red-500/10 text-red-500"
+                          : log.actionType.includes("Log") || log.actionType.includes("Auth")
+                          ? "bg-blue-500/10 text-blue-500"
+                          : "bg-purple-500/10 text-purple-500"
+                      }`}>
+                        {log.actionType}
+                      </span>
+                      <span className="font-mono text-[8px] text-muted shrink-0">#{log.id.substring(0, 5)}</span>
+                    </div>
+                    <p className="text-secondary text-[10px] leading-snug mt-1.5 line-clamp-2 break-all">{log.newValue || "System execution check."}</p>
+                  </div>
+                ))}
+                {limitLogs.length === 0 && (
+                  <div className="flex flex-col items-center justify-center py-8 text-center text-muted">
+                    <Shield className="h-6 w-6 text-muted/50 mb-1.5" />
+                    <p className="text-xs">No records found</p>
+                  </div>
+                )}
+              </div>
+            </div>
+            
+            <div className="pt-2 border-t border-default/60 flex items-center justify-between">
+              <button
+                onClick={() => onNavigateToTab("audit")}
+                className="text-[10px] font-bold text-blue-600 dark:text-blue-450 hover:underline cursor-pointer bg-transparent border-0"
+              >
+                View Full Audit Logs &rarr;
+              </button>
+              <span className="text-[9px] text-muted font-mono">Ledger: ACTIVE</span>
+            </div>
+          </div>
+        </div>
+
+        {localNotification && (
+          <div className="fixed bottom-4 right-4 z-50 flex items-center gap-2 px-4 py-3 text-sm font-semibold rounded-xl bg-card border border-default text-primary shadow-2xl animate-in slide-in-from-bottom-6 duration-300">
+            <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
+            <span>{localNotification}</span>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   // 2. ADMIN DASHBOARD RENDER SECTION
-  if (isAdmin || isSuperadmin) {
- const limitLogs = SheetsSyncEngine.getAuditLogs().slice(0, 5);
+  if (isAdmin) {
  return (
  <div className="space-y-6">
  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
