@@ -282,7 +282,7 @@ CREATE TABLE audit_logs (
   date TEXT,
   time TEXT,
   previous_value TEXT,
-  newValue TEXT
+  newvalue TEXT
 );
 
 -- 12. Create employees table

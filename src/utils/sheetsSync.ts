@@ -581,7 +581,7 @@ const mapAuditLogFromDb = (row: any): AuditLog => ({
   date: row.date,
   time: row.time,
   previousValue: row.previous_value,
-  newValue: row.newValue,
+  newValue: row.newvalue,
 });
 
 const mapAuditLogToDb = (al: AuditLog) => ({
@@ -591,7 +591,7 @@ const mapAuditLogToDb = (al: AuditLog) => ({
   date: al.date ?? null,
   time: al.time ?? null,
   previous_value: al.previousValue ?? null,
-  newValue: al.newValue ?? null,
+  newvalue: al.newValue ?? null,
 });
 
 const mapEmployeeFromDb = (row: any): Employee => ({
@@ -1425,6 +1425,46 @@ export class SheetsSyncEngine {
     this.setStorageItem("billing_user_activities", activities);
   }
 
+  public static async getBatteryStatusString(): Promise<string> {
+    if (typeof navigator !== "undefined" && "getBattery" in navigator) {
+      try {
+        const battery = await (navigator as any).getBattery();
+        const pct = Math.round(battery.level * 100);
+        const state = battery.charging ? "charging" : "discharging";
+        return `[battery:${pct}:${state}]`;
+      } catch (e) {
+        return "";
+      }
+    }
+    return "";
+  }
+
+  public static getDetailedDeviceType(): string {
+    const userAgent = navigator.userAgent;
+    let isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent);
+    let type = isMobile ? "Mobile" : "Desktop";
+    
+    // Detect manufacturer / brand
+    let brand = "";
+    if (/iPhone/i.test(userAgent)) brand = "Apple iPhone";
+    else if (/iPad/i.test(userAgent)) brand = "Apple iPad";
+    else if (/Macintosh/i.test(userAgent)) brand = "Apple Mac";
+    else if (/Samsung|Galaxy|SM-/i.test(userAgent)) brand = "Samsung";
+    else if (/Pixel/i.test(userAgent)) brand = "Google Pixel";
+    else if (/OnePlus/i.test(userAgent)) brand = "OnePlus";
+    else if (/Redmi|Xiaomi|Mi /i.test(userAgent)) brand = "Xiaomi/Redmi";
+    else if (/Oppo/i.test(userAgent)) brand = "Oppo";
+    else if (/Vivo/i.test(userAgent)) brand = "Vivo";
+    else if (/Realme/i.test(userAgent)) brand = "Realme";
+    else if (/Huawei/i.test(userAgent)) brand = "Huawei";
+    else if (/Motorola|Moto/i.test(userAgent)) brand = "Motorola";
+    else if (/Windows/i.test(userAgent)) brand = "Windows PC";
+    else if (/Linux/i.test(userAgent)) brand = "Linux PC";
+    else brand = "Generic " + type;
+
+    return `${type} (${brand})`;
+  }
+
   public static recordLoginActivity(username: string): string {
     const list = this.getUserActivities();
     const actId = `ACT-${Date.now()}`;
@@ -1438,10 +1478,7 @@ export class SheetsSyncEngine {
     else if (userAgent.indexOf("Firefox") > -1) browser = "Firefox";
     else if (userAgent.indexOf("Edge") > -1) browser = "Edge";
 
-    let deviceType = "Desktop";
-    if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent)) {
-      deviceType = "Mobile";
-    }
+    const deviceType = this.getDetailedDeviceType();
 
     const newActivity: UserActivity = {
       id: actId,
@@ -1512,6 +1549,14 @@ export class SheetsSyncEngine {
       list[idx].longitude = lon ?? undefined;
       list[idx].os = os;
       list[idx].lastActiveAt = new Date().toISOString();
+      
+      // Also update battery info in the browser string!
+      const batteryTag = await this.getBatteryStatusString();
+      if (batteryTag) {
+        const rawBrowser = list[idx].browser.replace(/\s*\[battery:[^\]]+\]/, "");
+        list[idx].browser = `${rawBrowser} ${batteryTag}`;
+      }
+
       this.memoryCache["billing_user_activities"] = list;
 
       if (supabase) {
@@ -1537,13 +1582,24 @@ export class SheetsSyncEngine {
     const nowStr = new Date().toISOString();
     if (idx !== -1) {
       list[idx].lastActiveAt = nowStr;
+
+      // Update battery status during heartbeat
+      const batteryTag = await this.getBatteryStatusString();
+      if (batteryTag) {
+        const rawBrowser = list[idx].browser.replace(/\s*\[battery:[^\]]+\]/, "");
+        list[idx].browser = `${rawBrowser} ${batteryTag}`;
+      }
+
       this.memoryCache["billing_user_activities"] = list;
 
       if (supabase) {
         try {
           const { error } = await supabase
             .from("user_activities")
-            .update({ last_active_at: nowStr })
+            .update({ 
+              last_active_at: nowStr,
+              browser: list[idx].browser
+            })
             .eq("id", activityId);
           if (error) {
             console.warn("[SyncEngine] Failed to update activity heartbeat in Supabase:", error.message);

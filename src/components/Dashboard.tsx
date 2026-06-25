@@ -24,12 +24,31 @@ import {
   VolumeX,
   Package,
   Server,
-  Trash2
+  Trash2,
+  Battery,
+  BatteryCharging
 } from "lucide-react";
 import { DashboardStats } from"../types";
 import { SheetsSyncEngine } from"../utils/sheetsSync";
 import { formatIndianCurrencyShort } from"../utils/currencyUtils";
 import { formatDisplayDate } from"../utils/dateUtils";
+
+const parseBrowserAndBattery = (browserStr: string) => {
+  if (!browserStr) return { browser: "Browser", batteryLevel: null, isCharging: false };
+  const match = browserStr.match(/^(.*?)\s*\[battery:(\d+):(charging|discharging)\]$/);
+  if (match) {
+    return {
+      browser: match[1],
+      batteryLevel: parseInt(match[2]),
+      isCharging: match[3] === "charging"
+    };
+  }
+  return {
+    browser: browserStr,
+    batteryLevel: null,
+    isCharging: false
+  };
+};
 
 interface DashboardProps {
  stats: DashboardStats;
@@ -438,7 +457,7 @@ export default function Dashboard({ stats, onRefresh, onNavigateToTab, userRole 
       if (act.logoutTime) return false;
       if (!act.lastActiveAt) return false;
       const lastActiveTime = new Date(act.lastActiveAt).getTime();
-      return (Date.now() - lastActiveTime) < 300000;
+      return (Date.now() - lastActiveTime) < 120000; // 2 minutes threshold (heartbeat is 1m)
     });
 
     return (
@@ -637,25 +656,46 @@ export default function Dashboard({ stats, onRefresh, onNavigateToTab, userRole 
               </span>
             </div>
             <div className="flex-1 overflow-y-auto space-y-3 pr-1 scrollbar-thin">
-              {onlineOperators.map((op, idx) => (
-                <div key={idx} className="text-xs border-b border-default pb-2.5 last:border-0 last:pb-0 flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-primary">@{op.username}</span>
-                      <span className="text-[9px] px-1.5 py-0.2 rounded bg-blue-500/10 text-blue-600 font-semibold">{op.os || "OS"}</span>
+              {onlineOperators.map((op, idx) => {
+                const { browser: cleanBrowser, batteryLevel, isCharging } = parseBrowserAndBattery(op.browser || "Browser");
+                return (
+                  <div key={idx} className="text-xs border-b border-default pb-2.5 last:border-0 last:pb-0 flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-primary">@{op.username}</span>
+                        <span className="text-[9px] px-1.5 py-0.2 rounded bg-blue-500/10 text-blue-600 font-semibold">{op.os || "OS"}</span>
+                        {op.deviceType && op.deviceType !== "Desktop" && op.deviceType !== "Mobile" && (
+                          <span className="text-[9px] px-1.5 py-0.2 rounded bg-purple-500/10 text-purple-600 font-semibold">{op.deviceType}</span>
+                        )}
+                      </div>
+                      <div className="text-[10px] text-secondary flex items-center gap-1.5 font-sans">
+                        <span>IP: {op.ipAddress.split(" ")[0]}</span>
+                        <span>•</span>
+                        <span>{cleanBrowser}</span>
+                        {batteryLevel !== null && (
+                          <>
+                            <span>•</span>
+                            <span className={`inline-flex items-center gap-0.5 font-bold ${
+                              batteryLevel > 50 ? "text-emerald-500" : batteryLevel > 20 ? "text-amber-500" : "text-rose-500 animate-pulse"
+                            }`}>
+                              {isCharging ? (
+                                <BatteryCharging className="h-3 w-3 text-emerald-500" />
+                              ) : (
+                                <Battery className="h-3 w-3" />
+                              )}
+                              <span>{batteryLevel}%</span>
+                            </span>
+                          </>
+                        )}
+                      </div>
                     </div>
-                    <div className="text-[10px] text-secondary flex items-center gap-1.5 font-sans">
-                      <span>IP: {op.ipAddress.split(" ")[0]}</span>
-                      <span>•</span>
-                      <span>{op.browser || "Browser"}</span>
+                    <div className="text-right">
+                      <span className="text-[9px] text-muted block">Active session</span>
+                      <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-450">Online</span>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <span className="text-[9px] text-muted block">Active session</span>
-                    <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-450">Online</span>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
               {onlineOperators.length === 0 && (
                 <div className="flex flex-col items-center justify-center h-full py-12 text-center text-muted">
                   <Users className="h-6 w-6 text-muted/50 mb-1.5" />

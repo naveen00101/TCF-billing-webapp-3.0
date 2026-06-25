@@ -15,10 +15,29 @@ import {
   Info,
   User,
   Calendar,
-  AlertCircle
+  AlertCircle,
+  Battery,
+  BatteryCharging
 } from "lucide-react";
 import { SheetsSyncEngine } from "../utils/sheetsSync";
 import { UserActivity } from "../types";
+
+const parseBrowserAndBattery = (browserStr: string) => {
+  if (!browserStr) return { browser: "Browser", batteryLevel: null, isCharging: false };
+  const match = browserStr.match(/^(.*?)\s*\[battery:(\d+):(charging|discharging)\]$/);
+  if (match) {
+    return {
+      browser: match[1],
+      batteryLevel: parseInt(match[2]),
+      isCharging: match[3] === "charging"
+    };
+  }
+  return {
+    browser: browserStr,
+    batteryLevel: null,
+    isCharging: false
+  };
+};
 
 export default function UserActivitiesTab() {
   const activities = SheetsSyncEngine.getUserActivities();
@@ -40,7 +59,7 @@ export default function UserActivitiesTab() {
     if (act.logoutTime) return false;
     if (!act.lastActiveAt) return false;
     const lastActiveTime = new Date(act.lastActiveAt).getTime();
-    return (now - lastActiveTime) < 300000; // 5 minutes threshold
+    return (now - lastActiveTime) < 120000; // 2 minutes threshold
   });
   const totalOnlineCount = onlineSessions.length;
 
@@ -54,7 +73,7 @@ export default function UserActivitiesTab() {
       if (act.logoutTime) return false;
       if (!act.lastActiveAt) return false;
       const lastActiveTime = new Date(act.lastActiveAt).getTime();
-      return (now - lastActiveTime) < 300000;
+      return (now - lastActiveTime) < 120000; // 2 minutes threshold
     });
   } else if (activeFilter === 'unique') {
     // Sort activities descending by login timestamp to ensure the first seen is the latest
@@ -317,13 +336,15 @@ export default function UserActivitiesTab() {
               <tbody className="divide-y divide-gray-150 dark:divide-gray-800/60">
                 {filteredActivities.map((act) => {
                   // Determine if this session is currently online
-                  const isSessionOnline = !act.logoutTime && act.lastActiveAt && (now - new Date(act.lastActiveAt).getTime()) < 300000;
+                  const isSessionOnline = !act.logoutTime && act.lastActiveAt && (now - new Date(act.lastActiveAt).getTime()) < 120000;
                   const isSelected = currentSelected?.id === act.id;
 
                   // Dynamic location fallback mapping
                   const displayLocation = act.locationName 
                     ? act.locationName 
                     : (isSessionOnline ? "Resolving Geolocation..." : "N/A (Old Record)");
+
+                  const { browser: cleanBrowser, batteryLevel, isCharging } = parseBrowserAndBattery(act.browser || "");
 
                   return (
                     <tr 
@@ -364,13 +385,27 @@ export default function UserActivitiesTab() {
                         )}
                       </td>
                       <td className="px-4 py-3 text-center">
-                        <div className="flex items-center justify-center gap-1.5 text-xs text-primary">
-                          {act.deviceType === "Mobile" ? (
-                            <Smartphone className="h-3.5 w-3.5 text-zinc-500" />
-                          ) : (
-                            <Laptop className="h-3.5 w-3.5 text-zinc-500" />
+                        <div className="flex flex-col items-center justify-center gap-0.5">
+                          <div className="flex items-center justify-center gap-1.5 text-xs text-primary font-sans">
+                            {act.deviceType.toLowerCase().includes("mobile") ? (
+                              <Smartphone className="h-3.5 w-3.5 text-zinc-500" />
+                            ) : (
+                              <Laptop className="h-3.5 w-3.5 text-zinc-500" />
+                            )}
+                            <span className="font-medium">{act.os || "Desktop OS"}</span>
+                          </div>
+                          {batteryLevel !== null && (
+                            <span className={`inline-flex items-center gap-0.5 text-[10px] font-bold ${
+                              batteryLevel > 50 ? "text-emerald-500" : batteryLevel > 20 ? "text-amber-500" : "text-rose-500 animate-pulse"
+                            }`}>
+                              {isCharging ? (
+                                <BatteryCharging className="h-2.5 w-2.5" />
+                              ) : (
+                                <Battery className="h-2.5 w-2.5" />
+                              )}
+                              <span>{batteryLevel}%</span>
+                            </span>
                           )}
-                          <span className="font-medium">{act.os || "Desktop OS"}</span>
                         </div>
                       </td>
                       <td className="px-4 py-3 font-mono text-xs text-primary">
@@ -413,126 +448,144 @@ export default function UserActivitiesTab() {
         {/* RIGHT COLUMN: ACTIVE TERMINAL INSPECTOR & GOOGLE MAP PANEL (1/3 width) */}
         <div className="rounded-xl border border-default bg-card shadow-sm transition-all duration-200 overflow-hidden">
           
-          {currentSelected ? (
-            <div className="flex flex-col h-full">
-              
-              {/* Header */}
-              <div className="px-5 py-4 border-b border-default bg-surface flex items-center justify-between transition-colors">
-                <div className="flex items-center gap-2">
-                  <Navigation className="h-4.5 w-4.5 text-purple-500" />
-                  <span className="font-bold text-primary text-sm">Terminal Inspector</span>
-                </div>
-                <button
-                  onClick={() => setSelectedSession(null)}
-                  className="p-1 rounded-lg hover:bg-default text-secondary hover:text-primary transition-colors cursor-pointer"
-                  title="Clear selection"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-
-              {/* Inspector Content */}
-              <div className="p-5 space-y-4 flex-1">
+          {currentSelected ? (() => {
+            const { browser: cleanBrowser, batteryLevel, isCharging } = parseBrowserAndBattery(currentSelected.browser || "");
+            return (
+              <div className="flex flex-col h-full">
                 
-                {/* Operator Profile */}
-                <div className="p-3 bg-surface rounded-xl border border-default space-y-2 transition-colors">
-                  <div className="flex items-center gap-2">
-                    <div className="h-8 w-8 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center font-bold text-sm">
-                      {currentSelected.username.substring(0, 2).toUpperCase()}
-                    </div>
-                    <div>
-                      <div className="font-bold text-primary text-xs flex items-center gap-1.5">
-                        <span>@{currentSelected.username}</span>
-                        {currentSelected.username.toLowerCase().includes("admin") && (
-                          <span className="px-1.5 py-0.2 text-[8px] font-bold rounded bg-purple-500/10 text-purple-500 border border-purple-500/20">
-                            ADMINISTRATOR
-                          </span>
-                        )}
+                {/* Header */}
+                <div className="px-5 py-4 border-b border-default bg-surface flex items-center justify-between transition-colors">
+                  <div>
+                    <h3 className="font-bold text-primary text-sm font-sans flex items-center gap-1.5">
+                      <Activity className="h-4.5 w-4.5 text-purple-605 dark:text-purple-400" />
+                      <span>Operator Diagnostics</span>
+                    </h3>
+                    <p className="text-[10px] text-muted dark:text-muted font-sans">Active browser pings (1m intervals)</p>
+                  </div>
+                  <button 
+                    onClick={() => setSelectedSession(null)}
+                    className="p-1.5 rounded-lg border border-default bg-card hover:bg-surface text-secondary hover:text-primary transition-all active:scale-95 cursor-pointer"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+
+                {/* Inspector Content */}
+                <div className="p-5 space-y-4 flex-1">
+                  
+                  {/* Operator Profile */}
+                  <div className="p-3 bg-surface rounded-xl border border-default space-y-2 transition-colors">
+                    <div className="flex items-center gap-2">
+                      <div className="h-8 w-8 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center font-bold text-sm">
+                        {currentSelected.username.substring(0, 2).toUpperCase()}
                       </div>
-                      <div className="text-[9px] text-muted font-mono">{currentSelected.id}</div>
+                      <div>
+                        <div className="font-bold text-primary text-xs flex items-center gap-1.5">
+                          <span>@{currentSelected.username}</span>
+                          {currentSelected.username.toLowerCase().includes("admin") && (
+                            <span className="px-1.5 py-0.2 text-[8px] font-bold rounded bg-purple-500/10 text-purple-500 border border-purple-500/20">
+                              ADMINISTRATOR
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[9px] text-muted font-mono">{currentSelected.id}</div>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                {/* Session Timing & Heartbeat */}
-                <div className="text-[11px] space-y-2 bg-surface p-3.5 rounded-xl border border-default transition-colors">
-                  <div className="flex justify-between items-center pb-2 border-b border-default/60">
-                    <span className="text-muted font-semibold">Active Status</span>
-                    {(!currentSelected.logoutTime && currentSelected.lastActiveAt && (now - new Date(currentSelected.lastActiveAt).getTime()) < 300000) ? (
-                      <span className="px-1.5 py-0.5 rounded bg-green-500/10 text-green-500 border border-green-500/25 font-bold font-mono text-[9px] flex items-center gap-1">
-                        <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse"></span>
-                        ONLINE
-                      </span>
-                    ) : (
-                      <span className="px-1.5 py-0.5 rounded bg-zinc-500/10 text-muted border border-zinc-500/25 font-semibold font-mono text-[9px]">
-                        OFFLINE
-                      </span>
-                    )}
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 pt-1 font-sans">
-                    <div>
-                      <span className="text-muted block text-[10px]">Logged In</span>
-                      <strong className="text-primary block font-mono">{currentSelected.loginDate} {currentSelected.loginTime}</strong>
+                  {/* Session Timing & Heartbeat */}
+                  <div className="text-[11px] space-y-2 bg-surface p-3.5 rounded-xl border border-default transition-colors">
+                    <div className="flex justify-between items-center pb-2 border-b border-default/60">
+                      <span className="text-muted font-semibold">Active Status</span>
+                      {(!currentSelected.logoutTime && currentSelected.lastActiveAt && (now - new Date(currentSelected.lastActiveAt).getTime()) < 120000) ? (
+                        <span className="px-1.5 py-0.5 rounded bg-green-500/10 text-green-500 border border-green-500/25 font-bold font-mono text-[9px] flex items-center gap-1">
+                          <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse"></span>
+                          ONLINE
+                        </span>
+                      ) : (
+                        <span className="px-1.5 py-0.5 rounded bg-zinc-500/10 text-muted border border-zinc-500/25 font-semibold font-mono text-[9px]">
+                          OFFLINE
+                        </span>
+                      )}
                     </div>
-                    <div>
-                      <span className="text-muted block text-[10px]">Last Heartbeat</span>
-                      <strong className="text-primary block font-mono">
-                        {currentSelected.lastActiveAt 
-                          ? new Date(currentSelected.lastActiveAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) 
-                          : "N/A"}
-                      </strong>
+                    <div className="grid grid-cols-2 gap-2 pt-1 font-sans">
+                      <div>
+                        <span className="text-muted block text-[10px]">Logged In</span>
+                        <strong className="text-primary block font-mono">{currentSelected.loginDate} {currentSelected.loginTime}</strong>
+                      </div>
+                      <div>
+                        <span className="text-muted block text-[10px]">Last Heartbeat</span>
+                        <strong className="text-primary block font-mono">
+                          {currentSelected.lastActiveAt 
+                            ? new Date(currentSelected.lastActiveAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) 
+                            : "N/A"}
+                        </strong>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                {/* System Specs */}
-                <div className="text-[11px] space-y-2 bg-surface p-3.5 rounded-xl border border-default transition-colors">
-                  <span className="text-muted font-semibold block border-b border-default/60 pb-1.5">System Signature</span>
-                  <div className="grid grid-cols-3 gap-2 text-center">
-                    <div className="bg-card p-1.5 rounded border border-default/55 flex flex-col items-center justify-center">
-                      <Laptop className="h-3.5 w-3.5 text-blue-500 mb-1" />
-                      <span className="text-muted text-[8px] font-bold">DEVICE</span>
-                      <strong className="text-primary text-[9px] truncate max-w-full">{currentSelected.deviceType}</strong>
-                    </div>
-                    <div className="bg-card p-1.5 rounded border border-default/55 flex flex-col items-center justify-center">
-                      <Monitor className="h-3.5 w-3.5 text-emerald-500 mb-1" />
-                      <span className="text-muted text-[8px] font-bold">BROWSER</span>
-                      <strong className="text-primary text-[9px] truncate max-w-full">{currentSelected.browser}</strong>
-                    </div>
-                    <div className="bg-card p-1.5 rounded border border-default/55 flex flex-col items-center justify-center">
-                      <Activity className="h-3.5 w-3.5 text-purple-500 mb-1" />
-                      <span className="text-muted text-[8px] font-bold">OS</span>
-                      <strong className="text-primary text-[9px] truncate max-w-full">{currentSelected.os || "Desktop"}</strong>
+                  {/* System Specs */}
+                  <div className="text-[11px] space-y-2 bg-surface p-3.5 rounded-xl border border-default transition-colors">
+                    <span className="text-muted font-semibold block border-b border-default/60 pb-1.5">System Signature</span>
+                    <div className={`grid ${batteryLevel !== null ? 'grid-cols-4' : 'grid-cols-3'} gap-2 text-center`}>
+                      <div className="bg-card p-1.5 rounded border border-default/55 flex flex-col items-center justify-center">
+                        <Laptop className="h-3.5 w-3.5 text-blue-500 mb-1" />
+                        <span className="text-muted text-[8px] font-bold">DEVICE</span>
+                        <strong className="text-primary text-[9px] truncate max-w-full" title={currentSelected.deviceType}>{currentSelected.deviceType}</strong>
+                      </div>
+                      <div className="bg-card p-1.5 rounded border border-default/55 flex flex-col items-center justify-center">
+                        <Monitor className="h-3.5 w-3.5 text-emerald-500 mb-1" />
+                        <span className="text-muted text-[8px] font-bold">BROWSER</span>
+                        <strong className="text-primary text-[9px] truncate max-w-full" title={cleanBrowser}>{cleanBrowser}</strong>
+                      </div>
+                      <div className="bg-card p-1.5 rounded border border-default/55 flex flex-col items-center justify-center">
+                        <Activity className="h-3.5 w-3.5 text-purple-500 mb-1" />
+                        <span className="text-muted text-[8px] font-bold">OS</span>
+                        <strong className="text-primary text-[9px] truncate max-w-full" title={currentSelected.os}>{currentSelected.os || "Desktop"}</strong>
+                      </div>
+                      {batteryLevel !== null && (
+                        <div className="bg-card p-1.5 rounded border border-default/55 flex flex-col items-center justify-center">
+                          {isCharging ? (
+                            <BatteryCharging className="h-3.5 w-3.5 text-emerald-500 mb-1" />
+                          ) : (
+                            <Battery className={`h-3.5 w-3.5 mb-1 ${
+                              batteryLevel > 50 ? "text-emerald-500" : batteryLevel > 20 ? "text-amber-500" : "text-rose-500 animate-pulse"
+                            }`} />
+                          )}
+                          <span className="text-muted text-[8px] font-bold">BATTERY</span>
+                          <strong className="text-primary text-[9px] truncate max-w-full">{batteryLevel}%</strong>
+                        </div>
+                      )}
                     </div>
                   </div>
-                </div>
 
-                {/* Network parameters */}
-                <div className="text-[11px] space-y-2 bg-surface p-3.5 rounded-xl border border-default transition-colors">
-                  <span className="text-muted font-semibold block border-b border-default/60 pb-1.5">Network & Geolocation</span>
-                  <div className="space-y-1.5">
-                    <div className="flex justify-between items-center">
-                      <span className="text-muted">IP Address</span>
-                      <span className="font-mono text-primary font-bold">{currentSelected.ipAddress}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-muted">Physical Location</span>
-                      <span className="text-primary font-semibold text-right max-w-[160px] truncate" title={currentSelected.locationName}>
-                        {currentSelected.locationName || (
-                          (!currentSelected.logoutTime && currentSelected.lastActiveAt && (now - new Date(currentSelected.lastActiveAt).getTime()) < 300000) 
-                            ? "Resolving Geolocation..." 
-                            : "N/A (Old Record)"
-                        )}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-muted">Coordinates</span>
-                      <span className="font-mono text-primary">
-                        {currentSelected.latitude && currentSelected.longitude 
-                          ? `${currentSelected.latitude.toFixed(5)}, ${currentSelected.longitude.toFixed(5)}`
-                          : "N/A"
-                        }
-                      </span>
+                  {/* Network parameters */}
+                  <div className="text-[11px] space-y-2 bg-surface p-3.5 rounded-xl border border-default transition-colors">
+                    <span className="text-muted font-semibold block border-b border-default/60 pb-1.5">Network & Geolocation</span>
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between items-center">
+                        <span className="text-muted">IP Address</span>
+                        <span className="font-mono text-primary font-bold">{currentSelected.ipAddress}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-muted">Physical Location</span>
+                        <span className="text-primary font-semibold text-right max-w-[160px] truncate" title={currentSelected.locationName}>
+                          {currentSelected.locationName || (
+                            (!currentSelected.logoutTime && currentSelected.lastActiveAt && (now - new Date(currentSelected.lastActiveAt).getTime()) < 120000) 
+                              ? "Resolving Geolocation..." 
+                              : "N/A (Old Record)"
+                          )}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-muted">Coordinates</span>
+                        <span className="font-mono text-primary">
+                          {currentSelected.latitude && currentSelected.longitude 
+                            ? `${currentSelected.latitude.toFixed(5)}, ${currentSelected.longitude.toFixed(5)}`
+                            : "N/A"
+                          }
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -624,9 +677,8 @@ export default function UserActivitiesTab() {
                 )}
 
               </div>
-
-            </div>
-          ) : (
+            );
+          })() : (
             <div className="flex flex-col items-center justify-center p-8 text-center h-[500px] text-muted dark:text-zinc-650 bg-card">
               <div className="h-16 w-16 rounded-full bg-purple-500/10 text-purple-500 flex items-center justify-center mb-4 border border-purple-500/20 animate-pulse">
                 <MapPin className="h-7 w-7" />

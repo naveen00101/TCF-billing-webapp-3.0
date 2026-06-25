@@ -75,15 +75,24 @@ export default function LoginPage({ onLoginSuccess, onShowNotification }: LoginP
  // Parse details and request location asynchronously
  const trackAndSaveSessionDetails = async (activityId: string) => {
    const userAgent = navigator.userAgent;
-   let os = "Unknown OS";
-   if (userAgent.indexOf("Windows NT 10.0") > -1) os = "Windows 10/11";
-   else if (userAgent.indexOf("Windows NT 6.2") > -1) os = "Windows 8";
-   else if (userAgent.indexOf("Windows NT 6.1") > -1) os = "Windows 7";
-   else if (userAgent.indexOf("Macintosh") > -1) os = "macOS";
-   else if (userAgent.indexOf("iPhone") > -1) os = "iOS (iPhone)";
-   else if (userAgent.indexOf("iPad") > -1) os = "iOS (iPad)";
-   else if (userAgent.indexOf("Android") > -1) os = "Android";
-   else if (userAgent.indexOf("Linux") > -1) os = "Linux";
+    let os = "Unknown OS";
+    if (userAgent.indexOf("Windows NT 10.0") > -1) os = "Windows 10/11";
+    else if (userAgent.indexOf("Windows NT 6.2") > -1) os = "Windows 8";
+    else if (userAgent.indexOf("Windows NT 6.1") > -1) os = "Windows 7";
+    else if (userAgent.indexOf("Macintosh") > -1) os = "macOS";
+    else if (userAgent.indexOf("iPhone") > -1) {
+      const match = userAgent.match(/iPhone OS\s+([^\s;)]+)/i);
+      os = match ? `iOS ${match[1].replace(/_/g, '.')}` : "iOS (iPhone)";
+    }
+    else if (userAgent.indexOf("iPad") > -1) {
+      const match = userAgent.match(/CPU OS\s+([^\s;)]+)/i);
+      os = match ? `iPadOS ${match[1].replace(/_/g, '.')}` : "iOS (iPad)";
+    }
+    else if (userAgent.indexOf("Android") > -1) {
+      const match = userAgent.match(/Android\s+([^\s;)]+)/i);
+      os = match ? `Android ${match[1]}` : "Android";
+    }
+    else if (userAgent.indexOf("Linux") > -1) os = "Linux";
 
    let ip = "127.0.0.1 (Local Client)";
    let locName = "Unknown Location";
