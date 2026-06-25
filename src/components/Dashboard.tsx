@@ -178,45 +178,45 @@ export default function Dashboard({ stats, onRefresh, onNavigateToTab, userRole 
     }, [activeMapSession?.latitude, activeMapSession?.longitude]);
 
     return (
-      <div className="space-y-6 text-left font-sans">
+      <div className="space-y-6 text-left font-mono text-emerald-400">
         {/* Local Toast Slideout for Superadmin Quick Actions */}
         {localNotification && (
-          <div className="fixed top-4 right-4 z-[9999] flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold text-white bg-purple-600 shadow-2xl animate-in slide-in-from-top-6 duration-300">
+          <div className="fixed top-4 right-4 z-[9999] flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold text-white bg-emerald-600 border border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.25)] animate-in slide-in-from-top-6 duration-300">
             <CheckCircle2 className="h-4 w-4 shrink-0" />
             <span>{localNotification}</span>
           </div>
         )}
 
         {/* HEADER SECTION */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-default pb-4">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-emerald-500/20 pb-4">
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-extrabold tracking-tight bg-gradient-to-r from-purple-600 via-fuchsia-505 to-indigo-500 bg-clip-text text-transparent font-sans">
+              <h1 className="text-2xl font-extrabold tracking-tight bg-gradient-to-r from-emerald-500 via-green-400 to-teal-400 bg-clip-text text-transparent uppercase shadow-[0_0_10px_rgba(16,185,129,0.1)]">
                 Omni-Command Telemetry Matrix
               </h1>
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[9px] font-extrabold bg-gradient-to-r from-purple-500/10 to-fuchsia-500/10 text-fuchsia-500 border border-fuchsia-500/20 shadow-sm animate-pulse">
-                <span className="h-1.5 w-1.5 rounded-full bg-fuchsia-500"></span>
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[9px] font-extrabold bg-gradient-to-r from-emerald-500/10 to-green-500/10 text-emerald-400 border border-emerald-500/30 shadow-[0_0_8px_rgba(16,185,129,0.15)] animate-pulse">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-450"></span>
                 GOD MODE ACTIVE
               </span>
             </div>
-            <p className="text-xs text-secondary font-sans mt-1">
+            <p className="text-xs text-emerald-500/70 font-mono mt-1">
               Real-time node status, live terminal geolocation tracking, administrative system overrides, and security ledger audit.
             </p>
           </div>
           <div className="flex items-center gap-2">
             <button
               onClick={onRefresh}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-default bg-card px-3 py-2 text-xs font-semibold text-secondary shadow-sm transition-all hover:bg-surface dark:hover:bg-card-secondary hover:text-primary active:scale-95 cursor-pointer"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-zinc-955 px-3 py-2 text-xs font-bold text-emerald-400 shadow-sm transition-all hover:bg-emerald-500/5 hover:border-emerald-500/50 hover:text-emerald-300 active:scale-95 cursor-pointer font-mono"
             >
               <RefreshCw className="h-3.5 w-3.5" />
-              <span>Force Sync Nodes</span>
+              <span>[FORCE_SYNC_NODES]</span>
             </button>
             <button
               onClick={() => onNavigateToTab("billing")}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-purple-600 px-3.5 py-2 text-xs font-semibold text-white transition-all hover:bg-purple-700 active:scale-95 cursor-pointer shadow-md shadow-purple-500/10"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 py-2 text-xs font-bold text-white transition-all hover:bg-emerald-700 active:scale-95 cursor-pointer shadow-md shadow-emerald-500/10 font-mono"
             >
-              <Sparkles className="h-3.5 w-3.5" />
-              <span>New Checkout</span>
+              <Sparkles className="h-3.5 w-3.5 animate-pulse" />
+              <span>[NEW_CHECKOUT]</span>
             </button>
           </div>
         </div>
@@ -226,135 +226,135 @@ export default function Dashboard({ stats, onRefresh, onNavigateToTab, userRole 
           {/* Glowing Metrics */}
           <div 
             onClick={() => onNavigateToTab("revenue")}
-            className="rounded-xl p-5 shadow-lg bg-gradient-to-br from-emerald-500 to-teal-650 text-white transition-all hover:shadow-xl hover:scale-[1.02] duration-155 cursor-pointer group flex flex-col justify-between h-32"
+            className="rounded-xl p-5 shadow-lg bg-zinc-950 border border-emerald-500/20 text-emerald-400 transition-all hover:shadow-[0_0_15px_rgba(16,185,129,0.15)] hover:scale-[1.02] duration-155 cursor-pointer group flex flex-col justify-between h-32 hover:border-emerald-500/50"
           >
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-100 font-sans">Weekly Revenue</p>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-500/70 font-mono">[WEEKLY_REVENUE]</p>
                 <h3 className="mt-1 text-2xl font-black font-mono">₹{formatIndianCurrencyShort(stats.weeklySales)}</h3>
               </div>
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/10 text-white">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                 <DollarSign className="h-5 w-5" />
               </div>
             </div>
-            <p className="text-[10px] text-emerald-100/90 font-medium">Click to open Revenue Analytics Hub &rarr;</p>
+            <p className="text-[10px] text-emerald-500/70 font-mono group-hover:text-emerald-400 transition-colors">Open Revenue Analytics Hub &rarr;</p>
           </div>
 
           <div 
             onClick={() => onNavigateToTab("revenue", undefined, { revenueModule: "Weekly Bills" })}
-            className="rounded-xl p-5 shadow-lg bg-gradient-to-br from-blue-500 to-indigo-600 text-white transition-all hover:shadow-xl hover:scale-[1.02] duration-155 cursor-pointer group flex flex-col justify-between h-32"
+            className="rounded-xl p-5 shadow-lg bg-zinc-950 border border-emerald-500/20 text-emerald-400 transition-all hover:shadow-[0_0_15px_rgba(16,185,129,0.15)] hover:scale-[1.02] duration-155 cursor-pointer group flex flex-col justify-between h-32 hover:border-emerald-500/50"
           >
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-blue-100 font-sans">Weekly Bills</p>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-500/70 font-mono">[WEEKLY_BILLS]</p>
                 <h3 className="mt-1 text-2xl font-black font-mono">{stats.weeklyInvoicesCount}</h3>
               </div>
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/10 text-white">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                 <FileText className="h-5 w-5" />
               </div>
             </div>
-            <p className="text-[10px] text-blue-100/90 font-medium">Invoices generated this week &rarr;</p>
+            <p className="text-[10px] text-emerald-500/70 font-mono group-hover:text-emerald-400 transition-colors">Invoices generated this week &rarr;</p>
           </div>
 
           <div 
             onClick={() => onNavigateToTab("activities")}
-            className="rounded-xl p-5 shadow-lg bg-gradient-to-br from-purple-500 to-fuchsia-600 text-white transition-all hover:shadow-xl hover:scale-[1.02] duration-155 cursor-pointer group flex flex-col justify-between h-32"
+            className="rounded-xl p-5 shadow-lg bg-zinc-950 border border-emerald-500/20 text-emerald-400 transition-all hover:shadow-[0_0_15px_rgba(16,185,129,0.15)] hover:scale-[1.02] duration-155 cursor-pointer group flex flex-col justify-between h-32 hover:border-emerald-500/50"
           >
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-purple-100 font-sans">Operators Online</p>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-500/70 font-mono">[ONLINE_OPERATORS]</p>
                 <h3 className="mt-1 text-2xl font-black font-mono flex items-center gap-1.5">
                   <span>{activities.filter(a => {
                     if (a.logoutTime) return false;
                     if (!a.lastActiveAt) return false;
                     return (Date.now() - new Date(a.lastActiveAt).getTime()) < 300000;
-                  }).length} Active</span>
+                  }).length} ONLINE</span>
                   <span className="flex h-2.5 w-2.5 relative">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-white"></span>
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-400"></span>
                   </span>
                 </h3>
               </div>
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/10 text-white">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                 <Activity className="h-5 w-5" />
               </div>
             </div>
-            <p className="text-[10px] text-purple-100/90 font-medium">Track operator details & map geolocation &rarr;</p>
+            <p className="text-[10px] text-emerald-500/70 font-mono group-hover:text-emerald-400 transition-colors">Track operator details & map &rarr;</p>
           </div>
 
           {/* TELEMETRY WIDGET */}
-          <div className="rounded-xl border border-purple-500/20 bg-zinc-950 text-white p-4 shadow-lg space-y-2.5 transition-colors duration-200">
-            <div className="flex items-center justify-between border-b border-zinc-800 pb-1.5">
-              <span className="text-[9px] font-bold text-fuchsia-500 tracking-wider uppercase flex items-center gap-1">
-                <Cpu className="h-3 w-3 animate-pulse" /> Live Node Telemetry
+          <div className="rounded-xl border border-emerald-500/20 bg-zinc-950 text-emerald-400 p-4 shadow-lg space-y-2.5 transition-colors duration-200 hover:border-emerald-500/40">
+            <div className="flex items-center justify-between border-b border-zinc-850 pb-1.5">
+              <span className="text-[9px] font-bold text-emerald-400 tracking-wider uppercase flex items-center gap-1">
+                <Cpu className="h-3 w-3 animate-pulse text-emerald-400" /> [LIVE_NODE_TELEMETRY]
               </span>
-              <span className="text-[9px] font-bold text-emerald-400 flex items-center gap-1">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse"></span> SYNCED
+              <span className="text-[9px] font-bold text-emerald-450 flex items-center gap-1">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span> ONLINE
               </span>
             </div>
             <div className="grid grid-cols-2 gap-x-2 gap-y-1.5 text-[10px] font-mono">
               <div className="flex justify-between border-b border-zinc-900 pb-1">
-                <span className="text-zinc-500">CPU Load:</span>
-                <span className="text-fuchsia-400 font-bold">{telemetry.cpu}%</span>
+                <span className="text-zinc-550">CPU Load:</span>
+                <span className="text-emerald-400 font-bold">{telemetry.cpu}%</span>
               </div>
               <div className="flex justify-between border-b border-zinc-900 pb-1">
-                <span className="text-zinc-500">Node Latency:</span>
-                <span className="text-blue-400 font-bold">{telemetry.latency}ms</span>
+                <span className="text-zinc-550">Node Latency:</span>
+                <span className="text-cyan-400 font-bold">{telemetry.latency}ms</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-zinc-500">Heap Alloc:</span>
+                <span className="text-zinc-550">Heap Alloc:</span>
                 <span className="text-emerald-400 font-bold">{telemetry.memory}MB</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-zinc-500">Active Terminals:</span>
-                <span className="text-purple-400 font-bold">{activities.length}</span>
+                <span className="text-zinc-550">Terminals:</span>
+                <span className="text-cyan-400 font-bold">{activities.length}</span>
               </div>
             </div>
           </div>
         </div>
 
         {/* WORK IN PROGRESS TRACKER */}
-        <div className="grid gap-3 grid-cols-3">
-          <div className="rounded-xl border border-default bg-card p-4 flex items-center justify-between shadow-sm hover:border-amber-500 transition duration-150 cursor-pointer" onClick={() => onNavigateToTab("revenue", undefined, { revenueModule: "Work In Progress" })}>
+        <div className="grid gap-3 grid-cols-3 font-mono">
+          <div className="rounded-xl border border-emerald-500/15 bg-zinc-950 p-4 flex items-center justify-between shadow-sm hover:border-emerald-500/40 transition duration-150 cursor-pointer" onClick={() => onNavigateToTab("revenue", undefined, { revenueModule: "Work In Progress" })}>
             <div>
-              <span className="text-[9px] uppercase font-bold text-muted font-sans">Active Work In Progress</span>
+              <span className="text-[9px] uppercase font-bold text-amber-500/90 font-mono">[STATUS: WIP_QUEUED]</span>
               <div className="text-base font-black text-amber-500 font-mono mt-0.5">{stats.wipBillsCount} Bills</div>
             </div>
             <Clock className="h-5 w-5 text-amber-500/20" />
           </div>
-          <div className="rounded-xl border border-default bg-card p-4 flex items-center justify-between shadow-sm hover:border-blue-500 transition duration-150 cursor-pointer" onClick={() => onNavigateToTab("revenue", undefined, { revenueModule: "Ready For Delivery" })}>
+          <div className="rounded-xl border border-emerald-500/15 bg-zinc-950 p-4 flex items-center justify-between shadow-sm hover:border-emerald-500/40 transition duration-150 cursor-pointer" onClick={() => onNavigateToTab("revenue", undefined, { revenueModule: "Ready For Delivery" })}>
             <div>
-              <span className="text-[9px] uppercase font-bold text-muted font-sans">Ready For Delivery</span>
-              <div className="text-base font-black text-blue-500 font-mono mt-0.5">{stats.readyBillsCount} Bills</div>
+              <span className="text-[9px] uppercase font-bold text-blue-400/90 font-mono">[STATUS: READY_DISPATCH]</span>
+              <div className="text-base font-black text-blue-400 font-mono mt-0.5">{stats.readyBillsCount} Bills</div>
             </div>
-            <Truck className="h-5 w-5 text-blue-500/20" />
+            <Truck className="h-5 w-5 text-blue-400/20" />
           </div>
-          <div className="rounded-xl border border-default bg-card p-4 flex items-center justify-between shadow-sm hover:border-green-500 transition duration-150 cursor-pointer" onClick={() => onNavigateToTab("revenue", undefined, { revenueModule: "Completed Cycles" })}>
+          <div className="rounded-xl border border-emerald-500/15 bg-zinc-950 p-4 flex items-center justify-between shadow-sm hover:border-emerald-500/40 transition duration-150 cursor-pointer" onClick={() => onNavigateToTab("revenue", undefined, { revenueModule: "Completed Cycles" })}>
             <div>
-              <span className="text-[9px] uppercase font-bold text-muted font-sans">Completed Cycles</span>
-              <div className="text-base font-black text-green-500 font-mono mt-0.5">{stats.completedBillsCount} Bills</div>
+              <span className="text-[9px] uppercase font-bold text-emerald-400/90 font-mono">[STATUS: ARCHIVED_PAID]</span>
+              <div className="text-base font-black text-emerald-450 font-mono mt-0.5">{stats.completedBillsCount} Bills</div>
             </div>
-            <CheckCircle className="h-5 w-5 text-green-500/20" />
+            <CheckCircle className="h-5 w-5 text-emerald-500/20" />
           </div>
         </div>
 
         {/* MAIN VISUALIZATION & GEOLOCATION MATRIX */}
         <div className="grid gap-6 md:grid-cols-3">
           {/* Revenue Distribution Chart */}
-          <div ref={chartRef} className="md:col-span-2 rounded-xl border border-default bg-card p-5 shadow-sm flex flex-col justify-between">
-            <h3 className="font-bold text-primary text-sm mb-4 flex items-center justify-between">
-              <span className="flex items-center gap-1.5"><TrendingUp className="h-4.5 w-4.5 text-purple-500" /> Monthly Revenue Distribution</span>
-              <span className="text-[9px] text-muted font-sans">GROSS SALES (₹) • CLICK TO DRILL DOWN</span>
+          <div ref={chartRef} className="md:col-span-2 rounded-xl border border-emerald-500/20 bg-zinc-950 p-5 shadow-sm flex flex-col justify-between font-mono">
+            <h3 className="font-bold text-emerald-450 text-sm mb-4 flex items-center justify-between">
+              <span className="flex items-center gap-1.5"><TrendingUp className="h-4.5 w-4.5 text-emerald-400" /> [REVENUE_DISTRIBUTION_LEDGER]</span>
+              <span className="text-[9px] text-emerald-500/70 font-mono">UNIT: INR (₹) • ANALYTICAL_DRILL_DOWN</span>
             </h3>
             <div className="h-[280px]">
               {chartDimensions.width > 0 && (
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={stats.monthlySalesData}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDark ? "#27272a" : "#f4f4f5"} />
-                    <XAxis dataKey="month" tickLine={false} axisLine={false} style={{ fontSize: "10px", fill: isDark ? "#a1a1aa" : "#71717a" }} />
-                    <YAxis tickLine={false} axisLine={false} style={{ fontSize: "10px", fill: isDark ? "#a1a1aa" : "#71717a" }} tickFormatter={(v) => `₹${formatIndianCurrencyShort(v)}`} />
-                    <Tooltip cursor={{ fill: isDark ? "#27272a" : "#f4f4f5", opacity: 0.4 }} contentStyle={{ backgroundColor: isDark ? "#18181b" : "#ffffff", borderColor: isDark ? "#27272a" : "#e4e4e7", borderRadius: "8px", fontSize: "11px", color: isDark ? "#ffffff" : "#000000" }} formatter={(value: any) => [`₹${value.toLocaleString()}`, "Gross Revenue"]} />
-                    <Bar dataKey="total" fill="#a855f7" radius={[4, 4, 0, 0]} />
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#111827" />
+                    <XAxis dataKey="month" tickLine={false} axisLine={false} style={{ fontSize: "10px", fill: "#34d399" }} />
+                    <YAxis tickLine={false} axisLine={false} style={{ fontSize: "10px", fill: "#34d399" }} tickFormatter={(v) => `₹${formatIndianCurrencyShort(v)}`} />
+                    <Tooltip cursor={{ fill: "#111827", opacity: 0.4 }} contentStyle={{ backgroundColor: "#090d10", borderColor: "rgba(16,185,129,0.3)", borderRadius: "8px", fontSize: "11px", color: "#34d399" }} formatter={(value: any) => [`₹${value.toLocaleString()}`, "Gross Revenue"]} />
+                    <Bar dataKey="total" fill="#10b981" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               )}
@@ -362,31 +362,31 @@ export default function Dashboard({ stats, onRefresh, onNavigateToTab, userRole 
           </div>
 
           {/* Live Geolocation Tracker Map Widget */}
-          <div className="rounded-xl border border-default bg-card p-5 shadow-sm flex flex-col">
-            <h3 className="font-bold text-primary text-sm mb-3.5 flex items-center justify-between">
-              <span className="flex items-center gap-1.5"><MapPin className="h-4.5 w-4.5 text-red-500 animate-bounce" /> Live Terminal GPS Tracker</span>
-              <span className="text-[9px] text-muted uppercase font-mono">Real-time Location</span>
+          <div className="rounded-xl border border-emerald-500/20 bg-zinc-950 p-5 shadow-sm flex flex-col font-mono text-emerald-400">
+            <h3 className="font-bold text-emerald-450 text-sm mb-3.5 flex items-center justify-between">
+              <span className="flex items-center gap-1.5"><MapPin className="h-4.5 w-4.5 text-emerald-400 animate-bounce" /> [GPS_NODE_TRACKER_MAP]</span>
+              <span className="text-[9px] text-emerald-500/70 uppercase font-mono">Real-time Location</span>
             </h3>
             {activeMapSession ? (
               <div className="flex-1 flex flex-col justify-between space-y-3">
-                <div className="relative rounded-xl overflow-hidden border border-default bg-surface h-48">
+                <div className="relative rounded-xl overflow-hidden border border-emerald-500/20 bg-surface h-48">
                   {mapElement}
                 </div>
-                <div className="text-[11px] p-2.5 rounded-lg bg-surface border border-default space-y-1 transition-colors">
+                <div className="text-[11px] p-2.5 rounded-lg bg-[#06080a] border border-emerald-500/20 space-y-1 transition-colors text-emerald-400">
                   <div className="flex justify-between items-center text-[10px]">
-                    <span className="text-muted">Active Operator:</span>
-                    <strong className="text-purple-600 dark:text-purple-400 font-mono font-bold">@{activeMapSession.username}</strong>
+                    <span className="text-emerald-500/70">Active Operator:</span>
+                    <strong className="text-emerald-400 font-mono font-bold">@{activeMapSession.username}</strong>
                   </div>
-                  <div className="flex justify-between items-center text-[10px] pb-1.5 border-b border-default/60">
-                    <span className="text-muted">Terminal Location:</span>
-                    <span className="text-primary font-semibold text-right max-w-[150px] truncate" title={activeMapSession.locationName}>
+                  <div className="flex justify-between items-center text-[10px] pb-1.5 border-b border-emerald-500/20">
+                    <span className="text-emerald-500/70">Terminal Location:</span>
+                    <span className="text-emerald-350 font-semibold text-right max-w-[150px] truncate" title={activeMapSession.locationName}>
                       {activeMapSession.locationName || "Resolving GPS..."}
                     </span>
                   </div>
                   
                   {/* Clickable Active Operators selection list */}
                   <div className="pt-1.5 space-y-1">
-                    <span className="text-[9px] uppercase font-bold text-muted block tracking-wide">Tracking Nodes</span>
+                    <span className="text-[9px] uppercase font-bold text-emerald-500/70 block tracking-wide">[NODE_REGISTRY_GPS]</span>
                     <div className="flex flex-wrap gap-1 max-h-20 overflow-y-auto pr-1">
                       {operatorsWithGps.map(uname => {
                         const isSelected = (selectedGpsUsername === uname) || (!selectedGpsUsername && activeMapSession?.username === uname);
@@ -403,8 +403,8 @@ export default function Dashboard({ stats, onRefresh, onNavigateToTab, userRole 
                             onClick={() => setSelectedGpsUsername(uname)}
                             className={`px-1.5 py-0.5 rounded text-[9px] font-mono font-bold border transition-all cursor-pointer ${
                               isSelected
-                                ? "bg-purple-500/15 border-purple-500 text-purple-400 shadow-sm"
-                                : "bg-card border-default text-muted hover:text-primary hover:border-gray-400"
+                                ? "bg-emerald-500/15 border-emerald-500 text-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.2)]"
+                                : "bg-zinc-900 border-emerald-500/25 text-emerald-500/80 hover:text-emerald-300 hover:border-emerald-500/50 hover:bg-emerald-500/5"
                             }`}
                           >
                             <span className="flex items-center gap-1">
@@ -415,17 +415,17 @@ export default function Dashboard({ stats, onRefresh, onNavigateToTab, userRole 
                         );
                       })}
                       {operatorsWithGps.length === 0 && (
-                        <span className="text-[9px] text-muted italic">No terminals with GPS tracking.</span>
+                        <span className="text-[9px] text-emerald-500/60 italic">No terminals with GPS tracking.</span>
                       )}
                     </div>
                   </div>
                 </div>
               </div>
             ) : (
-              <div className="flex-1 flex flex-col items-center justify-center text-center p-6 border border-dashed border-default rounded-xl bg-surface/50 text-muted">
-                <Globe className="h-8 w-8 mb-2 text-muted animate-spin-slow" />
-                <h4 className="font-bold text-xs text-primary mb-1">No GPS Terminals Active</h4>
-                <p className="text-[10px] text-secondary max-w-[180px]">
+              <div className="flex-1 flex flex-col items-center justify-center text-center p-6 border border-dashed border-emerald-500/20 rounded-xl bg-surface/50 text-emerald-500/70">
+                <Globe className="h-8 w-8 mb-2 text-emerald-500/60 animate-spin-slow" />
+                <h4 className="font-bold text-xs text-emerald-400 mb-1">No GPS Terminals Active</h4>
+                <p className="text-[10px] text-emerald-500/65 max-w-[180px]">
                   No active session coordinates detected. Location mapping requires device GPS authorization at login.
                 </p>
               </div>
@@ -438,21 +438,21 @@ export default function Dashboard({ stats, onRefresh, onNavigateToTab, userRole 
           {/* Security Audit Trail (2/3 width) */}
           <div 
             onClick={() => onNavigateToTab("audit")}
-            className="md:col-span-2 group rounded-xl border border-default bg-card p-5 shadow-sm flex flex-col h-[380px] cursor-pointer hover:border-purple-500/50 hover:shadow-[0_0_15px_rgba(168,85,247,0.15)] transition-all duration-300"
+            className="md:col-span-2 group rounded-xl border border-emerald-500/20 bg-zinc-950 p-5 shadow-sm flex flex-col h-[380px] cursor-pointer hover:border-emerald-500/50 hover:shadow-[0_0_15px_rgba(16,185,129,0.15)] transition-all duration-300 font-mono text-emerald-400"
             title="Click card to view full security audit history ledger"
           >
             <div className="mb-3.5 flex items-center justify-between">
               <div>
                 <div className="flex items-center gap-1.5">
-                  <Terminal className="h-4.5 w-4.5 text-purple-500 animate-pulse group-hover:text-purple-600 transition-colors" />
-                  <h3 className="font-bold text-primary text-sm font-sans flex items-center gap-2">
-                    <span>Cryptographic Security Audit Trail</span>
+                  <Terminal className="h-4.5 w-4.5 text-emerald-400 animate-pulse group-hover:text-emerald-500 transition-colors" />
+                  <h3 className="font-bold text-emerald-450 text-sm font-sans flex items-center gap-2">
+                    <span>[SECURITY_AUDIT_LEDGER]</span>
                   </h3>
                 </div>
-                <p className="text-xs text-secondary font-sans mt-0.5">Secure ledgers registering system authorizations and override actions</p>
+                <p className="text-xs text-emerald-500/75 font-mono mt-0.5">SYSTEM_CORE_AUTHORIZATIONS_AND_OVERRIDE_LOGS</p>
               </div>
-              <span className="text-[10px] text-purple-600 dark:text-purple-400 font-bold opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-x-1 group-hover:translate-x-0">
-                Audit Registry &rarr;
+              <span className="text-[10px] text-emerald-400 hover:text-emerald-300 font-bold opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-x-1 group-hover:translate-x-0">
+                [AUDIT_REGISTRY] &rarr;
               </span>
             </div>
             <div className="flex-1 overflow-y-auto space-y-3 pr-1">
@@ -463,21 +463,21 @@ export default function Dashboard({ stats, onRefresh, onNavigateToTab, userRole 
                     e.stopPropagation();
                     onNavigateToTab("audit", undefined, { auditId: log.id });
                   }}
-                  className="group/row text-xs border-b border-default pb-2.5 last:border-0 last:pb-0 hover:bg-purple-500/5 p-2 rounded-lg transition-all cursor-pointer relative"
+                  className="group/row text-xs border-b border-emerald-500/10 pb-2.5 last:border-0 last:pb-0 hover:bg-emerald-500/5 hover:border-emerald-500/20 p-2 rounded-lg transition-all cursor-pointer relative"
                   title={`View details of audit: ${log.id}`}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="font-bold text-primary group-hover/row:text-purple-600 dark:group-hover/row:text-purple-400 transition-colors">{log.actionType}</span>
-                    <span className="text-[10px] font-mono text-muted">{log.time}</span>
+                    <span className="font-bold text-emerald-300 group-hover/row:text-emerald-400 transition-colors">{log.actionType}</span>
+                    <span className="text-[10px] font-mono text-emerald-550">{log.time}</span>
                   </div>
                   <div className="flex justify-between items-center mt-1 text-[10px]">
-                    <span className="text-muted">Operator: <span className="font-mono text-secondary">@{log.userName}</span></span>
-                    <span className="text-muted font-mono text-[9px]">{log.id}</span>
+                    <span className="text-emerald-500/70">Operator: <span className="font-mono text-emerald-400">@{log.userName}</span></span>
+                    <span className="text-emerald-550 font-mono text-[9px]">{log.id}</span>
                   </div>
                 </div>
               ))}
               {limitLogs.length === 0 && (
-                <div className="h-full flex items-center justify-center text-center text-muted font-sans text-xs">
+                <div className="h-full flex items-center justify-center text-center text-emerald-500/60 font-mono text-xs">
                   No system security logs captured yet.
                 </div>
               )}
@@ -485,16 +485,16 @@ export default function Dashboard({ stats, onRefresh, onNavigateToTab, userRole 
           </div>
 
           {/* Master Overrides & System Shortcuts (1/3 width) */}
-          <div className="rounded-xl border border-purple-500/20 bg-zinc-950 text-white p-5 shadow-lg flex flex-col h-[380px] justify-between text-left">
+          <div className="rounded-xl border border-emerald-500/25 bg-zinc-950 text-emerald-400 p-5 shadow-lg flex flex-col h-[380px] justify-between text-left font-mono">
             <div>
-              <div className="flex items-center gap-2 border-b border-zinc-800 pb-2.5 mb-4">
-                <Shield className="h-4.5 w-4.5 text-purple-400" />
+              <div className="flex items-center gap-2 border-b border-zinc-900 pb-2.5 mb-4">
+                <Shield className="h-4.5 w-4.5 text-emerald-400" />
                 <div>
-                  <h3 className="font-bold text-sm">Master Override Controls</h3>
-                  <span className="text-[8px] font-mono text-fuchsia-400 tracking-widest uppercase">System Core Shunts</span>
+                  <h3 className="font-bold text-sm">[MASTER_OVERRIDE_CONTROLS]</h3>
+                  <span className="text-[8px] font-mono text-emerald-400 tracking-widest uppercase">SYSTEM_CORE_SHUNTS</span>
                 </div>
               </div>
-              <p className="text-[11px] text-zinc-400 font-sans leading-relaxed mb-4">
+              <p className="text-[11px] text-emerald-500/70 font-sans leading-relaxed mb-4">
                 Superuser shunts to optimize remote database storage nodes, sync client instances, or dump ledger indexes.
               </p>
             </div>
@@ -503,7 +503,7 @@ export default function Dashboard({ stats, onRefresh, onNavigateToTab, userRole 
               <button
                 onClick={handleVacuumDb}
                 disabled={isVacuuming}
-                className="w-full flex items-center justify-center gap-2 rounded-lg bg-zinc-900 border border-zinc-800 hover:bg-zinc-800/80 text-xs font-bold py-2.5 text-purple-400 transition-all cursor-pointer disabled:opacity-50 active:scale-97"
+                className="w-full flex items-center justify-center gap-2 rounded-lg bg-zinc-900 border border-emerald-500/20 hover:bg-emerald-500/5 hover:border-emerald-500/40 text-xs font-bold py-2.5 text-emerald-400 transition-all cursor-pointer disabled:opacity-50 active:scale-97"
               >
                 <Database className={`h-4 w-4 ${isVacuuming ? "animate-spin" : ""}`} />
                 <span>{isVacuuming ? "Vacuuming Database Indexes..." : "Vacuum Database Indices"}</span>
@@ -511,7 +511,7 @@ export default function Dashboard({ stats, onRefresh, onNavigateToTab, userRole 
 
               <button
                 onClick={handleExportLedgerDump}
-                className="w-full flex items-center justify-center gap-2 rounded-lg bg-zinc-900 border border-zinc-800 hover:bg-zinc-800/80 text-xs font-bold py-2.5 text-blue-400 transition-all cursor-pointer active:scale-97"
+                className="w-full flex items-center justify-center gap-2 rounded-lg bg-zinc-900 border border-emerald-500/20 hover:bg-emerald-500/5 hover:border-emerald-500/40 text-xs font-bold py-2.5 text-emerald-400 transition-all cursor-pointer active:scale-97"
               >
                 <Download className="h-4 w-4" />
                 <span>Export Ledger JSON Dump</span>
@@ -519,7 +519,7 @@ export default function Dashboard({ stats, onRefresh, onNavigateToTab, userRole 
 
               <button
                 onClick={() => onNavigateToTab("users")}
-                className="w-full flex items-center justify-center gap-2 rounded-lg bg-purple-600/20 border border-purple-500/30 hover:bg-purple-600/30 text-xs font-bold py-2.5 text-purple-300 transition-all cursor-pointer active:scale-97"
+                className="w-full flex items-center justify-center gap-2 rounded-lg bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/20 text-xs font-bold py-2.5 text-emerald-400 transition-all cursor-pointer active:scale-97 shadow-[0_0_10px_rgba(16,185,129,0.1)]"
               >
                 <Users className="h-4 w-4" />
                 <span>Open Personnel Access Matrix</span>
@@ -527,7 +527,7 @@ export default function Dashboard({ stats, onRefresh, onNavigateToTab, userRole 
             </div>
 
             <div className="border-t border-zinc-900 pt-2.5 mt-4 text-center">
-              <span className="text-[8px] font-mono text-zinc-500 tracking-wider uppercase">Node ID: SUPABASE_MAIN_01</span>
+              <span className="text-[8px] font-mono text-emerald-500/60 tracking-wider uppercase font-mono">Node ID: SUPABASE_MAIN_01</span>
             </div>
           </div>
         </div>

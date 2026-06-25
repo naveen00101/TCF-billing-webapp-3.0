@@ -799,6 +799,13 @@ export class SheetsSyncEngine {
         await supabase.from("users").insert(DEFAULT_USERS.map(mapUserToDb));
       }
 
+      // Run auto purge for expired trash if currentUser is Superadmin
+      try {
+        await this.runAutoPurgeTrash();
+      } catch (purgeErr) {
+        console.error("[SyncEngine] Failed to run trash auto-purge:", purgeErr);
+      }
+
       this.hasSyncedDownThisSession = true;
       this.updateSyncStatus("success");
       this.subscribeToRealtime();
@@ -1880,69 +1887,340 @@ export class SheetsSyncEngine {
     }
   }
 
+  // Admin Deletion Hijacking Utilities
+  public static tagAsAdminDeleted(text: string | undefined | null): string {
+    const timestamp = new Date().toISOString();
+    const tag = `[AdminDeleted:${timestamp}]`;
+    if (!text) return tag;
+    if (text.includes("[AdminDeleted:")) {
+      return text.replace(/\[AdminDeleted:[^\]]+\]/, tag);
+    }
+    return `${tag} ${text}`;
+  }
+
+  public static isAdminDeleted(text: string | undefined | null): boolean {
+    return !!text && text.includes("[AdminDeleted:");
+  }
+
+  public static getAdminDeletedTimestamp(text: string | undefined | null): string | null {
+    if (!text) return null;
+    const match = text.match(/\[AdminDeleted:([^\]]+)\]/);
+    return match ? match[1] : null;
+  }
+
+  public static stripAdminDeletedTag(text: string | undefined | null): string {
+    if (!text) return "";
+    return text.replace(/\[AdminDeleted:[^\]]+\]/, "").trim();
+  }
+
+  // Auto Purge Retention Logic
+  public static async runAutoPurgeTrash(): Promise<void> {
+    const currentUser = this.getCurrentUser();
+    if (currentUser?.role !== "Superadmin") return;
+
+    if (typeof window === "undefined") return;
+    const retentionVal = localStorage.getItem("trash_retention_days");
+    if (!retentionVal || retentionVal === "disabled" || retentionVal === "Disabled") {
+      return;
+    }
+
+    // Parse retention days
+    let days = 0;
+    if (retentionVal === "1 week") days = 7;
+    else if (retentionVal === "2 weeks") days = 14;
+    else if (retentionVal === "15 days") days = 15;
+    else if (retentionVal === "1 month") days = 30;
+    else {
+      const parsed = parseInt(retentionVal, 10);
+      if (isNaN(parsed) || parsed <= 0) return;
+      days = parsed;
+    }
+
+    const maxAgeMs = days * 24 * 60 * 60 * 1000;
+    const now = Date.now();
+
+    console.log(`[SyncEngine] Running trash auto-purge for Superadmin. Retention: ${days} days (${retentionVal}).`);
+
+    const isExpired = (timestampStr: string | null): boolean => {
+      if (!timestampStr) return false;
+      try {
+        const deletedTime = new Date(timestampStr).getTime();
+        return (now - deletedTime) > maxAgeMs;
+      } catch (e) {
+        return false;
+      }
+    };
+
+    // 1. Products
+    const products = this.getProducts();
+    for (const p of products) {
+      if (p.isSoftDeleted && this.isAdminDeleted(p.notes)) {
+        const ts = this.getAdminDeletedTimestamp(p.notes);
+        if (isExpired(ts)) {
+          console.log(`[SyncEngine] Auto-purging expired product: ${p.name} (${p.id})`);
+          await this.deleteProductPermanently(p.id, true);
+        }
+      }
+    }
+
+    // 2. Customers
+    const customers = this.getCustomers();
+    for (const c of customers) {
+      if (c.isSoftDeleted && this.isAdminDeleted(c.notes)) {
+        const ts = this.getAdminDeletedTimestamp(c.notes);
+        if (isExpired(ts)) {
+          console.log(`[SyncEngine] Auto-purging expired customer: ${c.name} (${c.id})`);
+          await this.deleteCustomerPermanently(c.id, true);
+        }
+      }
+    }
+
+    // 3. Agents
+    const agents = this.getAgents();
+    for (const a of agents) {
+      if (a.isSoftDeleted && this.isAdminDeleted(a.notes)) {
+        const ts = this.getAdminDeletedTimestamp(a.notes);
+        if (isExpired(ts)) {
+          console.log(`[SyncEngine] Auto-purging expired agent: ${a.name} (${a.id})`);
+          await this.deleteAgentPermanently(a.id, true);
+        }
+      }
+    }
+
+    // 4. Promo Codes
+    const promos = this.getPromoCodes();
+    for (const p of promos) {
+      if (p.isSoftDeleted && this.isAdminDeleted(p.description)) {
+        const ts = this.getAdminDeletedTimestamp(p.description);
+        if (isExpired(ts)) {
+          console.log(`[SyncEngine] Auto-purging expired promo: ${p.promoCode}`);
+          await this.deletePromoCodePermanently(p.promoCode, true);
+        }
+      }
+    }
+
+    // 5. Users
+    const users = this.getUsers();
+    for (const u of users) {
+      if (u.status === "Deleted" && this.isAdminDeleted(u.fullName)) {
+        const ts = this.getAdminDeletedTimestamp(u.fullName);
+        if (isExpired(ts)) {
+          console.log(`[SyncEngine] Auto-purging expired user: ${u.fullName} (${u.id})`);
+          await this.deleteUserPermanently(u.id, true);
+        }
+      }
+    }
+
+    // 6. Invoices
+    const invoices = this.getInvoices();
+    for (const inv of invoices) {
+      if (inv.isSoftDeleted && this.isAdminDeleted(inv.deletedBy)) {
+        const ts = this.getAdminDeletedTimestamp(inv.deletedBy);
+        if (isExpired(ts)) {
+          console.log(`[SyncEngine] Auto-purging expired invoice: ${inv.invoiceNo}`);
+          await this.deleteInvoicePermanently(inv.invoiceId || inv.invoiceNo, true);
+        }
+      }
+    }
+  }
+
   // Permanent Deletion Handlers
-  public static async deleteProductPermanently(productId: string): Promise<void> {
-    const list = this.getProducts().filter(p => p.id !== productId);
-    this.memoryCache["billing_products"] = list;
-    if (supabase) {
-      const { error } = await supabase.from("products").delete().eq("id", productId);
-      if (error) console.error("[SyncEngine] Error deleting product permanently:", error);
+  public static async deleteProductPermanently(productId: string, forcePurge = false): Promise<void> {
+    const currentUser = this.getCurrentUser();
+    const isSuper = currentUser?.role === "Superadmin" || forcePurge;
+
+    if (isSuper) {
+      const list = this.getProducts().filter(p => p.id !== productId);
+      this.memoryCache["billing_products"] = list;
+      if (supabase) {
+        const { error } = await supabase.from("products").delete().eq("id", productId);
+        if (error) console.error("[SyncEngine] Error deleting product permanently:", error);
+      }
+    } else {
+      const list = this.getProducts();
+      const idx = list.findIndex(p => p.id === productId);
+      if (idx !== -1) {
+        const prod = { ...list[idx] };
+        prod.notes = this.tagAsAdminDeleted(prod.notes);
+        prod.isSoftDeleted = true;
+        list[idx] = prod;
+        this.memoryCache["billing_products"] = [...list];
+        if (supabase) {
+          const { error } = await supabase
+            .from("products")
+            .update({ notes: prod.notes, is_soft_deleted: true })
+            .eq("id", productId);
+          if (error) console.error("[SyncEngine] Error hijacking product delete:", error);
+        }
+      }
     }
   }
 
-  public static async deleteUserPermanently(userId: string): Promise<void> {
-    const list = this.getUsers().filter(u => u.id !== userId);
-    this.memoryCache["billing_user_registry"] = list;
-    if (supabase) {
-      const { error } = await supabase.from("users").delete().eq("id", userId);
-      if (error) console.error("[SyncEngine] Error deleting user permanently:", error);
+  public static async deleteUserPermanently(userId: string, forcePurge = false): Promise<void> {
+    const currentUser = this.getCurrentUser();
+    const isSuper = currentUser?.role === "Superadmin" || forcePurge;
+
+    if (isSuper) {
+      const list = this.getUsers().filter(u => u.id !== userId);
+      this.memoryCache["billing_user_registry"] = list;
+      if (supabase) {
+        const { error } = await supabase.from("users").delete().eq("id", userId);
+        if (error) console.error("[SyncEngine] Error deleting user permanently:", error);
+      }
+    } else {
+      const list = this.getUsers();
+      const idx = list.findIndex(u => u.id === userId);
+      if (idx !== -1) {
+        const user = { ...list[idx] };
+        user.fullName = this.tagAsAdminDeleted(user.fullName);
+        user.status = "Deleted";
+        list[idx] = user;
+        this.memoryCache["billing_user_registry"] = [...list];
+        if (supabase) {
+          const { error } = await supabase
+            .from("users")
+            .update({ full_name: user.fullName, status: "Deleted" })
+            .eq("id", userId);
+          if (error) console.error("[SyncEngine] Error hijacking user delete:", error);
+        }
+      }
     }
   }
 
-  public static async deletePromoCodePermanently(code: string): Promise<void> {
-    const list = this.getPromoCodes().filter(p => p.promoCode !== code);
-    this.memoryCache["billing_promo_codes"] = list;
-    if (supabase) {
-      const { error } = await supabase.from("promo_codes").delete().eq("promo_code", code);
-      if (error) console.error("[SyncEngine] Error deleting promo code permanently:", error);
+  public static async deletePromoCodePermanently(code: string, forcePurge = false): Promise<void> {
+    const currentUser = this.getCurrentUser();
+    const isSuper = currentUser?.role === "Superadmin" || forcePurge;
+
+    if (isSuper) {
+      const list = this.getPromoCodes().filter(p => p.promoCode !== code);
+      this.memoryCache["billing_promo_codes"] = list;
+      if (supabase) {
+        const { error } = await supabase.from("promo_codes").delete().eq("promo_code", code);
+        if (error) console.error("[SyncEngine] Error deleting promo code permanently:", error);
+      }
+    } else {
+      const list = this.getPromoCodes();
+      const idx = list.findIndex(p => p.promoCode === code);
+      if (idx !== -1) {
+        const promo = { ...list[idx] };
+        promo.description = this.tagAsAdminDeleted(promo.description);
+        promo.isSoftDeleted = true;
+        list[idx] = promo;
+        this.memoryCache["billing_promo_codes"] = [...list];
+        if (supabase) {
+          const { error } = await supabase
+            .from("promo_codes")
+            .update({ description: promo.description, is_soft_deleted: true })
+            .eq("promo_code", code);
+          if (error) console.error("[SyncEngine] Error hijacking promo delete:", error);
+        }
+      }
     }
   }
 
-  public static async deleteAgentPermanently(agentId: string): Promise<void> {
-    const list = this.getAgents().filter(a => a.id !== agentId);
-    this.memoryCache["billing_agents_registry"] = list;
-    if (supabase) {
-      const { error } = await supabase.from("agents").delete().eq("id", agentId);
-      if (error) console.error("[SyncEngine] Error deleting agent permanently:", error);
+  public static async deleteAgentPermanently(agentId: string, forcePurge = false): Promise<void> {
+    const currentUser = this.getCurrentUser();
+    const isSuper = currentUser?.role === "Superadmin" || forcePurge;
+
+    if (isSuper) {
+      const list = this.getAgents().filter(a => a.id !== agentId);
+      this.memoryCache["billing_agents_registry"] = list;
+      if (supabase) {
+        const { error } = await supabase.from("agents").delete().eq("id", agentId);
+        if (error) console.error("[SyncEngine] Error deleting agent permanently:", error);
+      }
+    } else {
+      const list = this.getAgents();
+      const idx = list.findIndex(a => a.id === agentId);
+      if (idx !== -1) {
+        const agent = { ...list[idx] };
+        agent.notes = this.tagAsAdminDeleted(agent.notes);
+        agent.isSoftDeleted = true;
+        list[idx] = agent;
+        this.memoryCache["billing_agents_registry"] = [...list];
+        if (supabase) {
+          const { error } = await supabase
+            .from("agents")
+            .update({ notes: agent.notes, is_soft_deleted: true })
+            .eq("id", agentId);
+          if (error) console.error("[SyncEngine] Error hijacking agent delete:", error);
+        }
+      }
     }
   }
 
-  public static async deleteCustomerPermanently(customerId: string): Promise<void> {
-    const list = this.getCustomers().filter(c => c.id !== customerId);
-    this.memoryCache["billing_customers"] = list;
-    this.setStorageItem("billing_customers", list);
-    if (supabase) {
-      const { error } = await supabase.from("customers").delete().eq("id", customerId);
-      if (error) console.error("[SyncEngine] Error deleting customer permanently:", error);
+  public static async deleteCustomerPermanently(customerId: string, forcePurge = false): Promise<void> {
+    const currentUser = this.getCurrentUser();
+    const isSuper = currentUser?.role === "Superadmin" || forcePurge;
+
+    if (isSuper) {
+      const list = this.getCustomers().filter(c => c.id !== customerId);
+      this.memoryCache["billing_customers"] = list;
+      this.setStorageItem("billing_customers", list);
+      if (supabase) {
+        const { error } = await supabase.from("customers").delete().eq("id", customerId);
+        if (error) console.error("[SyncEngine] Error deleting customer permanently:", error);
+      }
+    } else {
+      const list = this.getCustomers();
+      const idx = list.findIndex(c => c.id === customerId);
+      if (idx !== -1) {
+        const cust = { ...list[idx] };
+        cust.notes = this.tagAsAdminDeleted(cust.notes);
+        cust.isSoftDeleted = true;
+        list[idx] = cust;
+        this.memoryCache["billing_customers"] = [...list];
+        this.setStorageItem("billing_customers", [...list]);
+        if (supabase) {
+          const { error } = await supabase
+            .from("customers")
+            .update({ notes: cust.notes, is_soft_deleted: true })
+            .eq("id", customerId);
+          if (error) console.error("[SyncEngine] Error hijacking customer delete:", error);
+        }
+      }
     }
   }
 
-  public static async deleteInvoicePermanently(invoiceId: string): Promise<void> {
-    const invoices = this.getInvoices().filter(inv => inv.invoiceId !== invoiceId && inv.invoiceNo !== invoiceId);
-    this.memoryCache["billing_invoices"] = invoices;
+  public static async deleteInvoicePermanently(invoiceId: string, forcePurge = false): Promise<void> {
+    const currentUser = this.getCurrentUser();
+    const isSuper = currentUser?.role === "Superadmin" || forcePurge;
 
-    const items = this.getInvoiceItems().filter(item => item.invoiceId !== invoiceId && item.invoiceNo !== invoiceId);
-    this.memoryCache["billing_invoice_items"] = items;
+    if (isSuper) {
+      const invoices = this.getInvoices().filter(inv => inv.invoiceId !== invoiceId && inv.invoiceNo !== invoiceId);
+      this.memoryCache["billing_invoices"] = invoices;
 
-    const txns = this.getPaymentTransactions().filter(t => t.invoiceId !== invoiceId && t.invoiceNo !== invoiceId);
-    this.memoryCache["billing_payment_transactions"] = txns;
+      const items = this.getInvoiceItems().filter(item => item.invoiceId !== invoiceId && item.invoiceNo !== invoiceId);
+      this.memoryCache["billing_invoice_items"] = items;
 
-    if (supabase) {
-      // 1. Delete transactions
-      await supabase.from("payment_transactions").delete().eq("invoice_id", invoiceId);
-      // 2. Delete invoice (cascades to invoice_items via DB schema)
-      const { error } = await supabase.from("invoices").delete().eq("invoice_id", invoiceId);
-      if (error) console.error("[SyncEngine] Error deleting invoice permanently:", error);
+      const txns = this.getPaymentTransactions().filter(t => t.invoiceId !== invoiceId && t.invoiceNo !== invoiceId);
+      this.memoryCache["billing_payment_transactions"] = txns;
+
+      if (supabase) {
+        // 1. Delete transactions
+        await supabase.from("payment_transactions").delete().eq("invoice_id", invoiceId);
+        // 2. Delete invoice (cascades to invoice_items via DB schema)
+        const { error } = await supabase.from("invoices").delete().eq("invoice_id", invoiceId);
+        if (error) console.error("[SyncEngine] Error deleting invoice permanently:", error);
+      }
+    } else {
+      const list = this.getInvoices();
+      const idx = list.findIndex(inv => inv.invoiceId === invoiceId || inv.invoiceNo === invoiceId);
+      if (idx !== -1) {
+        const inv = { ...list[idx] };
+        const userTag = currentUser?.username || "admin";
+        inv.deletedBy = this.tagAsAdminDeleted(inv.deletedBy || userTag);
+        inv.isSoftDeleted = true;
+        list[idx] = inv;
+        this.memoryCache["billing_invoices"] = [...list];
+        if (supabase) {
+          const { error } = await supabase
+            .from("invoices")
+            .update({ deleted_by: inv.deletedBy, is_soft_deleted: true })
+            .eq("invoice_id", invoiceId);
+          if (error) console.error("[SyncEngine] Error hijacking invoice delete:", error);
+        }
+      }
     }
   }
 

@@ -24,21 +24,111 @@ export default function TrashTab({ onRefresh, onShowNotification }: TrashTabProp
   const [adminPassword, setAdminPassword] = useState("");
 
   const currentUser = SheetsSyncEngine.getCurrentUser();
-  const isAdmin = currentUser?.role === "Admin";
+  const isSuperadmin = currentUser?.role === "Superadmin";
+  const isAdmin = currentUser?.role === "Admin" || isSuperadmin;
 
-  // Get deleted items from SheetsSyncEngine
-  const deletedProducts = SheetsSyncEngine.getProducts().filter((p) => p.isSoftDeleted);
-  const deletedInvoices = SheetsSyncEngine.getInvoices().filter((i) => i.isSoftDeleted);
-  const deletedAgents = SheetsSyncEngine.getAgents().filter((a) => a.isSoftDeleted);
-  const deletedCustomers = SheetsSyncEngine.getCustomers().filter((c) => c.isSoftDeleted);
-  const deletedUsers = SheetsSyncEngine.getUsers().filter((u) => u.status === "Deleted");
-  const deletedPromos = SheetsSyncEngine.getPromoCodes().filter((p) => p.isSoftDeleted);
+  const [retentionPeriod, setRetentionPeriod] = useState(
+    typeof window !== "undefined" ? localStorage.getItem("trash_retention_days") || "disabled" : "disabled"
+  );
+
+  // Helper to render AdminDeleted badge and expiration warning
+  const renderAdminDeletedBadge = (notesField: string | undefined | null) => {
+    if (!SheetsSyncEngine.isAdminDeleted(notesField)) return null;
+    const timestampStr = SheetsSyncEngine.getAdminDeletedTimestamp(notesField);
+    if (!timestampStr) return <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/10 text-rose-500 border border-rose-500/20">Admin Deleted</span>;
+    
+    const retentionVal = retentionPeriod;
+    if (!retentionVal || retentionVal === "disabled" || retentionVal === "Disabled") {
+      return (
+        <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/10 text-rose-500 border border-rose-500/20">
+          Admin Deleted - Pending Purge
+        </span>
+      );
+    }
+    
+    let days = 0;
+    if (retentionVal === "1 week") days = 7;
+    else if (retentionVal === "2 weeks") days = 14;
+    else if (retentionVal === "15 days") days = 15;
+    else if (retentionVal === "1 month") days = 30;
+    else {
+      const parsed = parseInt(retentionVal, 10);
+      if (!isNaN(parsed) && parsed > 0) days = parsed;
+    }
+    
+    if (days === 0) {
+      return (
+        <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/10 text-rose-500 border border-rose-500/20">
+          Admin Deleted - Pending Purge
+        </span>
+      );
+    }
+    
+    try {
+      const deletedTime = new Date(timestampStr).getTime();
+      const maxAgeMs = days * 24 * 60 * 60 * 1000;
+      const elapsedMs = Date.now() - deletedTime;
+      const remainingMs = maxAgeMs - elapsedMs;
+      
+      if (remainingMs <= 0) {
+        return (
+          <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-red-600 text-white border border-red-500 animate-pulse">
+            Pending Purge (Expired)
+          </span>
+        );
+      }
+      
+      const remainingDays = Math.ceil(remainingMs / (24 * 60 * 60 * 1000));
+      return (
+        <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/10 text-rose-500 border border-rose-500/20" title={`Deleted on ${new Date(timestampStr).toLocaleString()}`}>
+          Admin Deleted - Purging in {remainingDays}d
+        </span>
+      );
+    } catch (e) {
+      return (
+        <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/10 text-rose-500 border border-rose-500/20">
+          Admin Deleted - Pending Purge
+        </span>
+      );
+    }
+  };
+
+  // Get deleted items from SheetsSyncEngine and filter based on roles
+  const rawProducts = SheetsSyncEngine.getProducts().filter((p) => p.isSoftDeleted);
+  const deletedProducts = isSuperadmin 
+    ? rawProducts 
+    : rawProducts.filter(p => !SheetsSyncEngine.isAdminDeleted(p.notes));
+
+  const rawInvoices = SheetsSyncEngine.getInvoices().filter((i) => i.isSoftDeleted);
+  const deletedInvoices = isSuperadmin
+    ? rawInvoices
+    : rawInvoices.filter(i => !SheetsSyncEngine.isAdminDeleted(i.deletedBy));
+
+  const rawAgents = SheetsSyncEngine.getAgents().filter((a) => a.isSoftDeleted);
+  const deletedAgents = isSuperadmin
+    ? rawAgents
+    : rawAgents.filter(a => !SheetsSyncEngine.isAdminDeleted(a.notes));
+
+  const rawCustomers = SheetsSyncEngine.getCustomers().filter((c) => c.isSoftDeleted);
+  const deletedCustomers = isSuperadmin
+    ? rawCustomers
+    : rawCustomers.filter(c => !SheetsSyncEngine.isAdminDeleted(c.notes));
+
+  const rawUsers = SheetsSyncEngine.getUsers().filter((u) => u.status === "Deleted");
+  const deletedUsers = isSuperadmin
+    ? rawUsers
+    : rawUsers.filter(u => !SheetsSyncEngine.isAdminDeleted(u.fullName));
+
+  const rawPromos = SheetsSyncEngine.getPromoCodes().filter((p) => p.isSoftDeleted);
+  const deletedPromos = isSuperadmin
+    ? rawPromos
+    : rawPromos.filter(p => !SheetsSyncEngine.isAdminDeleted(p.description));
 
   const handleRestoreCustomer = async (customer: Customer) => {
     try {
       const allCustomers = SheetsSyncEngine.getCustomers();
       const updated = allCustomers.map((c) =>
-        c.id === customer.id ? { ...c, isSoftDeleted: false } : c
+        c.id === customer.id ? { ...c, isSoftDeleted: false, notes: SheetsSyncEngine.stripAdminDeletedTag(c.notes) } : c
       );
       await SheetsSyncEngine.saveCustomers(updated);
       onShowNotification(`✓ Customer '${customer.name}' successfully restored.`, "success");
@@ -52,7 +142,7 @@ export default function TrashTab({ onRefresh, onShowNotification }: TrashTabProp
     try {
       const allProducts = SheetsSyncEngine.getProducts();
       const updated = allProducts.map((p) =>
-        p.id === product.id ? { ...p, isSoftDeleted: false } : p
+        p.id === product.id ? { ...p, isSoftDeleted: false, notes: SheetsSyncEngine.stripAdminDeletedTag(p.notes) } : p
       );
       await SheetsSyncEngine.saveProducts(updated);
       onShowNotification(`✓ Product '${product.name}' successfully restored.`, "success");
@@ -66,7 +156,7 @@ export default function TrashTab({ onRefresh, onShowNotification }: TrashTabProp
     try {
       const allInvoices = SheetsSyncEngine.getInvoices();
       const updated = allInvoices.map((i) =>
-        i.invoiceNo === invoice.invoiceNo ? { ...i, isSoftDeleted: false, status: "Work In Progress" as any } : i
+        i.invoiceNo === invoice.invoiceNo ? { ...i, isSoftDeleted: false, status: "Work In Progress" as any, deletedBy: SheetsSyncEngine.stripAdminDeletedTag(i.deletedBy) } : i
       );
       await SheetsSyncEngine.saveInvoices(updated, true);
       onShowNotification(`✓ Invoice '${invoice.invoiceNo}' successfully restored.`, "success");
@@ -80,7 +170,7 @@ export default function TrashTab({ onRefresh, onShowNotification }: TrashTabProp
     try {
       const allAgents = SheetsSyncEngine.getAgents();
       const updated = allAgents.map((a) =>
-        a.id === agent.id ? { ...a, isSoftDeleted: false } : a
+        a.id === agent.id ? { ...a, isSoftDeleted: false, notes: SheetsSyncEngine.stripAdminDeletedTag(a.notes) } : a
       );
       await SheetsSyncEngine.saveAgents(updated);
       onShowNotification(`✓ Agent '${agent.name}' successfully restored.`, "success");
@@ -94,10 +184,10 @@ export default function TrashTab({ onRefresh, onShowNotification }: TrashTabProp
     try {
       const allUsers = SheetsSyncEngine.getUsers();
       const updated = allUsers.map((u) =>
-        u.id === user.id ? { ...u, status: "Active" as const } : u
+        u.id === user.id ? { ...u, status: "Active" as const, fullName: SheetsSyncEngine.stripAdminDeletedTag(u.fullName) } : u
       );
       await SheetsSyncEngine.saveUsers(updated);
-      onShowNotification(`✓ User account for '${user.fullName}' successfully restored.`, "success");
+      onShowNotification(`✓ User account for '${SheetsSyncEngine.stripAdminDeletedTag(user.fullName)}' successfully restored.`, "success");
       onRefresh();
     } catch (e) {
       onShowNotification("Error restoring user account", "error");
@@ -108,7 +198,7 @@ export default function TrashTab({ onRefresh, onShowNotification }: TrashTabProp
     try {
       const allPromos = SheetsSyncEngine.getPromoCodes();
       const updated = allPromos.map((p) =>
-        p.promoCode === promo.promoCode ? { ...p, isSoftDeleted: false } : p
+        p.promoCode === promo.promoCode ? { ...p, isSoftDeleted: false, description: SheetsSyncEngine.stripAdminDeletedTag(p.description) } : p
       );
       await SheetsSyncEngine.savePromoCodes(updated);
       onShowNotification(`✓ Promo Code '${promo.promoCode}' successfully restored.`, "success");
@@ -176,15 +266,15 @@ export default function TrashTab({ onRefresh, onShowNotification }: TrashTabProp
   // Perform Bulk Clear
   const handleConfirmBulkClear = async () => {
     const users = SheetsSyncEngine.getUsers();
-    const adminUser = users.find(u => u.role === "Admin");
-    if (!adminUser) {
-      onShowNotification("Error: No admin user registered.", "error");
+    const authUser = users.find(u => u.username === currentUser?.username);
+    if (!authUser) {
+      onShowNotification("Error: User session invalid.", "error");
       return;
     }
 
     const hashedInput = MD5(adminPassword).toString();
-    if (adminUser.passwordHash !== hashedInput) {
-      onShowNotification("Access Denied: Invalid admin password.", "error");
+    if (authUser.passwordHash !== hashedInput) {
+      onShowNotification("Access Denied: Invalid password.", "error");
       return;
     }
 
@@ -227,6 +317,28 @@ export default function TrashTab({ onRefresh, onShowNotification }: TrashTabProp
 
         {/* Tab & Action Selector */}
         <div className="flex items-center gap-3">
+          {isSuperadmin && (
+            <div className="flex items-center gap-1.5 bg-surface border border-default rounded-lg px-2 py-1 text-[11px] font-mono">
+              <span className="font-bold text-muted uppercase text-[9px] tracking-wider text-rose-500">Retention:</span>
+              <select
+                value={retentionPeriod}
+                onChange={(e) => {
+                  localStorage.setItem("trash_retention_days", e.target.value);
+                  setRetentionPeriod(e.target.value);
+                  onShowNotification(`✓ Trash retention period set to: ${e.target.value}`, "success");
+                  onRefresh();
+                }}
+                className="bg-transparent text-primary font-bold border-none outline-none cursor-pointer text-xs"
+              >
+                <option value="disabled" className="bg-card">Disabled (No Auto Purge)</option>
+                <option value="1 week" className="bg-card">1 Week</option>
+                <option value="2 weeks" className="bg-card">2 Weeks</option>
+                <option value="15 days" className="bg-card">15 Days</option>
+                <option value="1 month" className="bg-card">1 Month</option>
+              </select>
+            </div>
+          )}
+
           <div className="flex bg-surface rounded-lg p-0.5 border border-default">
             <button
               onClick={() => setActiveType("products")}
@@ -334,7 +446,12 @@ export default function TrashTab({ onRefresh, onShowNotification }: TrashTabProp
                   deletedProducts.map((p) => (
                     <tr key={p.id} className="hover:bg-card-secondary/20">
                       <td className="p-4 font-mono">{p.id}</td>
-                      <td className="p-4 font-bold">{p.name}</td>
+                      <td className="p-4 font-bold">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span>{p.name}</span>
+                          {renderAdminDeletedBadge(p.notes)}
+                        </div>
+                      </td>
                       <td className="p-4">{p.category}</td>
                       <td className="p-4">₹{p.price.toFixed(2)}</td>
                       <td className="p-4 text-right">
@@ -388,7 +505,12 @@ export default function TrashTab({ onRefresh, onShowNotification }: TrashTabProp
                   deletedInvoices.map((inv) => (
                     <tr key={inv.invoiceNo} className="hover:bg-card-secondary/20">
                       <td className="p-4 font-mono font-bold">{inv.invoiceNo}</td>
-                      <td className="p-4">{inv.customerName}</td>
+                      <td className="p-4">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span>{inv.customerName}</span>
+                          {renderAdminDeletedBadge(inv.deletedBy)}
+                        </div>
+                      </td>
                       <td className="p-4">{new Date(inv.createdDate || inv.date).toLocaleDateString()}</td>
                       <td className="p-4 font-mono">₹{inv.grandTotal.toFixed(2)}</td>
                       <td className="p-4 text-right">
@@ -442,7 +564,12 @@ export default function TrashTab({ onRefresh, onShowNotification }: TrashTabProp
                   deletedAgents.map((agt) => (
                     <tr key={agt.id} className="hover:bg-card-secondary/20">
                       <td className="p-4 font-mono">{agt.id}</td>
-                      <td className="p-4 font-bold">{agt.name}</td>
+                      <td className="p-4 font-bold">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span>{agt.name}</span>
+                          {renderAdminDeletedBadge(agt.notes)}
+                        </div>
+                      </td>
                       <td className="p-4">{agt.agentType}</td>
                       <td className="p-4">{agt.commissionPercentage}%</td>
                       <td className="p-4 text-right">
@@ -496,7 +623,12 @@ export default function TrashTab({ onRefresh, onShowNotification }: TrashTabProp
                   deletedCustomers.map((c) => (
                     <tr key={c.id} className="hover:bg-card-secondary/20">
                       <td className="p-4 font-mono">{c.id}</td>
-                      <td className="p-4 font-bold">{c.name}</td>
+                      <td className="p-4 font-bold">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span>{c.name}</span>
+                          {renderAdminDeletedBadge(c.notes)}
+                        </div>
+                      </td>
                       <td className="p-4 font-mono">{c.mobile}</td>
                       <td className="p-4 truncate max-w-[250px]" title={c.address}>{c.address || "No Address"}</td>
                       <td className="p-4 text-right">
@@ -551,7 +683,12 @@ export default function TrashTab({ onRefresh, onShowNotification }: TrashTabProp
                   deletedUsers.map((u) => (
                     <tr key={u.id} className="hover:bg-card-secondary/20">
                       <td className="p-4 font-mono">{u.id}</td>
-                      <td className="p-4 font-bold">{u.fullName}</td>
+                      <td className="p-4 font-bold">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span>{SheetsSyncEngine.stripAdminDeletedTag(u.fullName)}</span>
+                          {renderAdminDeletedBadge(u.fullName)}
+                        </div>
+                      </td>
                       <td className="p-4 font-mono text-indigo-600 dark:text-indigo-400">{u.username}</td>
                       <td className="p-4">
                         <span className="inline-block rounded bg-card-secondary dark:bg-zinc-800 px-2 py-0.5 text-[9px] font-semibold text-muted uppercase">
@@ -613,7 +750,12 @@ export default function TrashTab({ onRefresh, onShowNotification }: TrashTabProp
                   deletedPromos.map((p) => (
                     <tr key={p.promoCode} className="hover:bg-card-secondary/20">
                       <td className="p-4 font-mono font-bold text-rose-600 dark:text-rose-450 bg-rose-500/5 px-2 py-1 rounded inline-block m-2">{p.promoCode}</td>
-                      <td className="p-4">{p.description}</td>
+                      <td className="p-4">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span>{SheetsSyncEngine.stripAdminDeletedTag(p.description)}</span>
+                          {renderAdminDeletedBadge(p.description)}
+                        </div>
+                      </td>
                       <td className="p-4 font-bold font-mono">
                         {p.discountType === "Percentage" ? `${p.percentageDiscount}%` : `₹${p.fixedDiscount}`}
                       </td>
@@ -668,8 +810,10 @@ export default function TrashTab({ onRefresh, onShowNotification }: TrashTabProp
 
             <div className="space-y-3">
               <p className="text-xs text-secondary leading-relaxed font-sans text-left">
-                You are about to permanently delete the {singleItemToDelete.type.slice(0, -1)} <strong>{singleItemToDelete.name}</strong> ({singleItemToDelete.id}).
-                This action is irreversible and will delete it from Supabase.
+                You are about to permanently delete the {singleItemToDelete.type.slice(0, -1)} <strong>{SheetsSyncEngine.stripAdminDeletedTag(singleItemToDelete.name)}</strong> ({singleItemToDelete.id}).
+                {isSuperadmin 
+                  ? " This action is irreversible and will permanently delete it from the database." 
+                  : " This action is final and will delete it from your panel."}
               </p>
               
               <div className="space-y-1 text-left">
