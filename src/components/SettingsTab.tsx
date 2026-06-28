@@ -1151,7 +1151,73 @@ export default function SettingsTab({
  </form>
  </div>
 
- {/* CANCELLATION REFUND POLICY SETTINGS CARD */}
+   {/* SUPERADMIN GLOBAL SYSTEM CONTROLS CARD */}
+  {userRole === "Superadmin" && (
+    <div className="rounded-xl border border-rose-500/10 dark:border-rose-500/20 bg-rose-500/5 p-5 shadow-sm space-y-4 h-fit transition-colors md:col-span-2">
+      <div className="flex items-center justify-between border-b border-rose-500/10 pb-2">
+        <div className="flex items-center gap-1.5">
+          <ShieldAlert className="h-4 w-4 text-rose-500 animate-pulse" />
+          <h2 className="font-bold text-rose-700 dark:text-rose-400 text-sm">Superadmin System Controls</h2>
+        </div>
+        <span className="text-[9px] bg-rose-500/15 border border-rose-500/20 text-rose-500 px-1.5 py-0.5 rounded font-extrabold font-mono flex items-center gap-0.5">
+          <ShieldAlert className="h-2.5 w-2.5" /> GLOBAL
+        </span>
+      </div>
+
+      <p className="text-[11px] text-muted leading-relaxed font-sans">
+        Configure global overrides for the entire billing system. Turning on "Enforce GST Only" will hide all Non-GST options, hide Non-GST invoices, and adjust stats, charts, and metrics across the entire application for every operator.
+      </p>
+
+      <div className="flex items-center justify-between pt-2">
+        <div className="space-y-0.5">
+          <label className="text-[11px] font-bold text-rose-700 dark:text-rose-400 uppercase tracking-wide">
+            Enforce GST Only Mode
+          </label>
+          <span className="text-[10px] text-muted block">
+            Hides non-GST invoices, weekly/daily counts, options, and filters system-wide.
+          </span>
+        </div>
+        <button
+          type="button"
+          onClick={async () => {
+            const newVal = !companySettings.gstOnlyMode;
+            const updated: CompanySettings = {
+              ...companySettings,
+              gstOnlyMode: newVal
+            };
+            try {
+              SheetsSyncEngine.saveCompanySettings(updated);
+              
+              // Log to audit log
+              await SheetsSyncEngine.addAuditLog(
+                "GST Only Mode Override",
+                currentUser?.fullName || "Superadmin",
+                companySettings.gstOnlyMode ? "ON" : "OFF",
+                newVal ? "ON" : "OFF"
+              );
+
+              onShowNotification(`✓ Enforce GST Only Mode is now ${newVal ? "ACTIVATED" : "DEACTIVATED"}.`, "success");
+              onRefresh();
+            } catch (err) {
+              console.error(err);
+              onShowNotification("Error updating global overrides", "error");
+            }
+          }}
+          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out outline-none ${
+            companySettings.gstOnlyMode ? "bg-rose-500" : "bg-zinc-200 dark:bg-zinc-700"
+          }`}
+        >
+          <span
+            className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+              companySettings.gstOnlyMode ? "translate-x-4" : "translate-x-0"
+            }`}
+          />
+        </button>
+      </div>
+    </div>
+  )}
+
+  {/* CANCELLATION REFUND POLICY SETTINGS CARD */}
  <div className="rounded-xl border border-default dark:border-default bg-card p-5 shadow-sm space-y-4 h-fit transition-colors">
  <div className="flex items-center justify-between border-b border-default pb-2">
  <div className="flex items-center gap-1.5">

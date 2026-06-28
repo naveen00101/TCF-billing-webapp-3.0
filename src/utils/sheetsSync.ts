@@ -32,6 +32,7 @@ const DEFAULT_INVOICES: Invoice[] = [];
 const DEFAULT_INVOICE_ITEMS: InvoiceItem[] = [];
 
 const DEFAULT_COMPANY_SETTINGS: CompanySettings = {
+  gstOnlyMode: false,
   companyName: "Tenali Central Furniture",
   shortName: "TCF Smart Billing",
   address: "Opp R.C.M Church, Amaravathi Yards, Chenchupet, Tenali, Andhra Pradesh 522202",
@@ -91,6 +92,7 @@ const DEFAULT_ACTIVITIES: UserActivity[] = [];
 // ============================================
 
 const mapCompanySettingsFromDb = (row: any): CompanySettings => ({
+  gstOnlyMode: !!row.cancellation_rules?.gstOnlyMode,
   companyName: row.company_name,
   shortName: row.short_name,
   address: row.address,
@@ -1230,7 +1232,10 @@ export class SheetsSyncEngine {
     if (supabase && !isSyncPull) {
       const dbRow = mapCompanySettingsToDb(settings);
       // Attach cancellation rules
-      (dbRow as any).cancellation_rules = this.getCancellationRules();
+      const rules = this.getCancellationRules() || {};
+      rules.gstOnlyMode = settings.gstOnlyMode ?? false;
+      this.setStorageItem("billing_cancellation_rules", rules);
+      (dbRow as any).cancellation_rules = rules;
       supabase.from("company_settings").upsert(dbRow).then(({ error }) => {
         if (error) console.error("Error upserting company settings to Supabase:", error);
       });
@@ -1628,6 +1633,10 @@ export class SheetsSyncEngine {
     const username = currentUser?.username || "";
 
     let invoices = this.getInvoices().filter(inv => !inv.isSoftDeleted && inv.status !== "Deleted");
+    const company = this.getCompanySettings();
+    if (company?.gstOnlyMode) {
+      invoices = invoices.filter(inv => inv.gstEnabled);
+    }
 
     if (userRole === "Employee") {
       invoices = invoices.filter(

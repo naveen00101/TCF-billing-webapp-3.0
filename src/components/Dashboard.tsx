@@ -428,7 +428,11 @@ export default function Dashboard({ stats, onRefresh, onNavigateToTab, userRole 
 
 
  // Shared invoices getter
- const allInvoices = SheetsSyncEngine.getInvoices().filter(inv => !inv.isSoftDeleted && inv.status !=="Deleted");
+ const company = SheetsSyncEngine.getCompanySettings();
+  let allInvoices = SheetsSyncEngine.getInvoices().filter(inv => !inv.isSoftDeleted && inv.status !== "Deleted");
+  if (company?.gstOnlyMode) {
+    allInvoices = allInvoices.filter(inv => inv.gstEnabled);
+  }
 
  const getStatusBadge = (status: string) => {
  switch (status) {

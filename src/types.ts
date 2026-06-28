@@ -310,6 +310,7 @@ export interface CompanySettings {
   sgstPercentage?: number;
   igstPercentage?: number;
   gstEnabledByDefault?: boolean;
+  gstOnlyMode?: boolean;
 }
 
 export interface DashboardStats {

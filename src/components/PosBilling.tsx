@@ -68,6 +68,12 @@ export default function PosBilling({
 
  // GST Management States & Helpers
  const [gstType, setGstType] = useState<"No GST" |"Within State GST" |"Out-of-State GST">("Within State GST");
+
+  useEffect(() => {
+    if (company?.gstOnlyMode && gstType === "No GST") {
+      setGstType("Within State GST");
+    }
+  }, [company, gstType]);
  const [customerState, setCustomerState] = useState("");
 
  const [customerGstNo, setCustomerGstNo] = useState("");
@@ -2012,7 +2018,7 @@ export default function PosBilling({
  }}
  className="w-full rounded-lg border border-default dark:border-zinc-700 bg-card  px-3 py-1.5 text-xs text-primary dark:text-primary outline-none focus:border-emerald-500"
  >
- <option value="No GST">No GST</option>
+ {!company?.gstOnlyMode && <option value="No GST">No GST</option>}
  <option value="Within State GST">Within State GST (CGST + SGST)</option>
  <option value="Out-of-State GST">Out-of-State GST (IGST)</option>
  </select>

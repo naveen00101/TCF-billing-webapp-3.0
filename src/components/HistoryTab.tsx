@@ -75,6 +75,12 @@ export default function HistoryTab({
   React.useEffect(() => {
     localStorage.setItem("tcf_history_gstFilter", gstFilter);
   }, [gstFilter]);
+
+  React.useEffect(() => {
+    if (company?.gstOnlyMode && gstFilter === "Non-GST") {
+      setGstFilter("All");
+    }
+  }, [company, gstFilter]);
  const [paymentStatusFilter, setPaymentStatusFilter] = useState<"All" |"Paid" |"Partially Paid" |"Balance Pending">("All");
  const [paymentTypeFilter, setPaymentTypeFilter] = useState<"All" |"Full Payment" |"Advance Payment">("All");
 
@@ -1348,7 +1354,7 @@ export default function HistoryTab({
       >
         <option value="All">All Receipts</option>
         <option value="GST">GST Bills (All)</option>
-        <option value="Non-GST">Non-GST Bills</option>
+        {!company?.gstOnlyMode && <option value="Non-GST">Non-GST Bills</option>}
         <option value="WithinState">State GST (CGST+SGST)</option>
         <option value="OutOfState">Out of State GST (IGST)</option>
       </select>
