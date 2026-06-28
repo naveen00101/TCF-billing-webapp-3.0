@@ -138,6 +138,8 @@ export default function PosBilling({
  const [showCustomerDetails, setShowCustomerDetails] = useState(false);
   const [address, setAddress] = useState("");
   const [pincode, setPincode] = useState("");
+  const [mobileBlurred, setMobileBlurred] = useState(false);
+  const [secondaryBlurred, setSecondaryBlurred] = useState(false);
  const [secondaryPhone, setSecondaryPhone] = useState("");
  const [secondaryContactName, setSecondaryContactName] = useState("");
  const [notes, setNotes] = useState("");
@@ -267,6 +269,8 @@ export default function PosBilling({
  setIsNewCustomer(true);
  setAddress("");
  setPincode("");
+ setMobileBlurred(false);
+ setSecondaryBlurred(false);
  setSecondaryPhone("");
  setSecondaryContactName("");
  setNotes("");
@@ -716,6 +720,8 @@ export default function PosBilling({
  setShowCustomerDetails(false);
  setAddress("");
  setPincode("");
+ setMobileBlurred(false);
+ setSecondaryBlurred(false);
  setSecondaryPhone("");
  setSecondaryContactName("");
  setNotes("");
@@ -1495,6 +1501,8 @@ export default function PosBilling({
  setMobileNumber("");
  setAddress("");
  setPincode("");
+ setMobileBlurred(false);
+ setSecondaryBlurred(false);
  setSecondaryPhone("");
  setSecondaryContactName("");
  setNotes("");
@@ -1607,19 +1615,37 @@ export default function PosBilling({
  <>
  <div className="space-y-1 text-left">
  <label className="text-xs font-semibold text-muted font-sans">New Customer Mobile</label>
- <input
-  id="customer-search-input"
-  type="text"
-  placeholder="Enter 10-digit mobile number"
-  value={mobileNumber}
-  onChange={(e) => {
-    const cleaned = String(e.target.value || "").replace(/\D/g, "").slice(0, 10);
-    setMobileNumber(cleaned);
-    setAllowDuplicateCustomer(false);
-  }}
-  maxLength={10}
-  className="w-full rounded-lg border border-default bg-surface pl-3 py-2 text-xs focus:border-blue-500 focus:bg-card focus:ring-1 focus:ring-blue-500 font-mono outline-none"
+ <div>
+  <input
+    id="customer-search-input"
+    type="text"
+    placeholder="Enter 10-digit mobile number"
+    value={mobileNumber}
+    onChange={(e) => {
+      const cleaned = String(e.target.value || "").replace(/\D/g, "").slice(0, 10);
+      setMobileNumber(cleaned);
+      setAllowDuplicateCustomer(false);
+    }}
+    onBlur={() => {
+      setMobileBlurred(true);
+      const cleaned = String(mobileNumber || "").replace(/\D/g, "");
+      if (cleaned.length > 0 && cleaned.length !== 10) {
+        onShowNotification("Caution: Primary Mobile Number must be exactly 10 digits.", "warning");
+      }
+    }}
+    maxLength={10}
+    className={`w-full rounded-lg border bg-surface pl-3 py-2 text-xs focus:bg-card focus:ring-1 font-mono outline-none ${
+      mobileBlurred && mobileNumber.length > 0 && mobileNumber.length !== 10
+        ? "border-rose-500 focus:border-rose-500 focus:ring-rose-500"
+        : "border-default focus:border-blue-500 focus:ring-blue-500"
+    }`}
   />
+  {mobileBlurred && mobileNumber.length > 0 && mobileNumber.length !== 10 && (
+    <p className="text-[10px] text-rose-500 font-bold mt-1">
+      ⚠ Mobile number must be exactly 10 digits (currently {mobileNumber.length}).
+    </p>
+  )}
+</div>
  </div>
 
  <div className="space-y-1 text-left">
@@ -1879,17 +1905,35 @@ export default function PosBilling({
  <div className="grid gap-3 sm:grid-cols-2 pt-1">
  <div className="space-y-1">
  <label className="text-[10px] uppercase font-bold text-muted">Secondary Mobile No</label>
- <input
-  type="text"
-  placeholder="Alternative contact (Optional)"
-  value={secondaryPhone}
-  onChange={(e) => {
-    const cleaned = String(e.target.value || "").replace(/\D/g, "").slice(0, 10);
-    setSecondaryPhone(cleaned);
-  }}
-  maxLength={10}
-  className="w-full rounded-lg border border-default bg-card px-3 py-1.5 text-xs text-primary outline-none focus:border-blue-500 font-mono"
+ <div>
+  <input
+    type="text"
+    placeholder="Alternative contact (Optional)"
+    value={secondaryPhone}
+    onChange={(e) => {
+      const cleaned = String(e.target.value || "").replace(/\D/g, "").slice(0, 10);
+      setSecondaryPhone(cleaned);
+    }}
+    onBlur={() => {
+      setSecondaryBlurred(true);
+      const cleaned = String(secondaryPhone || "").replace(/\D/g, "");
+      if (cleaned.length > 0 && cleaned.length !== 10) {
+        onShowNotification("Caution: Secondary Mobile Number must be exactly 10 digits if provided.", "warning");
+      }
+    }}
+    maxLength={10}
+    className={`w-full rounded-lg border bg-card px-3 py-1.5 text-xs text-primary outline-none font-mono ${
+      secondaryBlurred && secondaryPhone.length > 0 && secondaryPhone.length !== 10
+        ? "border-rose-500 focus:border-rose-500"
+        : "border-default focus:border-blue-500"
+    }`}
   />
+  {secondaryBlurred && secondaryPhone.length > 0 && secondaryPhone.length !== 10 && (
+    <p className="text-[10px] text-rose-500 font-bold mt-1">
+      ⚠ Secondary mobile must be exactly 10 digits (currently {secondaryPhone.length}).
+    </p>
+  )}
+</div>
  </div>
 
  <div className="space-y-1">
