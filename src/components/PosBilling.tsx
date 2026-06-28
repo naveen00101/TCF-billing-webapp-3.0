@@ -204,14 +204,40 @@ export default function PosBilling({
  // Load staff list (active employees) for assignment from registered Employees Table
  const activeStaff = SheetsSyncEngine.getEmployees().filter(e => e.status ==="Active");
 
-  // Auto-generate invoice number on load
+  // Helper to generate independent prefix/number based on table counts
+  const getNextInvoiceNumber = (isGst: boolean) => {
+    const currentInvoices = SheetsSyncEngine.getInvoices();
+    const base = company.nextInvoiceNumber || 1001;
+    
+    // Find all invoice numbers for the selected category
+    const suffixes = currentInvoices
+      .filter(inv => {
+        const matchesGst = inv.gstEnabled || inv.invoiceCategory === "GST";
+        return isGst ? matchesGst : !matchesGst;
+      })
+      .map(inv => {
+        const parts = inv.invoiceNo.split('-');
+        const numStr = parts[parts.length - 1];
+        const parsed = parseInt(numStr || "");
+        return isNaN(parsed) ? 0 : parsed;
+      })
+      .filter(num => num >= base);
+      
+    const maxNum = suffixes.length > 0 ? Math.max(...suffixes) : base - 1;
+    const nextNum = maxNum + 1;
+    
+    if (isGst) {
+      return `TCF-G-${nextNum}`;
+    } else {
+      return `TCF-${nextNum}`;
+    }
+  };
+
+  // Auto-generate and update invoice number dynamically on load and setting changes
   useEffect(() => {
-    const prefix = company.invoicePrefix || "YR";
-    const nextNum = company.nextInvoiceNumber || 1001;
-    const terminalId = SheetsSyncEngine.getTerminalId();
-    const suffix = terminalId ? `-${terminalId}` : "";
-    setInvoiceNo(`${prefix}-${nextNum}${suffix}`);
-  }, [company]);
+    const nextNo = getNextInvoiceNumber(gstEnabled);
+    setInvoiceNo(nextNo);
+  }, [company, gstEnabled]);
 
  // Handle auto-detecting customer profile from mobile input
  const handleMobileChange = (num: string) => {
@@ -647,11 +673,8 @@ export default function PosBilling({
  };
 
  const clearForm = () => {
- const prefix = company.invoicePrefix || "YR";
- const nextNum = company.nextInvoiceNumber || 1001;
- const terminalId = SheetsSyncEngine.getTerminalId();
- const suffix = terminalId ? `-${terminalId}` : "";
- setInvoiceNo(`${prefix}-${nextNum}${suffix}`);
+ const nextNo = getNextInvoiceNumber(gstEnabled);
+ setInvoiceNo(nextNo);
  setMobileNumber("");
  setCustomerName("");
  setCustomerSearch("");
@@ -831,37 +854,9 @@ export default function PosBilling({
 
  setShowPaymentModal(false);
 
- let finalInvoiceNo = invoiceNo;
- const conn = SheetsSyncEngine.getConnectionSettings();
- if (conn.isConnected && conn.appsScriptUrl) {
- onShowNotification("Generating secure invoice number from server...","info");
- try {
- const payload = {
- action:"generateInvoiceNumber",
- spreadsheetId: conn.spreadsheetId,
- data: {
- isGst: gstEnabled,
- prefix: company.invoicePrefix ||"TCF"
- }
- };
- const res = await fetch(conn.appsScriptUrl, {
- method:"POST", mode:"cors", headers: {"Content-Type":"text/plain;charset=utf-8" }, body: JSON.stringify(payload)
- });
-  const resJson = await res.json();
-  if (resJson.success && resJson.invoiceNumber) {
-    const terminalId = SheetsSyncEngine.getTerminalId();
-    const suffix = terminalId ? `-${terminalId}` : "";
-    let secureNo = resJson.invoiceNumber;
-    if (terminalId && !secureNo.endsWith(`-${terminalId}`)) {
-      secureNo = `${secureNo}${suffix}`;
-    }
-    finalInvoiceNo = secureNo;
-    setInvoiceNo(finalInvoiceNo);
-  }
- } catch (e) {
- console.warn("Counter sequence fetch failed, falling back to local.", e);
- }
- }
+ // Generate secure suffix-free invoice number locally based on actual count
+  const finalInvoiceNo = getNextInvoiceNumber(gstEnabled);
+  setInvoiceNo(finalInvoiceNo);
 
  const TODAY_STR = getTodayStr();
  const TIME_STR = getCurrentTimeStr();
@@ -1073,9 +1068,7 @@ export default function PosBilling({
  SheetsSyncEngine.saveInvoices([activeInvoice, ...currentInvoices], true);
  SheetsSyncEngine.saveInvoiceItems([...activeItems, ...currentItems]);
 
- // Increment Company settings local number mapping
- const updatedCompany = { ...company, nextInvoiceNumber: company.nextInvoiceNumber + 1 };
- SheetsSyncEngine.saveCompanySettings(updatedCompany);
+  // Settings increment bypassed; numbering dynamically computes from invoice log
 
  // Audit log recording
  SheetsSyncEngine.addAuditLog(

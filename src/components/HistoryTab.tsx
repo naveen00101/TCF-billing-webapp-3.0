@@ -298,56 +298,64 @@ export default function HistoryTab({
 
  return searchMatch && dateMatch;
  }).sort((a, b) => {
- switch (sortType) {
- case"Oldest First": return parseInvoiceDate(a.date).getTime() - parseInvoiceDate(b.date).getTime();
- case"Highest Bill Amount": return b.grandTotal - a.grandTotal;
- case"Lowest Bill Amount": return a.grandTotal - b.grandTotal;
- case"Highest Balance Due": return (b.balanceDue || 0) - (a.balanceDue || 0);
- case"Lowest Balance Due": return (a.balanceDue || 0) - (b.balanceDue || 0);
- case"Customer Name A-Z": return a.customerName.localeCompare(b.customerName);
- case"Customer Name Z-A": return b.customerName.localeCompare(a.customerName);
- case"Invoice Number A-Z": return a.invoiceNo.localeCompare(b.invoiceNo);
- case"Invoice Number Z-A": return b.invoiceNo.localeCompare(a.invoiceNo);
- case"Work In Progress First": {
- const valA = a.status ==="Work In Progress" ? 0 : 1;
- const valB = b.status ==="Work In Progress" ? 0 : 1;
- return valA !== valB ? valA - valB : parseInvoiceDate(b.date).getTime() - parseInvoiceDate(a.date).getTime();
- }
- case"Ready First": {
- const valA = a.status ==="Ready for Delivery" ? 0 : 1;
- const valB = b.status ==="Ready for Delivery" ? 0 : 1;
- return valA !== valB ? valA - valB : parseInvoiceDate(b.date).getTime() - parseInvoiceDate(a.date).getTime();
- }
- case"Completed First": {
- const valA = a.status ==="Completed" ? 0 : 1;
- const valB = b.status ==="Completed" ? 0 : 1;
- return valA !== valB ? valA - valB : parseInvoiceDate(b.date).getTime() - parseInvoiceDate(a.date).getTime();
- }
- case"Cancelled First": {
- const valA = a.status ==="Cancelled" ? 0 : 1;
- const valB = b.status ==="Cancelled" ? 0 : 1;
- return valA !== valB ? valA - valB : parseInvoiceDate(b.date).getTime() - parseInvoiceDate(a.date).getTime();
- }
- case"Paid First": {
- const valA = a.paymentStatus ==="Paid" ? 0 : 1;
- const valB = b.paymentStatus ==="Paid" ? 0 : 1;
- return valA !== valB ? valA - valB : parseInvoiceDate(b.date).getTime() - parseInvoiceDate(a.date).getTime();
- }
- case"Partially Paid First": {
- const valA = a.paymentStatus ==="Partially Paid" ? 0 : 1;
- const valB = b.paymentStatus ==="Partially Paid" ? 0 : 1;
- return valA !== valB ? valA - valB : parseInvoiceDate(b.date).getTime() - parseInvoiceDate(a.date).getTime();
- }
- case"Balance Pending First": {
- const valA = a.paymentStatus ==="Balance Pending" ? 0 : 1;
- const valB = b.paymentStatus ==="Balance Pending" ? 0 : 1;
- return valA !== valB ? valA - valB : parseInvoiceDate(b.date).getTime() - parseInvoiceDate(a.date).getTime();
- }
- case"Newest First":
- default:
- return parseInvoiceDate(b.date).getTime() - parseInvoiceDate(a.date).getTime();
- }
- });
+    const getSortTime = (inv: Invoice) => {
+      if (inv.createdTimestamp) {
+        const t = new Date(inv.createdTimestamp).getTime();
+        if (!isNaN(t)) return t;
+      }
+      return parseInvoiceDate(inv.date).getTime();
+    };
+
+    switch (sortType) {
+      case "Oldest First": return getSortTime(a) - getSortTime(b);
+      case "Highest Bill Amount": return b.grandTotal - a.grandTotal;
+      case "Lowest Bill Amount": return a.grandTotal - b.grandTotal;
+      case "Highest Balance Due": return (b.balanceDue || 0) - (a.balanceDue || 0);
+      case "Lowest Balance Due": return (a.balanceDue || 0) - (b.balanceDue || 0);
+      case "Customer Name A-Z": return a.customerName.localeCompare(b.customerName);
+      case "Customer Name Z-A": return b.customerName.localeCompare(a.customerName);
+      case "Invoice Number A-Z": return a.invoiceNo.localeCompare(b.invoiceNo);
+      case "Invoice Number Z-A": return b.invoiceNo.localeCompare(a.invoiceNo);
+      case "Work In Progress First": {
+        const valA = a.status === "Work In Progress" ? 0 : 1;
+        const valB = b.status === "Work In Progress" ? 0 : 1;
+        return valA !== valB ? valA - valB : getSortTime(b) - getSortTime(a);
+      }
+      case "Ready First": {
+        const valA = a.status === "Ready for Delivery" ? 0 : 1;
+        const valB = b.status === "Ready for Delivery" ? 0 : 1;
+        return valA !== valB ? valA - valB : getSortTime(b) - getSortTime(a);
+      }
+      case "Completed First": {
+        const valA = a.status === "Completed" ? 0 : 1;
+        const valB = b.status === "Completed" ? 0 : 1;
+        return valA !== valB ? valA - valB : getSortTime(b) - getSortTime(a);
+      }
+      case "Cancelled First": {
+        const valA = a.status === "Cancelled" ? 0 : 1;
+        const valB = b.status === "Cancelled" ? 0 : 1;
+        return valA !== valB ? valA - valB : getSortTime(b) - getSortTime(a);
+      }
+      case "Paid First": {
+        const valA = a.paymentStatus === "Paid" ? 0 : 1;
+        const valB = b.paymentStatus === "Paid" ? 0 : 1;
+        return valA !== valB ? valA - valB : getSortTime(b) - getSortTime(a);
+      }
+      case "Partially Paid First": {
+        const valA = a.paymentStatus === "Partially Paid" ? 0 : 1;
+        const valB = b.paymentStatus === "Partially Paid" ? 0 : 1;
+        return valA !== valB ? valA - valB : getSortTime(b) - getSortTime(a);
+      }
+      case "Balance Pending First": {
+        const valA = a.paymentStatus === "Balance Pending" ? 0 : 1;
+        const valB = b.paymentStatus === "Balance Pending" ? 0 : 1;
+        return valA !== valB ? valA - valB : getSortTime(b) - getSortTime(a);
+      }
+      case "Newest First":
+      default:
+        return getSortTime(b) - getSortTime(a);
+    }
+  });
 
  // Pagination calculations
  const totalPages = Math.ceil(filteredInvoices.length / itemsPerPage);
@@ -1268,336 +1276,482 @@ export default function HistoryTab({
  </div>
  </div>
 
- {/* SEARCH & FILTERS ROW */}
- <div className="flex flex-col gap-3 font-sans mb-2">
- {/* Quick Date Range */}
- <div className="flex overflow-x-auto items-center gap-1.5 w-full hide-scrollbar">
- {(["All Time","Today","This Week","This Month","Last 6 Months","This Year"] as QuickTimeRange[]).map((qr) => (
- <button
- key={qr}
- onClick={() => { setQuickTimeRange(qr); setStartDate(""); setEndDate(""); }}
- className={`px-3 py-1 text-[11px] font-bold rounded-full transition-colors cursor-pointer whitespace-nowrap shrink-0 border ${
- quickTimeRange === qr 
- ?"bg-blue-50 dark:bg-blue-900/20 text-blue-700 border-blue-200 dark:border-blue-800"
- :"bg-surface border-default text-muted hover:text-primary dark:hover:text-gray-100 hover:bg-card-secondary dark:hover:bg-zinc-800"
- }`}
- >
- {qr}
- </button>
- ))}
- </div>
+ {/* REDESIGNED SEARCH & COLLAPSED FILTERS TOOLBAR */}
+  <div className="flex flex-col gap-2 font-sans mb-3">
+    {/* Row 1: Search & Sort + Filters Toggle */}
+    <div className="flex flex-col md:flex-row gap-2">
+      <div className="relative flex-1">
+        <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted" />
+        <input
+          type="text"
+          placeholder="Search by Invoice No, Customer Name, Mobile Number, Agent, Product, Notes..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-full rounded-xl border border-default bg-surface/50 pl-11 pr-4 py-3 text-sm font-medium focus:border-blue-500 outline-none transition-colors dark:text-primary"
+        />
+      </div>
+      <div className="flex gap-2">
+        <select
+          value={sortType}
+          onChange={(e) => setSortType(e.target.value)}
+          className="rounded-xl border border-default bg-surface/50 px-4 py-3 text-xs font-semibold focus:border-blue-500 outline-none transition-colors dark:text-primary cursor-pointer max-w-[150px]"
+        >
+          <option value="Newest First">Newest First</option>
+          <option value="Oldest First">Oldest First</option>
+          <option value="Highest Bill Amount">Highest Amount</option>
+          <option value="Lowest Bill Amount">Lowest Amount</option>
+          <option value="Highest Balance Due">Highest Bal Due</option>
+          <option value="Lowest Balance Due">Lowest Bal Due</option>
+          <option value="Customer Name A-Z">Customer A-Z</option>
+          <option value="Customer Name Z-A">Customer Z-A</option>
+          <option value="Invoice Number A-Z">Invoice A-Z</option>
+          <option value="Invoice Number Z-A">Invoice Z-A</option>
+          <option value="Work In Progress First">WIP First</option>
+          <option value="Ready First">Ready First</option>
+          <option value="Completed First">Completed First</option>
+          <option value="Cancelled First">Cancelled First</option>
+          <option value="Paid First">Paid First</option>
+          <option value="Partially Paid First">Partial Paid First</option>
+          <option value="Balance Pending First">Bal Pending First</option>
+        </select>
+        <button
+          onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+          className={`flex items-center gap-1.5 px-4 py-3 rounded-xl border transition-all cursor-pointer text-xs font-bold uppercase shrink-0 ${
+            showAdvancedFilters 
+              ? "bg-blue-600 border-blue-600 text-white shadow-sm" 
+              : "bg-surface/50 border-default text-secondary hover:bg-card hover:text-primary"
+          }`}
+        >
+          <Filter className="h-3.5 w-3.5" />
+          <span>Filters {activeFilterCount > 0 ? `(${activeFilterCount})` : ""}</span>
+          {showAdvancedFilters ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+        </button>
+      </div>
+    </div>
 
- {/* Smart Search & Sort */}
- <div className="flex flex-col md:flex-row gap-2">
- <div className="relative flex-1">
- <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted" />
- <input
- type="text"
- placeholder="Search by Invoice No, Customer Name, Mobile Number, Agent, Product, Notes..."
- value={search}
- onChange={(e) => setSearch(e.target.value)}
- className="w-full rounded-xl border border-default bg-surface/50 pl-11 pr-4 py-3.5 text-sm font-medium focus:border-blue-500 outline-none transition-colors dark:text-primary"
- />
- </div>
- <select
- value={sortType}
- onChange={(e) => setSortType(e.target.value)}
- className="rounded-xl border border-default bg-surface/50 px-4 py-3.5 text-sm font-medium focus:border-blue-500 outline-none transition-colors dark:text-primary md:max-w-[200px] cursor-pointer"
- >
- <option value="Newest First">Newest First</option>
- <option value="Oldest First">Oldest First</option>
- <option value="Highest Bill Amount">Highest Bill Amount</option>
- <option value="Lowest Bill Amount">Lowest Bill Amount</option>
- <option value="Highest Balance Due">Highest Balance Due</option>
- <option value="Lowest Balance Due">Lowest Balance Due</option>
- <option value="Customer Name A-Z">Customer Name A-Z</option>
- <option value="Customer Name Z-A">Customer Name Z-A</option>
- <option value="Invoice Number A-Z">Invoice Number A-Z</option>
- <option value="Invoice Number Z-A">Invoice Number Z-A</option>
- <option value="Work In Progress First">Work In Progress First</option>
- <option value="Ready First">Ready First</option>
- <option value="Completed First">Completed First</option>
- <option value="Cancelled First">Cancelled First</option>
- <option value="Paid First">Paid First</option>
- <option value="Partially Paid First">Partially Paid First</option>
- <option value="Balance Pending First">Balance Pending First</option>
- </select>
- </div>
+    {/* Row 2: Prominent GST Category Horizontal Tabs */}
+    <div className="flex flex-wrap items-center gap-1.5 mt-1 border-b border-default pb-2.5">
+      {([
+        { value: "All", label: "All Receipts" },
+        { value: "GST", label: "GST Bills" },
+        { value: "Non-GST", label: "Non-GST Bills" },
+        { value: "WithinState", label: "State GST" }
+      ] as const).map((tab) => (
+        <button
+          key={tab.value}
+          onClick={() => {
+            setGstFilter(tab.value);
+            setCurrentPage(1);
+          }}
+          className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer border ${
+            gstFilter === tab.value
+              ? "bg-blue-600 text-white border-blue-600 shadow-sm"
+              : "bg-surface/30 border-default text-muted hover:text-primary hover:bg-surface"
+          }`}
+        >
+          {tab.label}
+        </button>
+      ))}
+    </div>
 
- {/* Quick Status Chips */}
- <div className="flex overflow-x-auto items-center gap-1.5 w-full hide-scrollbar">
- <span className="text-[10px] font-bold uppercase text-muted mr-1 shrink-0">Status</span>
- {(["All","Work In Progress","Ready for Delivery","Pending Deliveries","Completed","Cancelled"] as const).map(st => (
- <button
- key={st}
- onClick={() => handleStatusFilterChange(st)}
- className={`px-2.5 py-0.5 text-[10px] uppercase font-bold rounded border transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
- statusFilter === st
- ?"bg-blue-50 dark:bg-blue-900/20 text-blue-700 border-blue-200 dark:border-blue-800"
- :"bg-transparent text-muted dark:text-muted border-default hover:bg-surface dark:hover:bg-card hover:text-primary dark:hover:text-gray-100"
- }`}
- >
- {st}
- </button>
- ))}
- </div>
- 
- {/* Summary Cards */}
- <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
- <div className="bg-card  border border-default p-2.5 rounded-lg flex flex-col justify-center leading-tight">
- <span className="text-[9px] font-bold text-muted tracking-wider uppercase mb-1">Filtered Results</span>
- <span className="text-lg font-bold font-mono text-primary">{filteredMetrics.totalRecords}</span>
- </div>
- <div className="bg-amber-50 dark:bg-amber-500/5 border border-amber-200 dark:border-amber-500/20 p-2.5 rounded-lg flex flex-col justify-center leading-tight">
- <span className="text-[9px] font-bold text-amber-700 dark:text-amber-500 tracking-wider uppercase mb-1">Pending</span>
- <span className="text-lg font-bold font-mono text-amber-600 truncate">{filteredMetrics.pending}</span>
- </div>
- <div className="bg-blue-50 dark:bg-blue-500/5 border border-blue-200 dark:border-blue-500/20 p-2.5 rounded-lg flex flex-col justify-center leading-tight">
- <span className="text-[9px] font-bold text-blue-700 dark:text-blue-500 tracking-wider uppercase mb-1">Ready</span>
- <span className="text-lg font-bold font-mono text-blue-600 truncate">{filteredMetrics.ready}</span>
- </div>
- <div className="bg-emerald-50 dark:bg-emerald-500/5 border border-emerald-200 dark:border-emerald-500/20 p-2.5 rounded-lg flex flex-col justify-center leading-tight">
- <span className="text-[9px] font-bold text-emerald-700 dark:text-emerald-500 tracking-wider uppercase mb-1">Closed</span>
- <span className="text-lg font-bold font-mono text-emerald-600 truncate">{filteredMetrics.completed}</span>
- </div>
- </div>
+    {/* Collapsible Drawer for Advanced Options */}
+    {showAdvancedFilters && (
+      <div className="p-4 border border-default rounded-xl bg-surface/50 dark:bg-card/30 space-y-4 animate-in slide-in-from-top-2">
+        {/* Quick Presets & Status */}
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="space-y-1.5">
+            <span className="text-[10px] font-bold uppercase text-muted block">Quick Date Preset</span>
+            <div className="flex flex-wrap items-center gap-1.5">
+              {(["All Time","Today","This Week","This Month","Last 6 Months","This Year"] as QuickTimeRange[]).map((qr) => (
+                <button
+                  key={qr}
+                  onClick={() => { setQuickTimeRange(qr); setStartDate(""); setEndDate(""); }}
+                  className={`px-2.5 py-1 text-[10px] font-bold uppercase rounded-full transition-colors cursor-pointer border ${
+                    quickTimeRange === qr 
+                      ? "bg-blue-50 dark:bg-blue-900/20 text-blue-700 border-blue-200 dark:border-blue-800"
+                      : "bg-card border-default text-muted hover:text-primary"
+                  }`}
+                >
+                  {qr}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <span className="text-[10px] font-bold uppercase text-muted block">Status Filter</span>
+            <div className="flex flex-wrap items-center gap-1.5">
+              {(["All","Work In Progress","Ready for Delivery","Pending Deliveries","Completed","Cancelled"] as const).map(st => (
+                <button
+                  key={st}
+                  onClick={() => handleStatusFilterChange(st)}
+                  className={`px-2.5 py-1 text-[10px] font-bold uppercase rounded-full border transition-colors cursor-pointer ${
+                    statusFilter === st
+                      ? "bg-blue-50 dark:bg-blue-900/20 text-blue-700 border-blue-200 dark:border-blue-800"
+                      : "bg-card text-muted border-default hover:text-primary"
+                  }`}
+                >
+                  {st}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
 
- {/* Advanced Filters */}
- <div className="border border-default rounded-lg overflow-hidden mt-1">
- <button
- onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
- className="w-full flex items-center justify-between px-3 py-2 bg-surface hover:bg-card-secondary/50 dark:hover:bg-zinc-800 transition-colors cursor-pointer border-none"
- >
- <div className="flex items-center gap-2">
- <Filter className="h-3.5 w-3.5 text-muted" />
- <span className="text-[11px] font-bold text-secondary dark:text-muted">Filters {activeFilterCount > 0 ? `(${activeFilterCount})` :""} ▼</span>
- </div>
- {showAdvancedFilters ? <ChevronUp className="h-4 w-4 text-muted" /> : <ChevronDown className="h-4 w-4 text-muted" />}
- </button>
- 
- {showAdvancedFilters && (
- <div className="p-4 grid gap-4 sm:grid-cols-2 md:grid-cols-3 bg-card border-t border-default animate-in slide-in-from-top-2">
- {/* Amount Filter Group */}
- <div className="col-span-full border border-default p-3 rounded-lg bg-surface/50 /30">
- <span className="text-[10px] font-bold uppercase text-muted block mb-2">Amount Filters</span>
- <div className="flex flex-col xl:flex-row xl:items-center gap-2 xl:gap-4">
- <div className="flex flex-wrap items-center gap-2">
- {(["All","Below ₹5k","₹5k-₹25k","₹25k-₹50k","₹50k-₹100k","Above ₹100k"] as const).map(pr => (
- <button
- key={pr}
- onClick={() => { setPricePreset(pr); setCustomPriceType("None"); }}
- className={`px-3 py-1 text-[10px] uppercase font-bold rounded border transition-colors cursor-pointer shrink-0 ${
- pricePreset === pr && customPriceType ==="None"
- ?"bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 border-emerald-200 dark:border-emerald-800"
- :"bg-card text-muted dark:text-muted border-default hover:bg-surface dark:hover:bg-card"
- }`}
- >
- {pr}
- </button>
- ))}
- </div>
- 
- <div className="flex flex-wrap items-center gap-2 mt-2 xl:mt-0">
- <select
- value={customPriceType}
- onChange={(e) => { setCustomPriceType(e.target.value as any); setPricePreset("All"); }}
- className="rounded-md border border-default bg-card  px-2 py-1.5 text-[10px] uppercase font-bold outline-none cursor-pointer text-primary"
- >
- <option value="None">Custom Range</option>
- <option value="Above">Above Amount</option>
- <option value="Below">Below Amount</option>
- <option value="Between">Between Amount Range</option>
- </select>
+        {/* Summary Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-2 border-t border-default/50">
+          <div className="bg-card border border-default p-2.5 rounded-lg flex flex-col justify-center leading-tight">
+            <span className="text-[9px] font-bold text-muted tracking-wider uppercase mb-1">Filtered Results</span>
+            <span className="text-lg font-bold font-mono text-primary">{filteredMetrics.totalRecords}</span>
+          </div>
+          <div className="bg-amber-50 dark:bg-amber-500/5 border border-amber-200 dark:border-amber-500/20 p-2.5 rounded-lg flex flex-col justify-center leading-tight">
+            <span className="text-[9px] font-bold text-amber-700 dark:text-amber-500 tracking-wider uppercase mb-1">Pending</span>
+            <span className="text-lg font-bold font-mono text-amber-600 truncate">{filteredMetrics.pending}</span>
+          </div>
+          <div className="bg-blue-50 dark:bg-blue-500/5 border border-blue-200 dark:border-blue-500/20 p-2.5 rounded-lg flex flex-col justify-center leading-tight">
+            <span className="text-[9px] font-bold text-blue-700 dark:text-blue-500 tracking-wider uppercase mb-1">Ready</span>
+            <span className="text-lg font-bold font-mono text-blue-600 truncate">{filteredMetrics.ready}</span>
+          </div>
+          <div className="bg-emerald-50 dark:bg-emerald-500/5 border border-emerald-200 dark:border-emerald-500/20 p-2.5 rounded-lg flex flex-col justify-center leading-tight">
+            <span className="text-[9px] font-bold text-emerald-700 dark:text-emerald-500 tracking-wider uppercase mb-1">Closed</span>
+            <span className="text-lg font-bold font-mono text-emerald-600 truncate">{filteredMetrics.completed}</span>
+          </div>
+        </div>
 
- {customPriceType !=="None" && (
- <div className="flex items-center gap-2 flex-wrap">
- <div className="relative">
- <IndianRupee className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted" />
- <input 
- type="number" 
- placeholder={customPriceType ==="Between" ?"Min" :"Amount"} 
- value={customPriceType ==="Below" ? customPriceMax : customPriceMin}
- onChange={(e) => customPriceType ==="Below" ? setCustomPriceMax(e.target.value) : setCustomPriceMin(e.target.value)}
- className="rounded-md border border-default bg-card  text-primary pl-6 pr-2 py-1.5 text-xs font-mono outline-none w-24"
- />
- </div>
- {customPriceType ==="Between" && (
- <>
- <span className="text-xs font-bold text-muted">to</span>
- <div className="relative">
- <IndianRupee className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted" />
- <input 
- type="number" 
- placeholder="Max"
- value={customPriceMax}
- onChange={(e) => setCustomPriceMax(e.target.value)}
- className="rounded-md border border-default bg-card  text-primary pl-6 pr-2 py-1.5 text-xs font-mono outline-none w-24"
- />
- </div>
- </>
- )}
- </div>
- )}
- </div>
- </div>
- </div>
+        {/* Amount range and other detailed dropdowns */}
+        <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 pt-2 border-t border-default/50">
+          <div className="col-span-full border border-default p-3 rounded-lg bg-surface/50">
+            <span className="text-[10px] font-bold uppercase text-muted block mb-2">Amount Filters</span>
+            <div className="flex flex-col xl:flex-row xl:items-center gap-2 xl:gap-4">
+              <div className="flex flex-wrap items-center gap-2">
+                {(["All","Below ₹5k","₹5k-₹25k","₹25k-₹50k","₹50k-₹100k","Above ₹100k"] as const).map(pr => (
+                  <button
+                    key={pr}
+                    onClick={() => { setPricePreset(pr); setCustomPriceType("None"); }}
+                    className={`px-3 py-1 text-[10px] uppercase font-bold rounded border transition-colors cursor-pointer shrink-0 ${
+                      pricePreset === pr && customPriceType ==="None"
+                        ? "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 border-emerald-200 dark:border-emerald-800"
+                        : "bg-card text-muted border-default hover:bg-surface"
+                    }`}
+                  >
+                    {pr}
+                  </button>
+                ))}
+              </div>
+              
+              <div className="flex flex-wrap items-center gap-2 mt-2 xl:mt-0">
+                <select
+                  value={customPriceType}
+                  onChange={(e) => { setCustomPriceType(e.target.value as any); setPricePreset("All"); }}
+                  className="rounded-md border border-default bg-card px-2 py-1.5 text-[10px] uppercase font-bold outline-none cursor-pointer text-primary"
+                >
+                  <option value="None">Custom Range</option>
+                  <option value="Above">Above Amount</option>
+                  <option value="Below">Below Amount</option>
+                  <option value="Between">Between Amount Range</option>
+                </select>
 
- <div className="space-y-1">
- <label className="text-[10px] uppercase font-bold text-muted">Date From</label>
- <input
- type="date"
- value={startDate}
- onChange={(e) => setStartDate(e.target.value)}
- className="w-full rounded-md border border-default bg-surface px-2.5 py-1.5 text-xs font-mono outline-none text-primary"
- />
- </div>
- <div className="space-y-1">
- <label className="text-[10px] uppercase font-bold text-muted">Date To</label>
- <input
- type="date"
- value={endDate}
- onChange={(e) => setEndDate(e.target.value)}
- className="w-full rounded-md border border-default bg-surface px-2.5 py-1.5 text-xs font-mono outline-none text-primary"
- />
- </div>
- <div className="space-y-1">
- <label className="text-[10px] uppercase font-bold text-muted">Referral Agent</label>
- <select
- value={agentFilter}
- onChange={(e) => setAgentFilter(e.target.value)}
- className="w-full rounded-md border border-default bg-surface px-2.5 py-1.5 text-xs outline-none cursor-pointer text-primary"
- >
- <option value="All">All Agents</option>
- {SheetsSyncEngine.getAgents().map(agt => <option key={agt.id} value={agt.id}>{agt.id} - {agt.name}</option>)}
- </select>
- </div>
- <div className="space-y-1">
- <label className="text-[10px] uppercase font-bold text-muted">Payment Status</label>
- <select
- value={paymentStatusFilter}
- onChange={(e) => setPaymentStatusFilter(e.target.value as any)}
- className="w-full rounded-md border border-default bg-surface px-2.5 py-1.5 text-xs outline-none cursor-pointer text-primary"
- >
- <option value="All">All Payment Statuses</option>
- <option value="Paid">Paid</option>
- <option value="Partially Paid">Partially Paid</option>
- <option value="Balance Pending">Balance Pending</option>
- </select>
- </div>
- <div className="space-y-1">
- <label className="text-[10px] uppercase font-bold text-muted">Payment Type</label>
- <select
- value={paymentTypeFilter}
- onChange={(e) => setPaymentTypeFilter(e.target.value as any)}
- className="w-full rounded-md border border-default bg-surface px-2.5 py-1.5 text-xs outline-none cursor-pointer text-primary"
- >
- <option value="All">All Types</option>
- <option value="Full Payment">Full Payment</option>
- <option value="Advance Payment">Advance Payment</option>
- </select>
- </div>
- <div className="space-y-1">
- <label className="text-[10px] uppercase font-bold text-muted">GST Category</label>
- <select
- value={gstFilter}
- onChange={(e) => setGstFilter(e.target.value as any)}
- className="w-full rounded-md border border-default bg-surface px-2.5 py-1.5 text-xs outline-none cursor-pointer text-primary"
- >
- <option value="All">All Receipts</option>
- <option value="GST">GST Enabled</option>
- <option value="Non-GST">Non-GST</option>
- <option value="WithinState">Within State (CGST+SGST)</option>
- <option value="OutOfState">Out of State (IGST)</option>
- </select>
- </div>
- {activeFilterCount > 0 && (
- <div className="col-span-full mt-2">
- <button 
- onClick={() => {
- setAgentFilter("All");
- setPaymentStatusFilter("All");
- setPaymentTypeFilter("All");
- setGstFilter("All");
- setStartDate("");
- setEndDate("");
- setPricePreset("All");
- setCustomPriceType("None");
- setCustomPriceMin("");
- setCustomPriceMax("");
- }}
- className="text-[10px] uppercase font-bold text-rose-500 hover:text-rose-600 bg-rose-50 hover:bg-rose-100 px-3 py-1.5 rounded transition-colors"
- >
- Clear Advanced Filters
- </button>
- </div>
- )}
- </div>
- )}
- </div>
- </div>
+                {customPriceType !=="None" && (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <div className="relative">
+                      <IndianRupee className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted" />
+                      <input 
+                        type="number" 
+                        placeholder={customPriceType ==="Between" ?"Min" :"Amount"} 
+                        value={customPriceType ==="Below" ? customPriceMax : customPriceMin}
+                        onChange={(e) => customPriceType ==="Below" ? setCustomPriceMax(e.target.value) : setCustomPriceMin(e.target.value)}
+                        className="rounded-md border border-default bg-card text-primary pl-6 pr-2 py-1.5 text-xs font-mono outline-none w-24"
+                      />
+                    </div>
+                    {customPriceType ==="Between" && (
+                      <>
+                        <span className="text-xs font-bold text-muted">to</span>
+                        <div className="relative">
+                          <IndianRupee className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted" />
+                          <input 
+                            type="number" 
+                            placeholder="Max"
+                            value={customPriceMax}
+                            onChange={(e) => setCustomPriceMax(e.target.value)}
+                            className="rounded-md border border-default bg-card text-primary pl-6 pr-2 py-1.5 text-xs font-mono outline-none w-24"
+                          />
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
 
- {/* INVOICES TABLE LOGS */}
- <div className="overflow-x-auto pt-2">
- <table className="min-w-full table-auto text-left text-xs text-muted">
- <thead className="bg-table-header text-[10px] uppercase font-bold text-muted dark:text-muted border-b border-default">
- <tr>
- <th className="px-4 py-3">Receipt No</th>
- <th className="px-4 py-3">Date</th>
- <th className="px-4 py-3">Customer Profile</th>
- <th className="px-4 py-3 text-center">Fulfillment Status</th>
- <th className="px-4 py-3 text-center">GST Type</th>
- <th className="px-4 py-3 text-center">Payment Status</th>
- <th className="px-4 py-3 text-right">Amnt Paid</th>
- <th className="px-4 py-3 text-right">Bal Due</th>
- <th className="px-4 py-3 text-right">Grand Total</th>
- </tr>
- </thead>
- <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
- {paginatedInvoices.map((inv, idx) => (
- <tr
- key={idx}
- onClick={() => { setInspectedInvoice(inv); setIsEditing(false); }}
- className={`cursor-pointer transition-colors ${
- inspectedInvoice?.invoiceNo === inv.invoiceNo
- ?"bg-blue-50/50 dark:bg-blue-900/10 hover:bg-shadow"
- :"hover:bg-table-hover dark:hover:bg-card/40"
- }`}
- >
- <td className="px-4 py-3 font-mono font-bold text-blue-600">{inv.invoiceNo}</td>
- <td className="px-4 py-3">{formatDisplayDate(inv.date)}</td>
- <td className="px-4 py-3 font-sans">
- <div className="flex items-center justify-between">
- <div className="font-semibold text-primary dark:text-primary capitalize truncate max-w-[120px] sm:max-w-[160px]">{inv.customerName}</div>
- {inv.referralAgentName && <span className="text-[9px] bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 px-1 rounded ml-1 truncate max-w-[80px]" title={inv.referralAgentName}>{inv.referralAgentName}</span>}
- </div>
- <div className="flex items-center justify-between mt-0.5">
- <span className="text-[10px] text-muted font-mono">{inv.mobile}</span>
- </div>
- </td>
- <td className="px-4 py-3 text-center">{getStatusBadge(inv.status)}</td>
- <td className="px-4 py-3 text-center font-bold">
- {inv.gstEnabled ? <span className="text-[9px] bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400 px-1.5 py-0.5 rounded uppercase">{inv.gstType || 'GST'}</span> : <span className="text-[9px] text-muted">NON-GST</span>}
- </td>
- <td className="px-4 py-3 text-center">
- <span className={`inline-block px-2 text-[9px] uppercase tracking-wide font-bold py-0.5 rounded-full ${inv.paymentStatus === 'Paid' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400' : inv.paymentStatus === 'Partially Paid' ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400' : 'bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-400'}`}>{inv.paymentStatus || 'Paid'}</span>
- </td>
- <td className="px-4 py-3 text-right font-mono text-emerald-600 dark:text-emerald-400">₹{(inv.amountPaid ?? inv.grandTotal).toFixed(2)}</td>
- <td className="px-4 py-3 text-right font-mono font-medium text-rose-600 dark:text-rose-400">{inv.balanceDue ? `₹${inv.balanceDue.toFixed(2)}` :"-"}</td>
- <td className="px-4 py-3 text-right font-mono font-bold text-primary dark:text-primary">₹{inv.grandTotal.toFixed(2)}</td>
- </tr>
- ))}
- {filteredInvoices.length === 0 && (
- <tr>
- <td colSpan={9} className="py-8 text-center text-muted">
- No active transaction log records located.
- </td>
- </tr>
- )}
- </tbody>
- </table>
- </div>
-
- {/* Pagination Section */}
+          <div className="space-y-1">
+            <label className="text-[10px] uppercase font-bold text-muted">Date From</label>
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="w-full rounded-md border border-default bg-surface px-2.5 py-1.5 text-xs font-mono outline-none text-primary"
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] uppercase font-bold text-muted">Date To</label>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="w-full rounded-md border border-default bg-surface px-2.5 py-1.5 text-xs font-mono outline-none text-primary"
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] uppercase font-bold text-muted">Referral Agent</label>
+            <select
+              value={agentFilter}
+              onChange={(e) => setAgentFilter(e.target.value)}
+              className="w-full rounded-md border border-default bg-surface px-2.5 py-1.5 text-xs outline-none cursor-pointer text-primary"
+            >
+              <option value="All">All Agents</option>
+              {SheetsSyncEngine.getAgents().map(agt => <option key={agt.id} value={agt.id}>{agt.id} - {agt.name}</option>)}
+            </select>
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] uppercase font-bold text-muted">Payment Status</label>
+            <select
+              value={paymentStatusFilter}
+              onChange={(e) => setPaymentStatusFilter(e.target.value as any)}
+              className="w-full rounded-md border border-default bg-surface px-2.5 py-1.5 text-xs outline-none cursor-pointer text-primary"
+            >
+              <option value="All">All Payment Statuses</option>
+              <option value="Paid">Paid</option>
+              <option value="Partially Paid">Partially Paid</option>
+              <option value="Balance Pending">Balance Pending</option>
+            </select>
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] uppercase font-bold text-muted">Payment Type</label>
+            <select
+              value={paymentTypeFilter}
+              onChange={(e) => setPaymentTypeFilter(e.target.value as any)}
+              className="w-full rounded-md border border-default bg-surface px-2.5 py-1.5 text-xs outline-none cursor-pointer text-primary"
+            >
+              <option value="All">All Types</option>
+              <option value="Full Payment">Full Payment</option>
+              <option value="Advance Payment">Advance Payment</option>
+            </select>
+          </div>
+          
+          {activeFilterCount > 0 && (
+            <div className="col-span-full mt-2">
+              <button 
+                onClick={() => {
+                  setAgentFilter("All");
+                  setPaymentStatusFilter("All");
+                  setPaymentTypeFilter("All");
+                  setGstFilter("All");
+                  setStartDate("");
+                  setEndDate("");
+                  setPricePreset("All");
+                  setCustomPriceType("None");
+                  setCustomPriceMin("");
+                  setCustomPriceMax("");
+                }}
+                className="text-[10px] uppercase font-bold text-rose-500 hover:text-rose-600 bg-rose-50 hover:bg-rose-100 px-3 py-1.5 rounded transition-colors"
+              >
+                Clear Advanced Filters
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    )}
+  </div>
+  
+{/* INVOICES TABLE LOGS */}
+  <div className="overflow-x-auto pt-2">
+    {gstFilter === "GST" || gstFilter === "WithinState" ? (
+      /* GST Bills Table Layout */
+      <table className="min-w-full table-auto text-left text-[11px] text-muted">
+        <thead className="bg-table-header text-[10px] uppercase font-extrabold text-muted border-b border-default">
+          <tr>
+            <th className="px-3 py-3">Receipt No</th>
+            <th className="px-3 py-3">Date</th>
+            <th className="px-3 py-3">Customer Profile</th>
+            <th className="px-3 py-3 text-center">GST Type</th>
+            <th className="px-3 py-3 text-right">Taxable Amt</th>
+            <th className="px-3 py-3 text-right">CGST</th>
+            <th className="px-3 py-3 text-right">SGST</th>
+            <th className="px-3 py-3 text-right">IGST</th>
+            <th className="px-3 py-3 text-right">Tax Amt</th>
+            <th className="px-3 py-3 text-right">Grand Total</th>
+            <th className="px-3 py-3 text-center">Fulfillment</th>
+            <th className="px-3 py-3 text-center">Payment</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+          {paginatedInvoices.map((inv, idx) => {
+            const cgst = inv.cgstAmount || 0;
+            const sgst = inv.sgstAmount || 0;
+            const igst = inv.igstAmount || 0;
+            const taxAmt = inv.taxAmount || (cgst + sgst + igst);
+            const taxableAmt = inv.grandTotal - taxAmt;
+            return (
+              <tr
+                key={idx}
+                onClick={() => { setInspectedInvoice(inv); setIsEditing(false); }}
+                className={`cursor-pointer transition-colors ${
+                  inspectedInvoice?.invoiceNo === inv.invoiceNo
+                    ? "bg-blue-50/50 dark:bg-blue-900/10 hover:bg-shadow"
+                    : "hover:bg-table-hover dark:hover:bg-card/40"
+                }`}
+              >
+                <td className="px-3 py-3 font-mono font-bold text-blue-600">{inv.invoiceNo}</td>
+                <td className="px-3 py-3 whitespace-nowrap">{formatDisplayDate(inv.date)}</td>
+                <td className="px-3 py-3 font-sans">
+                  <div className="flex items-center justify-between">
+                    <div className="font-semibold text-primary capitalize truncate max-w-[110px]">{inv.customerName}</div>
+                    {inv.referralAgentName && <span className="text-[9px] bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 px-1 rounded ml-1 truncate max-w-[70px]" title={inv.referralAgentName}>{inv.referralAgentName}</span>}
+                  </div>
+                  <div className="text-[10px] text-muted font-mono">{inv.mobile}</div>
+                  {inv.customerGstNo && <div className="text-[9px] text-emerald-600 font-mono mt-0.5">GSTIN: {inv.customerGstNo.toUpperCase()}</div>}
+                </td>
+                <td className="px-3 py-3 text-center font-semibold">
+                  <span className="text-[9px] bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400 px-1.5 py-0.5 rounded uppercase">
+                    {inv.gstType === "CGST_SGST" ? "CGST/SGST" : inv.gstType === "IGST" ? "IGST" : "GST"}
+                  </span>
+                </td>
+                <td className="px-3 py-3 text-right font-mono">₹{taxableAmt.toFixed(2)}</td>
+                <td className="px-3 py-3 text-right font-mono">{cgst > 0 ? `₹${cgst.toFixed(2)}` : "-"}</td>
+                <td className="px-3 py-3 text-right font-mono">{sgst > 0 ? `₹${sgst.toFixed(2)}` : "-"}</td>
+                <td className="px-3 py-3 text-right font-mono">{igst > 0 ? `₹${igst.toFixed(2)}` : "-"}</td>
+                <td className="px-3 py-3 text-right font-mono text-amber-600 dark:text-amber-400">₹{taxAmt.toFixed(2)}</td>
+                <td className="px-3 py-3 text-right font-mono font-bold text-primary">₹{inv.grandTotal.toFixed(2)}</td>
+                <td className="px-3 py-3 text-center">{getStatusBadge(inv.status)}</td>
+                <td className="px-3 py-3 text-center">
+                  <span className={`inline-block px-1.5 text-[9px] uppercase tracking-wide font-bold py-0.5 rounded-full ${inv.paymentStatus === 'Paid' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400' : inv.paymentStatus === 'Partially Paid' ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400' : 'bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-400'}`}>{inv.paymentStatus || 'Paid'}</span>
+                </td>
+              </tr>
+            );
+          })}
+          {filteredInvoices.length === 0 && (
+            <tr>
+              <td colSpan={12} className="py-8 text-center text-muted">No active GST invoice records found.</td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    ) : gstFilter === "Non-GST" ? (
+      /* Non-GST Bills Table Layout */
+      <table className="min-w-full table-auto text-left text-xs text-muted">
+        <thead className="bg-table-header text-[10px] uppercase font-bold text-muted border-b border-default">
+          <tr>
+            <th className="px-4 py-3">Receipt No</th>
+            <th className="px-4 py-3">Date</th>
+            <th className="px-4 py-3">Customer Profile</th>
+            <th className="px-4 py-3 text-center">Item Count</th>
+            <th className="px-4 py-3 text-center">Fulfillment Status</th>
+            <th className="px-4 py-3 text-center">Payment Status</th>
+            <th className="px-4 py-3 text-right">Amt Paid</th>
+            <th className="px-4 py-3 text-right">Bal Due</th>
+            <th className="px-4 py-3 text-right">Grand Total</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+          {paginatedInvoices.map((inv, idx) => (
+            <tr
+              key={idx}
+              onClick={() => { setInspectedInvoice(inv); setIsEditing(false); }}
+              className={`cursor-pointer transition-colors ${
+                inspectedInvoice?.invoiceNo === inv.invoiceNo
+                  ? "bg-blue-50/50 dark:bg-blue-900/10 hover:bg-shadow"
+                  : "hover:bg-table-hover dark:hover:bg-card/40"
+              }`}
+            >
+              <td className="px-4 py-3 font-mono font-bold text-blue-600">{inv.invoiceNo}</td>
+              <td className="px-4 py-3">{formatDisplayDate(inv.date)}</td>
+              <td className="px-4 py-3 font-sans">
+                <div className="flex items-center justify-between">
+                  <div className="font-semibold text-primary capitalize truncate max-w-[120px]">{inv.customerName}</div>
+                  {inv.referralAgentName && <span className="text-[9px] bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 px-1 rounded ml-1 truncate max-w-[80px]" title={inv.referralAgentName}>{inv.referralAgentName}</span>}
+                </div>
+                <div className="text-[10px] text-muted font-mono">{inv.mobile}</div>
+              </td>
+              <td className="px-4 py-3 text-center font-mono">{inv.itemCount}</td>
+              <td className="px-4 py-3 text-center">{getStatusBadge(inv.status)}</td>
+              <td className="px-4 py-3 text-center">
+                <span className={`inline-block px-2 text-[9px] uppercase tracking-wide font-bold py-0.5 rounded-full ${inv.paymentStatus === 'Paid' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400' : inv.paymentStatus === 'Partially Paid' ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400' : 'bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-400'}`}>{inv.paymentStatus || 'Paid'}</span>
+              </td>
+              <td className="px-4 py-3 text-right font-mono text-emerald-600 dark:text-emerald-400">₹{(inv.amountPaid ?? inv.grandTotal).toFixed(2)}</td>
+              <td className="px-4 py-3 text-right font-mono font-medium text-rose-600 dark:text-rose-400">{inv.balanceDue ? `₹${inv.balanceDue.toFixed(2)}` : "-"}</td>
+              <td className="px-4 py-3 text-right font-mono font-bold text-primary">₹{inv.grandTotal.toFixed(2)}</td>
+            </tr>
+          ))}
+          {filteredInvoices.length === 0 && (
+            <tr>
+              <td colSpan={9} className="py-8 text-center text-muted">No active Non-GST invoice records found.</td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    ) : (
+      /* Unified Table Layout (All Receipts) */
+      <table className="min-w-full table-auto text-left text-xs text-muted">
+        <thead className="bg-table-header text-[10px] uppercase font-bold text-muted dark:text-muted border-b border-default">
+          <tr>
+            <th className="px-4 py-3">Receipt No</th>
+            <th className="px-4 py-3">Date</th>
+            <th className="px-4 py-3">Customer Profile</th>
+            <th className="px-4 py-3 text-center">Fulfillment Status</th>
+            <th className="px-4 py-3 text-center">GST Type</th>
+            <th className="px-4 py-3 text-center">Payment Status</th>
+            <th className="px-4 py-3 text-right">Amnt Paid</th>
+            <th className="px-4 py-3 text-right">Bal Due</th>
+            <th className="px-4 py-3 text-right">Grand Total</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+          {paginatedInvoices.map((inv, idx) => (
+            <tr
+              key={idx}
+              onClick={() => { setInspectedInvoice(inv); setIsEditing(false); }}
+              className={`cursor-pointer transition-colors ${
+                inspectedInvoice?.invoiceNo === inv.invoiceNo
+                  ? "bg-blue-50/50 dark:bg-blue-900/10 hover:bg-shadow"
+                  : "hover:bg-table-hover dark:hover:bg-card/40"
+              }`}
+            >
+              <td className="px-4 py-3 font-mono font-bold text-blue-600">{inv.invoiceNo}</td>
+              <td className="px-4 py-3">{formatDisplayDate(inv.date)}</td>
+              <td className="px-4 py-3 font-sans">
+                <div className="flex items-center justify-between">
+                  <div className="font-semibold text-primary dark:text-primary capitalize truncate max-w-[120px] sm:max-w-[160px]">{inv.customerName}</div>
+                  {inv.referralAgentName && <span className="text-[9px] bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 px-1 rounded ml-1 truncate max-w-[80px]" title={inv.referralAgentName}>{inv.referralAgentName}</span>}
+                </div>
+                <div className="flex items-center justify-between mt-0.5">
+                  <span className="text-[10px] text-muted font-mono">{inv.mobile}</span>
+                </div>
+              </td>
+              <td className="px-4 py-3 text-center">{getStatusBadge(inv.status)}</td>
+              <td className="px-4 py-3 text-center font-bold">
+                {inv.gstEnabled ? <span className="text-[9px] bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400 px-1.5 py-0.5 rounded uppercase">{inv.gstType || 'GST'}</span> : <span className="text-[9px] text-muted">NON-GST</span>}
+              </td>
+              <td className="px-4 py-3 text-center">
+                <span className={`inline-block px-2 text-[9px] uppercase tracking-wide font-bold py-0.5 rounded-full ${inv.paymentStatus === 'Paid' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400' : inv.paymentStatus === 'Partially Paid' ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400' : 'bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-400'}`}>{inv.paymentStatus || 'Paid'}</span>
+              </td>
+              <td className="px-4 py-3 text-right font-mono text-emerald-600 dark:text-emerald-400">₹{(inv.amountPaid ?? inv.grandTotal).toFixed(2)}</td>
+              <td className="px-4 py-3 text-right font-mono font-medium text-rose-600 dark:text-rose-400">{inv.balanceDue ? `₹${inv.balanceDue.toFixed(2)}` : "-"}</td>
+              <td className="px-4 py-3 text-right font-mono font-bold text-primary dark:text-primary">₹{inv.grandTotal.toFixed(2)}</td>
+            </tr>
+          ))}
+          {filteredInvoices.length === 0 && (
+            <tr>
+              <td colSpan={9} className="py-8 text-center text-muted text-xs">
+                No active transaction log records located.
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    )}
+  </div>
+{/* Pagination Section */}
  {totalPages > 1 && (
  <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-default text-xs mt-4">
  <span className="text-muted font-sans">
