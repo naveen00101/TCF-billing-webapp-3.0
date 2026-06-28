@@ -69,7 +69,11 @@ export default function HistoryTab({
 
  const [agentFilter, setAgentFilter] = useState("All");
   const [gstFilter, setGstFilter] = useState<"All" | "GST" | "Non-GST" | "WithinState" | "OutOfState">(() => {
-    return (localStorage.getItem("tcf_history_gstFilter") as any) || "All";
+    const saved = localStorage.getItem("tcf_history_gstFilter") as any;
+    if (company?.gstOnlyMode && (saved === "Non-GST" || saved === "All")) {
+      return "GST";
+    }
+    return saved || (company?.gstOnlyMode ? "GST" : "All");
   });
 
   React.useEffect(() => {
@@ -77,8 +81,8 @@ export default function HistoryTab({
   }, [gstFilter]);
 
   React.useEffect(() => {
-    if (company?.gstOnlyMode && gstFilter === "Non-GST") {
-      setGstFilter("All");
+    if (company?.gstOnlyMode && (gstFilter === "Non-GST" || gstFilter === "All")) {
+      setGstFilter("GST");
     }
   }, [company, gstFilter]);
  const [paymentStatusFilter, setPaymentStatusFilter] = useState<"All" |"Paid" |"Partially Paid" |"Balance Pending">("All");
@@ -1352,7 +1356,7 @@ export default function HistoryTab({
         }}
         className="rounded-lg border border-default bg-surface/50 px-3 py-1.5 text-xs font-bold focus:border-blue-500 outline-none transition-colors dark:text-primary cursor-pointer min-w-[160px]"
       >
-        <option value="All">All Receipts</option>
+        {!company?.gstOnlyMode && <option value="All">All Receipts</option>}
         <option value="GST">GST Bills (All)</option>
         {!company?.gstOnlyMode && <option value="Non-GST">Non-GST Bills</option>}
         <option value="WithinState">State GST (CGST+SGST)</option>

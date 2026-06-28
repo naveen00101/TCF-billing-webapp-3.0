@@ -284,10 +284,13 @@ export default function App() {
   const reloadApplicationState = () => {
     const prods = SheetsSyncEngine.getProducts().filter(p => !p.isSoftDeleted);
     const custs = SheetsSyncEngine.getCustomers().filter(c => !c.isSoftDeleted);
-    const invs = SheetsSyncEngine.getInvoices().filter(i => !i.isSoftDeleted);
+    const comp = SheetsSyncEngine.getCompanySettings();
+    let invs = SheetsSyncEngine.getInvoices().filter(i => !i.isSoftDeleted);
+    if (comp?.gstOnlyMode) {
+      invs = invs.filter(i => i.gstEnabled);
+    }
     const items = SheetsSyncEngine.getInvoiceItems();
     const conn = SheetsSyncEngine.getConnectionSettings();
-    const comp = SheetsSyncEngine.getCompanySettings();
 
     setProducts(prods);
     setCustomers(custs);
