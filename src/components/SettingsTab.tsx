@@ -1238,7 +1238,7 @@ export default function SettingsTab({
  <form onSubmit={handleSaveCancellationRules} className="space-y-4.5 pt-1">
  <div className="space-y-3.5">
  {Object.keys(cancellationRules).map((statusKey) => {
- if (statusKey ==="Ready For Delivery") return null; // Deduplicate alternate casing representation
+ if (statusKey ==="Ready For Delivery" || statusKey === "gstOnlyMode") return null; // Deduplicate alternate casing representation
  const displayLabel = statusKey;
  return (
  <div key={statusKey} className="grid grid-cols-3 items-center gap-3">

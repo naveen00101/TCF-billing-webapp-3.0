@@ -91,9 +91,11 @@ const DEFAULT_ACTIVITIES: UserActivity[] = [];
 // DATABASE FIELD MAPPINGS (CAMEL <=> SNAKE)
 // ============================================
 
-const mapCompanySettingsFromDb = (row: any): CompanySettings => ({
-  gstOnlyMode: !!row.cancellation_rules?.gstOnlyMode,
-  companyName: row.company_name,
+const mapCompanySettingsFromDb = (row: any): CompanySettings => {
+  const rules = typeof row.cancellation_rules === 'string' ? JSON.parse(row.cancellation_rules) : row.cancellation_rules;
+  return {
+    gstOnlyMode: !!rules?.gstOnlyMode,
+    companyName: row.company_name,
   shortName: row.short_name,
   address: row.address,
   phone: row.phone,
@@ -113,7 +115,8 @@ const mapCompanySettingsFromDb = (row: any): CompanySettings => ({
   sgstPercentage: Number(row.sgst_percentage),
   igstPercentage: Number(row.igst_percentage),
   gstEnabledByDefault: row.gst_enabled_by_default,
-});
+  };
+};
 
 const mapCompanySettingsToDb = (s: CompanySettings) => ({
   id: 'SETTINGS_ROW',
