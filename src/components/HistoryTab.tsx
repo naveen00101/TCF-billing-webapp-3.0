@@ -68,7 +68,13 @@ export default function HistoryTab({
  const [statusFilter, setStatusFilter] = useState(initialStatusFilter);
 
  const [agentFilter, setAgentFilter] = useState("All");
- const [gstFilter, setGstFilter] = useState<"All" |"GST" |"Non-GST" |"WithinState" |"OutOfState">("All");
+  const [gstFilter, setGstFilter] = useState<"All" | "GST" | "Non-GST" | "WithinState" | "OutOfState">(() => {
+    return (localStorage.getItem("tcf_history_gstFilter") as any) || "All";
+  });
+
+  React.useEffect(() => {
+    localStorage.setItem("tcf_history_gstFilter", gstFilter);
+  }, [gstFilter]);
  const [paymentStatusFilter, setPaymentStatusFilter] = useState<"All" |"Paid" |"Partially Paid" |"Balance Pending">("All");
  const [paymentTypeFilter, setPaymentTypeFilter] = useState<"All" |"Full Payment" |"Advance Payment">("All");
 
@@ -206,18 +212,18 @@ export default function HistoryTab({
  }
  }
 
- // GST Class categories matching
- if (gstFilter !=="All") {
- if (gstFilter ==="GST") {
- if (!inv.gstEnabled) return false;
- } else if (gstFilter ==="Non-GST") {
- if (inv.gstEnabled) return false;
- } else if (gstFilter ==="WithinState") {
- if (!inv.gstEnabled || inv.gstType !=="CGST_SGST") return false;
- } else if (gstFilter ==="OutOfState") {
- if (!inv.gstEnabled || inv.gstType !=="IGST") return false;
- }
- }
+  // GST Class categories matching
+  if (gstFilter !== "All") {
+    if (gstFilter === "GST") {
+      if (!inv.gstEnabled) return false;
+    } else if (gstFilter === "Non-GST") {
+      if (inv.gstEnabled) return false;
+    } else if (gstFilter === "WithinState") {
+      if (!inv.gstEnabled || (inv.gstType !== "CGST_SGST" && inv.gstType !== "Within State GST")) return false;
+    } else if (gstFilter === "OutOfState") {
+      if (!inv.gstEnabled || (inv.gstType !== "IGST" && inv.gstType !== "Out-of-State GST")) return false;
+    }
+  }
 
  // Payment Status filter
  if (paymentStatusFilter !=="All") {
@@ -1329,32 +1335,26 @@ export default function HistoryTab({
       </div>
     </div>
 
-    {/* Row 2: Prominent GST Category Horizontal Tabs */}
-    <div className="flex flex-wrap items-center gap-1.5 mt-1 border-b border-default pb-2.5">
-      {([
-        { value: "All", label: "All Receipts" },
-        { value: "GST", label: "GST Bills" },
-        { value: "Non-GST", label: "Non-GST Bills" },
-        { value: "WithinState", label: "State GST" }
-      ] as const).map((tab) => (
-        <button
-          key={tab.value}
-          onClick={() => {
-            setGstFilter(tab.value);
-            setCurrentPage(1);
-          }}
-          className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer border ${
-            gstFilter === tab.value
-              ? "bg-blue-600 text-white border-blue-600 shadow-sm"
-              : "bg-surface/30 border-default text-muted hover:text-primary hover:bg-surface"
-          }`}
-        >
-          {tab.label}
-        </button>
-      ))}
+    {/* Row 2: GST Category Filter Dropdown */}
+    <div className="flex items-center gap-2 mt-1 border-b border-default pb-2.5">
+      <span className="text-[10px] font-bold uppercase text-muted tracking-wider">Receipt Type:</span>
+      <select
+        value={gstFilter}
+        onChange={(e) => {
+          setGstFilter(e.target.value as any);
+          setCurrentPage(1);
+        }}
+        className="rounded-lg border border-default bg-surface/50 px-3 py-1.5 text-xs font-bold focus:border-blue-500 outline-none transition-colors dark:text-primary cursor-pointer min-w-[160px]"
+      >
+        <option value="All">All Receipts</option>
+        <option value="GST">GST Bills (All)</option>
+        <option value="Non-GST">Non-GST Bills</option>
+        <option value="WithinState">State GST (CGST+SGST)</option>
+        <option value="OutOfState">Out of State GST (IGST)</option>
+      </select>
     </div>
 
-    {/* Collapsible Drawer for Advanced Options */}
+        {/* Collapsible Drawer for Advanced Options */}
     {showAdvancedFilters && (
       <div className="p-4 border border-default rounded-xl bg-surface/50 dark:bg-card/30 space-y-4 animate-in slide-in-from-top-2">
         {/* Quick Presets & Status */}
@@ -1566,7 +1566,7 @@ export default function HistoryTab({
   
 {/* INVOICES TABLE LOGS */}
   <div className="overflow-x-auto pt-2">
-    {gstFilter === "GST" || gstFilter === "WithinState" ? (
+    {gstFilter === "GST" || gstFilter === "WithinState" || gstFilter === "OutOfState" ? (
       /* GST Bills Table Layout */
       <table className="min-w-full table-auto text-left text-[11px] text-muted">
         <thead className="bg-table-header text-[10px] uppercase font-extrabold text-muted border-b border-default">
