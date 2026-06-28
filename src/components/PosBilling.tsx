@@ -136,7 +136,8 @@ export default function PosBilling({
 
  // Advanced Customer Details states
  const [showCustomerDetails, setShowCustomerDetails] = useState(false);
- const [address, setAddress] = useState("");
+  const [address, setAddress] = useState("");
+  const [pincode, setPincode] = useState("");
  const [secondaryPhone, setSecondaryPhone] = useState("");
  const [secondaryContactName, setSecondaryContactName] = useState("");
  const [notes, setNotes] = useState("");
@@ -240,16 +241,23 @@ export default function PosBilling({
   }, [company, gstEnabled]);
 
  // Handle auto-detecting customer profile from mobile input
- const handleMobileChange = (num: string) => {
- const cleaned = String(num ||"").replace(/\D/g,"");
- setMobileNumber(cleaned);
+  const handleMobileChange = (num: string) => {
+  const cleaned = String(num ||"").replace(/\D/g,"").slice(0, 10);
+  setMobileNumber(cleaned);
 
- if (cleaned.length >= 8) {
- const match = customers.find((c) => String(c.mobile ||"").replace(/\D/g,"") === cleaned);
- if (match) {
- setCustomerName(match.name);
- setAddress(match.address ||"");
- setSecondaryPhone(match.secondaryPhone ||"");
+  if (cleaned.length >= 8) {
+  const match = customers.find((c) => String(c.mobile ||"").replace(/\D/g,"") === cleaned);
+  if (match) {
+  setCustomerName(match.name);
+  const addr = match.address || "";
+  const pincodeMatch = addr.match(/(?:\s*-\s*|\s+)(\d{6})\s*$/);
+  if (pincodeMatch) {
+    setPincode(pincodeMatch[1]);
+    setAddress(addr.replace(pincodeMatch[0], "").trim());
+  } else {
+    setPincode("");
+    setAddress(addr);
+  } setSecondaryPhone(match.secondaryPhone ||"");
  setSecondaryContactName(match.secondaryContactName ||"");
  setNotes(match.notes ||"");
  setIsNewCustomer(false);
@@ -258,6 +266,7 @@ export default function PosBilling({
  } else {
  setIsNewCustomer(true);
  setAddress("");
+ setPincode("");
  setSecondaryPhone("");
  setSecondaryContactName("");
  setNotes("");
@@ -706,6 +715,7 @@ export default function PosBilling({
  // Reset advanced details
  setShowCustomerDetails(false);
  setAddress("");
+ setPincode("");
  setSecondaryPhone("");
  setSecondaryContactName("");
  setNotes("");
@@ -800,6 +810,22 @@ export default function PosBilling({
 
  const cleanPrim = String(mobileNumber ||"").replace(/\D/g,"");
  const cleanSec = String(secondaryPhone ||"").replace(/\D/g,"");
+    if (cleanPrim.length !== 10) {
+      onShowNotification("Primary Mobile Number must be exactly 10 digits.", "error");
+      return;
+    }
+    if (cleanSec !== "" && cleanSec.length !== 10) {
+      onShowNotification("Secondary Mobile Number must be exactly 10 digits if provided.", "error");
+      return;
+    }
+    if (!pincode || pincode.trim() === "") {
+      onShowNotification("Pincode is required.", "error");
+      return;
+    }
+    if (!/^\d{6}$/.test(pincode.trim())) {
+      onShowNotification("Pincode must be exactly 6 digits.", "error");
+      return;
+    }
  if (cleanSec !=="" && cleanPrim === cleanSec) {
  onShowNotification("Primary and Secondary Mobile Numbers cannot be identical.","error");
  return;
@@ -832,6 +858,23 @@ export default function PosBilling({
 
  const cleanPrim = String(mobileNumber ||"").replace(/\D/g,"");
  const cleanSec = String(secondaryPhone ||"").replace(/\D/g,"");
+    if (cleanPrim.length !== 10) {
+      onShowNotification("Primary Mobile Number must be exactly 10 digits.", "error");
+      return;
+    }
+    if (cleanSec !== "" && cleanSec.length !== 10) {
+      onShowNotification("Secondary Mobile Number must be exactly 10 digits if provided.", "error");
+      return;
+    }
+    if (!pincode || pincode.trim() === "") {
+      onShowNotification("Pincode is required to complete checkout.", "error");
+      return;
+    }
+    if (!/^\d{6}$/.test(pincode.trim())) {
+      onShowNotification("Pincode must be exactly 6 digits.", "error");
+      return;
+    }
+    const finalAddress = pincode.trim() ? `${address.trim()} - ${pincode.trim()}` : address.trim();
  if (cleanSec !=="" && cleanPrim === cleanSec) {
  onShowNotification("Primary and Secondary Mobile Numbers cannot be identical.","error");
  return;
@@ -884,7 +927,7 @@ export default function PosBilling({
  customerName: String(customerName ||"").trim() ||"Walk-in Customer",
  mobile: String(mobileNumber ||"").trim() ||"N/A",
  customerPrimaryPhone: String(mobileNumber ||"").trim() ||"N/A",
- customerBusinessAddress: String(address ||"").trim(),
+ customerBusinessAddress: finalAddress,
  customerSecondaryPhone: String(secondaryPhone ||"").trim(),
  customerSecondaryContactName: String(secondaryContactName ||"").trim(),
  notes: String(notes ||"").trim() || undefined,
@@ -989,7 +1032,7 @@ export default function PosBilling({
  id: `CUST-${Math.floor(1000 + Math.random() * 9000)}`,
  name: activeInvoice.customerName,
  mobile: activeInvoice.mobile,
- address: address ||"POS Checkout Client",
+ address: finalAddress || "POS Checkout Client",
  secondaryPhone: secondaryPhone || undefined,
  secondaryContactName: secondaryContactName || undefined,
  notes: notes || undefined,
@@ -999,7 +1042,7 @@ export default function PosBilling({
  finalCustomers[existingIdx] = {
  ...finalCustomers[existingIdx],
  name: activeInvoice.customerName,
- address: address || finalCustomers[existingIdx].address,
+ address: finalAddress || finalCustomers[existingIdx].address,
  secondaryPhone: secondaryPhone || finalCustomers[existingIdx].secondaryPhone,
  secondaryContactName: secondaryContactName || finalCustomers[existingIdx].secondaryContactName,
  notes: notes || finalCustomers[existingIdx].notes,
@@ -1451,6 +1494,7 @@ export default function PosBilling({
  setCustomerName("");
  setMobileNumber("");
  setAddress("");
+ setPincode("");
  setSecondaryPhone("");
  setSecondaryContactName("");
  setNotes("");
@@ -1564,17 +1608,18 @@ export default function PosBilling({
  <div className="space-y-1 text-left">
  <label className="text-xs font-semibold text-muted font-sans">New Customer Mobile</label>
  <input
- id="customer-search-input"
- type="text"
- placeholder="Enter 10-digit mobile number"
- value={mobileNumber}
- onChange={(e) => {
- const cleaned = String(e.target.value ||"").replace(/\D/g,"");
- setMobileNumber(cleaned);
- setAllowDuplicateCustomer(false);
- }}
- className="w-full rounded-lg border border-default bg-surface pl-3 py-2 text-xs focus:border-blue-500 focus:bg-card focus:ring-1 focus:ring-blue-500 font-mono outline-none"
- />
+  id="customer-search-input"
+  type="text"
+  placeholder="Enter 10-digit mobile number"
+  value={mobileNumber}
+  onChange={(e) => {
+    const cleaned = String(e.target.value || "").replace(/\D/g, "").slice(0, 10);
+    setMobileNumber(cleaned);
+    setAllowDuplicateCustomer(false);
+  }}
+  maxLength={10}
+  className="w-full rounded-lg border border-default bg-surface pl-3 py-2 text-xs focus:border-blue-500 focus:bg-card focus:ring-1 focus:ring-blue-500 font-mono outline-none"
+  />
  </div>
 
  <div className="space-y-1 text-left">
@@ -1835,12 +1880,16 @@ export default function PosBilling({
  <div className="space-y-1">
  <label className="text-[10px] uppercase font-bold text-muted">Secondary Mobile No</label>
  <input
- type="text"
- placeholder="Alternative contact (Optional)"
- value={secondaryPhone}
- onChange={(e) => setSecondaryPhone(e.target.value)}
- className="w-full rounded-lg border border-default bg-card px-3 py-1.5 text-xs text-primary outline-none focus:border-blue-500 font-mono"
- />
+  type="text"
+  placeholder="Alternative contact (Optional)"
+  value={secondaryPhone}
+  onChange={(e) => {
+    const cleaned = String(e.target.value || "").replace(/\D/g, "").slice(0, 10);
+    setSecondaryPhone(cleaned);
+  }}
+  maxLength={10}
+  className="w-full rounded-lg border border-default bg-card px-3 py-1.5 text-xs text-primary outline-none focus:border-blue-500 font-mono"
+  />
  </div>
 
  <div className="space-y-1">
@@ -1854,17 +1903,34 @@ export default function PosBilling({
  />
  </div>
 
- <div className="space-y-1 sm:col-span-2">
- <label className="text-[10px] uppercase font-bold text-muted">Address Location *</label>
- <input
- type="text"
- placeholder="Street details, city, zip (Required)"
- value={address}
- onChange={(e) => setAddress(e.target.value)}
- required
- className="w-full rounded-lg border border-default bg-card px-3 py-1.5 text-xs text-primary outline-none"
- />
- </div>
+ <div className="grid gap-3 sm:grid-cols-3 sm:col-span-2">
+    <div className="space-y-1 sm:col-span-2">
+      <label className="text-[10px] uppercase font-bold text-muted">Address Location *</label>
+      <input
+        type="text"
+        placeholder="Street details, city, landmark (Required)"
+        value={address}
+        onChange={(e) => setAddress(e.target.value)}
+        required
+        className="w-full rounded-lg border border-default bg-card px-3 py-1.5 text-xs text-primary outline-none"
+      />
+    </div>
+    <div className="space-y-1">
+      <label className="text-[10px] uppercase font-bold text-muted">Pincode *</label>
+      <input
+        type="text"
+        placeholder="6-digit PIN"
+        value={pincode}
+        onChange={(e) => {
+          const val = e.target.value.replace(/\D/g, "").slice(0, 6);
+          setPincode(val);
+        }}
+        required
+        maxLength={6}
+        className="w-full rounded-lg border border-default bg-card px-3 py-1.5 text-xs text-primary outline-none font-mono"
+      />
+    </div>
+  </div>
 
  <div className="space-y-1 sm:col-span-2">
  <label className="text-[10px] uppercase font-bold text-muted">Client / Order Notes</label>
