@@ -53,6 +53,7 @@ export default function PosBilling({
 
  // POS States
  const [invoiceNo, setInvoiceNo] = useState("");
+ const [isSaving, setIsSaving] = useState(false);
  const [customerSearch, setCustomerSearch] = useState("");
  const [mobileNumber, setMobileNumber] = useState("");
  const [customerName, setCustomerName] = useState("");
@@ -862,8 +863,9 @@ export default function PosBilling({
  setAmountReceivedInput(grandTotal.toString());
  };
 
- const handleSaveInvoice = async () => {
- if (!address || address.trim() ==="") {
+  const handleSaveInvoice = async () => {
+    if (isSaving) return;
+    if (!address || address.trim() ==="") {
  onShowNotification("Cannot create invoice without customer address.","error");
  return;
  }
@@ -1029,6 +1031,7 @@ export default function PosBilling({
  };
  });
 
+  setIsSaving(true);
  try {
  // 1. Update client local-storage first
  const currentInvoices = SheetsSyncEngine.getInvoices();
@@ -1171,7 +1174,9 @@ export default function PosBilling({
  } catch (e: any) {
  console.error("Save invoice defect:", e);
  onShowNotification("Verification Error: Failed to commit checkout transaction.","error");
- }
+ } finally {
+    setIsSaving(false);
+  }
   };
 
   return (
@@ -2735,10 +2740,11 @@ export default function PosBilling({
 
  <button
  onClick={handleSaveInvoice}
- className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-600 py-3.5 text-sm font-bold text-primary shadow-md transition-all hover:bg-blue-700 active:scale-95 border-none mt-2 cursor-pointer"
+ disabled={isSaving}
+ className={`w-full flex items-center justify-center gap-2 rounded-xl bg-blue-600 py-3.5 text-sm font-bold text-primary shadow-md transition-all hover:bg-blue-700 active:scale-95 border-none mt-2 cursor-pointer ${isSaving ? 'opacity-50 cursor-not-allowed' : ''}`}
  >
-        <Save className="h-4 w-4" />
-        <span>Confirm & Save</span>
+        {isSaving ? <RotateCcw className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+        <span>{isSaving ? "Saving..." : "Confirm & Save"}</span>
       </button>
     </div>
   </div>
