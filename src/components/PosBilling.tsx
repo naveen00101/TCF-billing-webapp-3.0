@@ -53,7 +53,8 @@ export default function PosBilling({
 
  // POS States
  const [invoiceNo, setInvoiceNo] = useState("");
- const [isSaving, setIsSaving] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const isSavingRef = React.useRef(false);
  const [customerSearch, setCustomerSearch] = useState("");
  const [mobileNumber, setMobileNumber] = useState("");
  const [customerName, setCustomerName] = useState("");
@@ -864,7 +865,6 @@ export default function PosBilling({
  };
 
   const handleSaveInvoice = async () => {
-    if (isSaving) return;
     if (!address || address.trim() ==="") {
  onShowNotification("Cannot create invoice without customer address.","error");
  return;
