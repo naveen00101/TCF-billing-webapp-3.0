@@ -1020,7 +1020,7 @@ export class SheetsSyncEngine {
     return this.validateAndRepairProductTree(raw);
   }
 
-  public static saveProducts(products: Product[], isSyncPull = false): void {
+  public static saveProducts(products: Product[], isSyncPull = true): void {
     const validated = this.validateAndRepairProductTree(products);
     this.setStorageItem("billing_products", validated);
     
@@ -1099,7 +1099,7 @@ export class SheetsSyncEngine {
     return this.getStorageItem<Customer[]>("billing_customers", DEFAULT_CUSTOMERS);
   }
 
-  public static saveCustomers(customers: Customer[], isSyncPull = false): void {
+  public static saveCustomers(customers: Customer[], isSyncPull = true): void {
     this.setStorageItem("billing_customers", customers);
     
     if (supabase && !isSyncPull) {
@@ -1126,7 +1126,7 @@ export class SheetsSyncEngine {
     return this.getStorageItem<Invoice[]>("billing_invoices", DEFAULT_INVOICES);
   }
 
-  public static saveInvoices(invoices: Invoice[], isUserAction: boolean = false, isSyncPull = false): void {
+  public static saveInvoices(invoices: Invoice[], isUserAction: boolean = false, isSyncPull = true): void {
     this.setStorageItem("billing_invoices", invoices);
 
     if (supabase && !isSyncPull) {
@@ -1141,7 +1141,7 @@ export class SheetsSyncEngine {
     return this.getStorageItem<InvoiceItem[]>("billing_invoice_items", DEFAULT_INVOICE_ITEMS);
   }
 
-  public static saveInvoiceItems(items: InvoiceItem[], isSyncPull = false): void {
+  public static saveInvoiceItems(items: InvoiceItem[], isSyncPull = true): void {
     this.setStorageItem("billing_invoice_items", items);
 
     if (supabase && !isSyncPull) {
@@ -1156,7 +1156,7 @@ export class SheetsSyncEngine {
     return this.getStorageItem<PaymentTransaction[]>("billing_payment_transactions", []);
   }
 
-  public static savePaymentTransactions(txns: PaymentTransaction[], isSyncPull = false): void {
+  public static savePaymentTransactions(txns: PaymentTransaction[], isSyncPull = true): void {
     this.setStorageItem("billing_payment_transactions", txns);
 
     if (supabase && !isSyncPull) {
@@ -1321,7 +1321,7 @@ export class SheetsSyncEngine {
     return this.getStorageItem<Agent[]>("billing_agents_registry", DEFAULT_AGENTS);
   }
 
-  public static saveAgents(agents: Agent[], isSyncPull = false): void {
+  public static saveAgents(agents: Agent[], isSyncPull = true): void {
     this.setStorageItem("billing_agents_registry", agents);
 
     if (supabase && !isSyncPull) {
@@ -1337,7 +1337,7 @@ export class SheetsSyncEngine {
     return this.getStorageItem<PromoCode[]>("billing_promo_codes", DEFAULT_PROMO_CODES);
   }
 
-  public static savePromoCodes(promos: PromoCode[], isSyncPull = false): void {
+  public static savePromoCodes(promos: PromoCode[], isSyncPull = true): void {
     this.setStorageItem("billing_promo_codes", promos);
 
     if (supabase && !isSyncPull) {
